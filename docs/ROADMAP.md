@@ -24,26 +24,40 @@
 
 ### 🛠️ 具体实践方式
 
-#### Epic三层架构应用
+#### Epic分支架构应用 🎯
 ```
 develop (开发主分支)
-  ↑
-epic/mvp-core (MVP核心功能Epic)
-epic/enhanced-version (增强版本Epic)  
-epic/enterprise-features (企业级功能Epic)
-  ↑ ↑ ↑
-feature/project-infrastructure    # Week 1-2 基础设施
-feature/core-modules             # Week 1-2 核心模块
-feature/init-command            # Week 3-4 init命令
-feature/start-command           # Week 3-4 start命令
-feature/status-sync             # Week 5-6 状态和同步
-...
+  ↑             ↑
+docs/           mvp-core/
+roadmap-updates project-infrastructure    # Week 1-2 基础设施
+api-design      core-modules             # Week 1-2 核心模块  
+user-guide      init-command            # Week 3-4 init命令
+               start-command           # Week 3-4 start命令
+               status-sync             # Week 5-6 状态和同步
+               ...
 ```
 
+#### 分支与目录对应规则 ⚡
+**核心设计原则**: 零心智负担，机械转换
+
+| 分支名 | Worktree目录 | 转换规则 |
+|--------|-------------|----------|
+| `docs/roadmap-updates` | `.worktrees/docs--roadmap-updates` | `/` → `--` |
+| `mvp-core/project-infrastructure` | `.worktrees/mvp-core--project-infrastructure` | `/` → `--` |
+| `enhanced/ui-system` | `.worktrees/enhanced--ui-system` | `/` → `--` |
+
+**优势**:
+- ✅ 看到分支名立即知道worktree位置
+- ✅ 简单字符替换，无需记忆映射
+- ✅ 所有操作系统文件系统兼容
+- ✅ Git分支命名无冲突
+
 #### 工作树管理实践
-- 使用 `.worktrees/mvp-core` 目录进行MVP功能开发
-- 使用 `.worktrees/enhanced` 目录进行增强功能开发
-- 验证多工作树的并行开发体验
+- 使用 `.worktrees/docs--*` 目录进行文档维护和更新
+- 使用 `.worktrees/mvp-core--*` 目录进行MVP功能开发
+- 使用 `.worktrees/enhanced--*` 目录进行增强功能开发(未来)
+- **命名规范**: 分支名直接决定worktree路径，无需记忆映射关系
+- **文档同步策略**: 在 `docs/` 系列分支中维护文档，通过develop分支同步到其他功能分支
 
 #### PR策略验证
 - **子功能级PR**: 每个feature分支创建独立PR到对应Epic
