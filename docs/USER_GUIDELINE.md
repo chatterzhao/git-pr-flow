@@ -91,7 +91,7 @@ git-pr-flow start auth/login # 如果只有 start 没有后面参数，则会列
 ```
 🔍 分析子功能: auth/login
   ✔ 检测到功能: auth (已存在)
-  ✔ 工作树环境: .worktrees/auth
+  ✔ 工作树环境: .worktrees/auth--login
   ✔ 这是第一个子功能
 
 ? 依赖关系: (方向键选择)
@@ -103,7 +103,7 @@ git-pr-flow start auth/login # 如果只有 start 没有后面参数，则会列
   子功能: auth/login  
   功能组: auth
   依赖: 无 (基础功能)
-  工作环境: .worktrees/auth
+  工作环境: .worktrees/auth--register
   [Y/n] 
 ```
 
@@ -121,7 +121,7 @@ git-pr-flow start auth/login # 如果只有 start 没有后面参数，则会列
 ### 第4步：正常开发第一个功能
 
 ```bash
-# 现在你在 .worktrees/auth 目录中
+# 现在你在 .worktrees/auth--login 目录中
 # 正常开发，正常提交
 
 echo "实现登录功能" > src/auth/login.js
@@ -145,7 +145,7 @@ git-pr-flow start auth/register
 ```
 🔍 分析子功能: auth/register
   ✔ 检测到功能: auth (已存在)
-  ✔ 工作树环境: .worktrees/auth
+  ✔ 工作树环境: .worktrees/auth--login
   ⚠ 检测到相关分支: auth/login
 
 ? 依赖关系: (方向键选择)
@@ -332,6 +332,26 @@ git-pr-flow ready
 **结果：**
 - 有策略地控制PR提交时机
 - 平衡开发速度和审查质量
+
+## 📋 分支与目录对应规则
+
+### 🎯 核心设计原则：零心智负担
+
+Git PR Flow 使用简单的转换规则，让你看到分支名立即知道工作目录位置：
+
+| 分支名 | Worktree目录 | 说明 |
+|--------|-------------|------|
+| `auth/login` | `.worktrees/auth--login` | 登录功能开发 |
+| `auth/register` | `.worktrees/auth--register` | 注册功能开发 |
+| `payment/checkout` | `.worktrees/payment--checkout` | 支付功能开发 |
+
+**转换规则**：分支名中的 `/` 替换为目录名中的 `--`
+
+**为什么使用双横线？**
+- ✅ 所有操作系统文件系统都支持
+- ✅ 不会与Shell命令冲突  
+- ✅ Git分支命名完全兼容
+- ✅ 简单机械转换，无需记忆
 
 ## 🔄 日常使用技巧
 

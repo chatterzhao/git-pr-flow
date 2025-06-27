@@ -508,7 +508,7 @@ declare -A DEPENDENCY_CACHE
 #   "dependents": ["auth/register", "auth/2fa"],
 #   "commits_ahead": 3,
 #   "commits_behind": 0,
-#   "worktree_path": "/path/to/.worktrees/@epics/auth",
+#   "worktree_path": "/path/to/.worktrees/auth--login",
 #   "last_sync": "2024-01-01T10:00:00Z"
 # }
 
@@ -611,7 +611,7 @@ declare -r SYNC_EPIC="epic"
 #   ],
 #   "potential_conflicts": ["src/auth/utils.js"],
 #   "worktree_switches": [
-#     {"branch": "auth/register", "path": "/path/to/.worktrees/@epics/auth"}
+#     {"branch": "auth/register", "path": "/path/to/.worktrees/auth--register"}
 #   ]
 # }
 
@@ -736,16 +736,16 @@ execute_sync_operation() {
 **职责**: 工作树创建、清理、路径管理
 
 ```bash
-# 工作树布局
+# 工作树布局（新架构：分支名直接映射）
 # .worktrees/
-# ├── @epics/
-# │   ├── auth/           # Epic工作树，多分支共享
-# │   │   ├── .git        # 指向主仓库
-# │   │   └── ...
-# │   └── payment/
-# └── @temp/
-#     ├── feature-123/    # 临时独立工作树
-#     └── hotfix-456/
+# ├── auth--login/        # auth/login分支工作树
+# ├── auth--register/     # auth/register分支工作树 
+# ├── auth--2fa/          # auth/2fa分支工作树
+# ├── payment--checkout/  # payment/checkout分支工作树
+# ├── payment--refund/    # payment/refund分支工作树
+# └── hotfix--bug-123/    # hotfix/bug-123分支工作树
+#
+# 规则：分支名的 / 转换为目录名的 --
 
 create_epic_worktree() {
   local epic_name="$1"

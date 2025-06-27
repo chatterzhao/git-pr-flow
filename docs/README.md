@@ -45,7 +45,7 @@ Day 7: git checkout -b auth/2fa && 提交PR#4 (依赖PR#2，但PR#2还在修改)
 git-pr-flow init auth
 
 # 2. 并行开发多个子功能，每个都有独立环境
-git-pr-flow start auth/login                    # 在 .worktrees/auth 中开发
+git-pr-flow start auth/login                    # 在 .worktrees/auth--login 中开发
 git-pr-flow start auth/register --depends auth/login
 git-pr-flow start auth/2fa --depends auth/register  
 git-pr-flow start auth/social --depends auth/login
@@ -95,11 +95,10 @@ epic/auth (集成线) ← 功能完整性保证
 每个子功能都有独立的工作树，避免分支切换的上下文丢失
 ```bash
 .worktrees/
-├── auth/           # 用户认证系统工作树
-│   ├── login分支环境
-│   ├── register分支环境
-│   └── 2fa分支环境
-└── payment/        # 支付系统工作树
+├── auth--login/        # auth/login 分支工作树
+├── auth--register/     # auth/register 分支工作树  
+├── auth--2fa/          # auth/2fa 分支工作树
+└── payment--checkout/  # payment/checkout 分支工作树
 ```
 
 ### 📊 Epic进度仪表盘

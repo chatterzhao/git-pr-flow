@@ -29,11 +29,11 @@ $ git-pr-flow init
 
 🔍 已有Epic配置:
 ├─ auth (用户认证系统) - 创建于2天前
-│   └─ 基础分支: develop, 工作树: .worktrees/auth
+│   └─ 基础分支: develop, 工作树: .worktrees/auth--*
 ├─ payment (支付系统) - 创建于1周前  
-│   └─ 基础分支: main, 工作树: .worktrees/payment
+│   └─ 基础分支: main, 工作树: .worktrees/payment--*
 └─ dashboard (管理面板) - 创建于3天前
-    └─ 基础分支: develop, 工作树: .worktrees/dashboard
+    └─ 基础分支: develop, 工作树: .worktrees/dashboard--*
 
 ? 选择操作: (方向键选择)
   ❯ 创建新的Epic功能
@@ -64,7 +64,7 @@ $ git-pr-flow init auth
 ├─ Epic名称: auth (用户认证系统)
 ├─ 基础分支: develop  
 ├─ 架构类型: 完整架构
-├─ 工作树路径: .worktrees/auth
+├─ 工作树路径: .worktrees/auth--login (示例)
 ├─ 上次配置: 2天前
 └─ 配置版本: v1.0
 
@@ -123,7 +123,7 @@ description: 用户认证系统
 base_branch: develop
 architecture: complete
 epic_branch: epic/auth
-worktree_path: .worktrees/auth
+worktree_path: .worktrees/auth--login
 workflow_type: gitflow
 created_at: 2024-01-01T10:00:00Z
 config_version: "1.0"
@@ -201,7 +201,7 @@ $ git-pr-flow start auth/register
 
 🔍 分析子功能: auth/register
   ✔ 检测到功能: auth (已存在)
-  ✔ 工作树环境: .worktrees/auth
+  ✔ 工作树环境: .worktrees/auth--login
   ⚠ 检测到相关分支: auth/login
 
 ? 依赖关系: (方向键选择)
@@ -214,11 +214,11 @@ $ git-pr-flow start auth/register
   子功能: auth/register  
   功能组: auth
   依赖: auth/login
-  工作环境: .worktrees/auth (共享)
+  工作环境: .worktrees/auth--register (基于login分支)
   [Y/n] Y
 
 ✔ 子功能环境就绪
-ℹ 在 .worktrees/auth 中开发，专注于注册功能
+ℹ 在 .worktrees/auth--register 中开发，专注于注册功能
 ```
 
 **核心理念体现**：
@@ -279,7 +279,7 @@ epic/auth (集成线) - 3个子功能已集成
 ├─ Epic名称: auth (用户认证系统)
 ├─ 基础分支: develop
 ├─ Epic分支: epic/auth
-├─ 工作树路径: .worktrees/auth
+├─ 工作树路径: .worktrees/auth--login (示例)
 ├─ 创建时间: 3天前
 └─ 最后同步: 2小时前
 
@@ -739,11 +739,11 @@ disk_threshold = 1GB
 ```ini
 [epic "auth"]
 description = "用户认证系统"
-worktree_path = .worktrees/@epics/auth
+worktree_path = .worktrees/auth--login
 
 [epic "payment"]
 description = "支付系统"
-worktree_path = .worktrees/@epics/payment
+worktree_path = .worktrees/payment--checkout
 
 [branch "auth/login"]
 depends = main
@@ -796,7 +796,7 @@ git-pr status --json
     {
       "name": "auth",
       "description": "用户认证系统",
-      "worktree_path": ".worktrees/@epics/auth",
+      "worktree_path": ".worktrees/auth--login",
       "branches": [
         {
           "name": "auth/login",
@@ -815,7 +815,7 @@ git-pr status --json
   "temp_branches": [
     {
       "name": "hotfix/bug-123",
-      "worktree_path": ".worktrees/@temp/hotfix-bug-123",
+      "worktree_path": ".worktrees/hotfix--bug-123",
       "status": "draft",
       "pr_number": 67
     }
