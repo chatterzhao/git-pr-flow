@@ -1,0 +1,20 @@
+# Git PR Flow Epic配置文件
+# Epic: bug-fixes
+# 创建于: 2025-06-27T12:40:58Z
+
+epic_name: "bug-fixes"
+description: "bug-fixes Epic功能开发"
+base_branch: "develop"
+worktree_path: ".worktrees/bug-fixes"
+config_version: "1.0"
+created_at: "2025-06-27T12:40:58Z"
+last_updated: "2025-06-27T12:40:58Z"
+
+# 自动化设置
+auto_switch_branch: true
+auto_sync: false
+auto_cleanup: false
+
+# 工作流设置
+workflow_type: "gitflow"
+pr_strategy: "progressive"
