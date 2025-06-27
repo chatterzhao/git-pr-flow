@@ -29,7 +29,7 @@ cmd_init() {
     fi
     
     # 检查是否已存在Epic配置
-    if config_epic_exists; then
+    if config_epic_exists "$base_epic_name"; then
         handle_existing_epic_config "$base_epic_name"
         return $?
     fi
@@ -43,9 +43,11 @@ handle_init_interactive() {
     ui_header "Epic开发环境初始化"
     
     # 检查现有配置
-    if config_epic_exists; then
+    local current_epic
+    current_epic=$(detect_current_epic)
+    if [[ -n "$current_epic" ]] && config_epic_exists "$current_epic"; then
         ui_subheader "检测到已有Epic配置"
-        config_epic_show
+        config_epic_show "$current_epic"
         
         local options=(
             "使用现有配置 (快速启动)"
@@ -64,7 +66,7 @@ handle_init_interactive() {
                 ;;
             1) # 重新配置
                 local epic_name
-                epic_name=$(config_epic_get "epic_name")
+                epic_name=$(config_epic_get "epic_name" "$current_epic")
                 if ui_confirm "确定要重新配置Epic '$epic_name' 吗？"; then
                     init_new_epic "$epic_name"
                     return $?
@@ -105,11 +107,11 @@ handle_init_interactive() {
 handle_existing_epic_config() {
     local new_epic_name="$1"
     local existing_epic_name
-    existing_epic_name=$(config_epic_get "epic_name")
+    existing_epic_name=$(config_epic_get "epic_name" "$new_epic_name")
     
     if [[ "$new_epic_name" == "$existing_epic_name" ]]; then
         ui_info "Epic '$new_epic_name' 已经初始化"
-        config_epic_show
+        config_epic_show "$new_epic_name"
         
         if ui_confirm "是否要重新初始化？"; then
             init_new_epic "$new_epic_name"
@@ -171,9 +173,13 @@ init_new_epic() {
     echo "  工作树路径: $worktree_base_path"
     echo
     
-    if ! ui_confirm "确认创建Epic配置？"; then
-        ui_info "取消Epic创建"
-        return 1
+    if [[ -t 0 ]]; then
+        if ! ui_confirm "确认创建Epic配置？"; then
+            ui_info "取消Epic创建"
+            return 1
+        fi
+    else
+        ui_info "非交互式环境，自动确认创建Epic配置"
     fi
     
     # 5. 创建Epic分支
@@ -248,6 +254,14 @@ select_base_branch() {
     
     ui_info "检测到以下分支："
     
+    # 非交互式环境：自动选择第一个分支
+    if [[ ! -t 0 ]]; then
+        local selected_branch="${detected_branches[0]}"
+        ui_info "非交互式环境，自动选择: $selected_branch"
+        echo "$selected_branch"
+        return 0
+    fi
+    
     local choice
     choice=$(ui_select_menu "选择基础分支" "${branch_descriptions[@]}")
     
@@ -287,17 +301,24 @@ generate_worktree_path() {
 show_detailed_config() {
     ui_header "Epic配置详情"
     
-    if ! config_epic_validate; then
+    local current_epic
+    current_epic=$(detect_current_epic)
+    if [[ -z "$current_epic" ]]; then
+        ui_error "无法检测当前Epic"
+        return 1
+    fi
+    
+    if ! config_epic_validate "$current_epic"; then
         return 1
     fi
     
     local epic_name description base_branch worktree_path created_at config_version
-    epic_name=$(config_epic_get "epic_name")
-    description=$(config_epic_get "description")
-    base_branch=$(config_epic_get "base_branch")
-    worktree_path=$(config_epic_get "worktree_path")
-    created_at=$(config_epic_get "created_at")
-    config_version=$(config_epic_get "config_version")
+    epic_name=$(config_epic_get "epic_name" "$current_epic")
+    description=$(config_epic_get "description" "$current_epic")
+    base_branch=$(config_epic_get "base_branch" "$current_epic")
+    worktree_path=$(config_epic_get "worktree_path" "$current_epic")
+    created_at=$(config_epic_get "created_at" "$current_epic")
+    config_version=$(config_epic_get "config_version" "$current_epic")
     
     echo "📋 基本信息:"
     echo "  Epic名称: $epic_name"
@@ -309,14 +330,14 @@ show_detailed_config() {
     echo
     
     echo "🔧 自动化设置:"
-    echo "  自动分支切换: $(config_epic_get "auto_switch_branch")"
-    echo "  自动同步: $(config_epic_get "auto_sync")"
-    echo "  自动清理: $(config_epic_get "auto_cleanup")"
+    echo "  自动分支切换: $(config_epic_get "auto_switch_branch" "$current_epic")"
+    echo "  自动同步: $(config_epic_get "auto_sync" "$current_epic")"
+    echo "  自动清理: $(config_epic_get "auto_cleanup" "$current_epic")"
     echo
     
     echo "🔄 工作流设置:"
-    echo "  工作流类型: $(config_epic_get "workflow_type")"
-    echo "  PR策略: $(config_epic_get "pr_strategy")"
+    echo "  工作流类型: $(config_epic_get "workflow_type" "$current_epic")"
+    echo "  PR策略: $(config_epic_get "pr_strategy" "$current_epic")"
     echo
     
     # 检查工作树状态

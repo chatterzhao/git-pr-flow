@@ -8,13 +8,15 @@ cmd_start() {
     local input_feature_name="$1"
     
     # 检查Epic配置
-    if ! config_epic_exists; then
+    local current_epic
+    current_epic=$(detect_current_epic)
+    if [[ -z "$current_epic" ]] || ! config_epic_exists "$current_epic"; then
         ui_error "未找到Epic配置文件"
         ui_info "请先运行: git-pr-flow init <epic-name>"
         return 1
     fi
     
-    if ! config_epic_validate; then
+    if ! config_epic_validate "$current_epic"; then
         ui_error "Epic配置文件无效"
         return 1
     fi
@@ -44,11 +46,12 @@ cmd_start() {
 
 # 交互式启动处理
 handle_start_interactive() {
-    local epic_name
-    epic_name=$(config_epic_get "epic_name")
+    local current_epic epic_name
+    current_epic=$(detect_current_epic)
+    epic_name=$(config_epic_get "epic_name" "$current_epic")
     
     ui_header "开始子功能开发"
-    ui_info "当前Epic: $epic_name ($(config_epic_get "description"))"
+    ui_info "当前Epic: $epic_name ($(config_epic_get "description" "$current_epic"))"
     
     # 列出现有的子功能分支
     local existing_features=()
@@ -148,10 +151,11 @@ switch_to_existing_feature() {
 # 启动功能开发
 start_feature_development() {
     local feature_name="$1"
-    local epic_name base_branch
+    local current_epic epic_name base_branch
     
-    epic_name=$(config_epic_get "epic_name")
-    base_branch=$(config_epic_get "base_branch")
+    current_epic=$(detect_current_epic)
+    epic_name=$(config_epic_get "epic_name" "$current_epic")
+    base_branch=$(config_epic_get "base_branch" "$current_epic")
     
     ui_loading "启动功能开发: $feature_name"
     
@@ -218,8 +222,9 @@ execute_feature_start() {
     local worktree_path="$2"
     local dependencies="$3"
     
-    local base_branch
-    base_branch=$(config_epic_get "base_branch")
+    local current_epic base_branch
+    current_epic=$(detect_current_epic)
+    base_branch=$(config_epic_get "base_branch" "$current_epic")
     
     # 确定基础分支
     local base_for_branch="$base_branch"
@@ -262,8 +267,9 @@ perform_auto_branch_switch() {
     local feature_name="$1"
     
     # 检查是否启用自动分支切换
-    local auto_switch
-    auto_switch=$(config_epic_get "auto_switch_branch")
+    local current_epic auto_switch
+    current_epic=$(detect_current_epic)
+    auto_switch=$(config_epic_get "auto_switch_branch" "$current_epic")
     if [[ "$auto_switch" != "true" ]]; then
         ui_info "自动分支切换已禁用"
         return 0
@@ -336,8 +342,9 @@ show_feature_start_success() {
 # 依赖关系检测
 detect_feature_dependencies() {
     local feature_name="$1"
-    local epic_name
-    epic_name=$(config_epic_get "epic_name")
+    local current_epic epic_name
+    current_epic=$(detect_current_epic)
+    epic_name=$(config_epic_get "epic_name" "$current_epic")
     
     # 获取同Epic下的所有分支
     local epic_branches
@@ -369,7 +376,14 @@ detect_feature_dependencies() {
     
     echo
     
-    # 提供依赖选择
+    # 依赖关系选择 (支持非交互式环境)
+    if [[ ! -t 0 ]]; then
+        # 非交互式环境：自动选择无依赖
+        ui_info "非交互式环境，自动选择: 无依赖 (基于基础分支)"
+        return 0
+    fi
+    
+    # 交互式环境：提供选择菜单
     local dep_options=(
         "无依赖 (基于基础分支)"
         "智能推荐 (基于最新分支)"
@@ -404,13 +418,14 @@ detect_feature_dependencies() {
 
 # 显示Epic状态
 show_epic_status() {
-    local epic_name
-    epic_name=$(config_epic_get "epic_name")
+    local current_epic epic_name
+    current_epic=$(detect_current_epic)
+    epic_name=$(config_epic_get "epic_name" "$current_epic")
     
     ui_header "Epic状态: $epic_name"
     
     # 基本信息
-    config_epic_show
+    config_epic_show "$current_epic"
     
     # 分支状态
     local feature_branches
