@@ -219,6 +219,10 @@ $ git-pr-flow start auth/register
 
 ✔ 子功能环境就绪
 ℹ 在 .worktrees/auth--register 中开发，专注于注册功能
+
+💡 VS Code集成提示:
+  git-pr-flow code auth/register  # 在VS Code中打开此功能
+  git-pr-flow workspace           # 生成多Epic工作区配置
 ```
 
 **核心理念体现**：
@@ -558,6 +562,55 @@ $ git-pr-flow ready
 
 #### `git-pr-flow clean`
 清理工作树和分支
+
+#### `git-pr-flow code`
+在VS Code中打开指定功能工作树
+
+**语法**:
+```bash
+git-pr-flow code [功能分支名]
+```
+
+**示例**:
+```bash
+# 在VS Code中打开认证功能开发环境
+git-pr-flow code auth/login
+
+# 自动在VS Code中打开对应的worktree目录
+# 等同于: code .worktrees/auth--login
+```
+
+#### `git-pr-flow workspace`
+生成VS Code多Epic工作区配置文件
+
+**语法**:
+```bash
+git-pr-flow workspace [选项]
+```
+
+**示例**:
+```bash
+# 生成包含所有Epic的工作区文件
+git-pr-flow workspace
+
+# 生成指定Epic的工作区
+git-pr-flow workspace --epic auth,payment
+```
+
+**生成的工作区文件**:
+```json
+// git-pr-flow.code-workspace
+{
+  "folders": [
+    {"name": "Auth Epic", "path": ".worktrees/auth--login"},
+    {"name": "Payment Epic", "path": ".worktrees/payment--api"},
+    {"name": "Main Project", "path": "."}
+  ],
+  "settings": {
+    "git.detectSubmodules": false
+  }
+}
+```
 
 **语法**:
 ```bash

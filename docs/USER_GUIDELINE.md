@@ -353,6 +353,32 @@ Git PR Flow 使用简单的转换规则，让你看到分支名立即知道工�
 - ✅ Git分支命名完全兼容
 - ✅ 简单机械转换，无需记忆
 
+### 💡 VS Code集成建议
+
+**方案1: 多窗口开发** (推荐)
+```bash
+# 为每个主要Epic开启独立VS Code窗口
+code /path/to/.worktrees/auth--login     # 认证功能窗口
+code /path/to/.worktrees/payment--api    # 支付功能窗口
+```
+
+**方案2: Workspace配置**
+```json
+// .vscode/multi-epic.code-workspace
+{
+  "folders": [
+    {"path": ".worktrees/auth--login"},
+    {"path": ".worktrees/payment--api"},
+    {"path": "."}  // 主项目作为参考
+  ]
+}
+```
+
+**方案3: 推荐扩展**
+- 安装 `Git Worktree` 扩展 (PhilStainer.git-worktree)
+- 安装 `Git Worktrees` 扩展 (GitWorktrees.git-worktrees)
+- 提供统一的worktree管理界面
+
 ## 🔄 日常使用技巧
 
 ### 每天开始工作
