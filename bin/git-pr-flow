@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+
+# Git PR Flow - 高质量PR开发工具
+# Version: 0.1.0-mvp
+# Author: chatterzhao
+# Description: 让每个开发者都能轻松产出高质量PR，享受并行开发的乐趣
+
+set -euo pipefail
+
+# 项目根目录
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# 加载核心库
+source "$PROJECT_ROOT/lib/utils/common.sh"
+source "$PROJECT_ROOT/lib/utils/ui.sh"
+source "$PROJECT_ROOT/lib/utils/git.sh"
+source "$PROJECT_ROOT/lib/utils/config.sh"
+
+# 版本信息
+readonly VERSION="0.1.0-mvp"
+
+# 显示帮助信息
+show_help() {
+    cat << EOF
+Git PR Flow - 高质量PR开发工具
+
+使用方法:
+    git-pr-flow <command> [options]
+
+核心命令:
+    init [epic-name]     初始化Epic开发环境
+    start [feature]      开始子功能开发 (含自动分支切换)
+    status               查看Epic进度仪表盘
+    sync                 智能同步依赖关系
+    pr [feature]         创建智能PR
+    ready                Epic级策略性发布
+    clean                清理工作环境
+    code [feature]       在VS Code中打开指定功能
+    workspace            生成VS Code多Epic工作区
+
+全局选项:
+    -h, --help          显示帮助信息
+    -v, --version       显示版本信息
+    --debug             启用调试模式
+
+示例:
+    git-pr-flow init auth           # 初始化用户认证系统开发
+    git-pr-flow start auth/login    # 开始登录功能开发
+    git-pr-flow status              # 查看整体进度
+    git-pr-flow sync                # 同步依赖更新
+    git-pr-flow pr auth/login       # 创建登录功能PR
+
+特色功能:
+    🔄 自动分支切换 - 主仓库跟随worktree自动切换分支
+    🎯 VS Code集成 - 完美的Git可视化支持
+    📊 Epic仪表盘 - 实时进度和依赖关系展示
+
+更多信息: https://github.com/chatterzhao/git-pr-flow
+EOF
+}
+
+# 显示版本信息
+show_version() {
+    echo "Git PR Flow v$VERSION"
+    echo "高质量PR开发工具 - MVP版本"
+    echo "设计理念: 零心智负担的并行开发"
+}
+
+# 主函数
+main() {
+    # 解析全局选项
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -v|--version)
+                show_version
+                exit 0
+                ;;
+            --debug)
+                export GIT_PR_DEBUG=1
+                shift
+                ;;
+            -*)
+                ui_error "未知选项: $1"
+                show_help
+                exit 1
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    # 检查Git环境
+    if ! git_check_environment; then
+        ui_error "请在Git仓库中运行此命令"
+        exit 1
+    fi
+
+    # 执行命令
+    local command="${1:-}"
+    
+    if [[ -z "$command" ]]; then
+        show_help
+        exit 0
+    fi
+
+    case "$command" in
+        init)
+            shift
+            source "$PROJECT_ROOT/lib/commands/init.sh"
+            cmd_init "$@"
+            ;;
+        start)
+            shift
+            source "$PROJECT_ROOT/lib/commands/start.sh"
+            cmd_start "$@"
+            ;;
+        status)
+            shift
+            source "$PROJECT_ROOT/lib/commands/status.sh"
+            cmd_status "$@"
+            ;;
+        sync)
+            shift
+            source "$PROJECT_ROOT/lib/commands/sync.sh"
+            cmd_sync "$@"
+            ;;
+        pr)
+            shift
+            source "$PROJECT_ROOT/lib/commands/pr.sh"
+            cmd_pr "$@"
+            ;;
+        ready)
+            shift
+            source "$PROJECT_ROOT/lib/commands/ready.sh"
+            cmd_ready "$@"
+            ;;
+        clean)
+            shift
+            source "$PROJECT_ROOT/lib/commands/clean.sh"
+            cmd_clean "$@"
+            ;;
+        code)
+            shift
+            source "$PROJECT_ROOT/lib/commands/code.sh"
+            cmd_code "$@"
+            ;;
+        workspace)
+            shift
+            source "$PROJECT_ROOT/lib/commands/workspace.sh"
+            cmd_workspace "$@"
+            ;;
+        *)
+            ui_error "未知命令: $command"
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+# 错误处理
+trap 'handle_error $? $LINENO' ERR
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    
+    if [[ $exit_code -ne 0 ]]; then
+        ui_error "命令执行失败 (退出码: $exit_code, 行号: $line_number)"
+        if [[ "${GIT_PR_DEBUG:-}" == "1" ]]; then
+            echo "调试信息: 可能的原因包括Git环境异常、权限问题或配置错误" >&2
+        fi
+    fi
+    
+    exit $exit_code
+}
+
+# 运行主函数
+main "$@"
