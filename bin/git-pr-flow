@@ -22,161 +22,53 @@ readonly VERSION="0.1.0-mvp"
 
 # 显示帮助信息
 show_help() {
-    local format="${1:-text}"
-    
-    if [[ "$format" == "json" ]]; then
-        show_help_json
-        return 0
-    fi
-    
     cat << EOF
-Git PR Flow - 高质量PR开发工具
-AI友好的Epic级项目管理工具
+Git PR Flow - 让复杂项目自然产出高质量PR
 
-语法:
-    git-pr-flow <command> [args...] [options]
+目的: 解决大功能开发中的PR质量问题
+- 功能太大无法拆分，导致巨型PR难审查
+- 多个子功能相互依赖，提交时机难控制  
+- 分支切换频繁，开发上下文经常丢失
 
-🔧 核心命令:
-    init [epic-name]           初始化Epic开发环境
-    start <epic/feature>       开始子功能开发 (自动分支切换)
-    status [--json]            查看Epic进度仪表盘  
-    sync [--dry-run]           智能同步依赖关系
-    pr <epic/feature>          创建智能PR
-    ready [epic-name]          Epic级策略性发布
-    clean [--force]            清理工作环境
-    code <epic/feature>        在VS Code中打开指定功能
-    workspace [--epic <name>]  生成VS Code多Epic工作区
+解决方案: Epic三层架构 + 并行工作树
+- Epic作为功能集合，子功能独立开发
+- 每个功能有独立工作环境，避免切换
+- 智能依赖管理，控制PR提交时机
 
-🔍 查询命令:
-    help [command] [--json]    显示帮助信息
-    version [--json]           显示版本信息
+基本使用流程:
+  1. 初始化Epic: git-pr-flow init user-auth
+  2. 开发子功能:   git-pr-flow start user-auth/login  
+  3. 查看进度:     git-pr-flow status
+  4. 提交PR:      git-pr-flow pr user-auth/login
+  5. Epic发布:    git-pr-flow ready user-auth
 
-⚙️  全局选项:
-    -h, --help                 显示帮助信息
-    -v, --version              显示版本信息
-    --debug                    启用调试模式
-    --json                     JSON格式输出 (适合AI解析)
+命令说明:
+  init <epic-name>      创建Epic开发环境和配置
+  start <epic/feature>  开始子功能开发，创建独立工作树
+  status               显示Epic进度和分支状态
+  pr <epic/feature>    为子功能创建PR
+  ready <epic-name>    Epic完成，准备发布
+  clean                清理已合并的分支和工作树
 
-📋 参数格式:
-    epic-name       ✓ 小写字母、数字、连字符 (如: user-auth, payment-api)
-    epic/feature    ✓ Epic名/功能名格式 (如: auth/login, payment/checkout)
+特点:
+- 非交互式友好，AI和脚本可直接调用
+- 自动选择合理默认值，减少决策负担
+- 清晰的状态反馈，便于理解执行结果
 
-🤖 AI使用提示:
-    • 所有命令支持非交互式模式，会自动选择合理默认值
-    • 使用 --json 选项获取结构化输出，便于解析
-    • 错误信息统一输出到stderr，便于分离正常输出
-    • 退出码: 0=成功, 1=一般错误, 2=参数错误
+参数格式:
+  epic-name: 小写字母数字连字符 (如: user-auth, payment-api)
+  epic/feature: Epic名/功能名 (如: user-auth/login)
 
-📖 常用工作流:
-    1. 初始化Epic:        git-pr-flow init my-epic
-    2. 开始功能开发:      git-pr-flow start my-epic/feature-1
-    3. 查看进度:          git-pr-flow status --json
-    4. 创建PR:            git-pr-flow pr my-epic/feature-1
-    5. Epic发布:          git-pr-flow ready my-epic
+示例项目结构:
+  .worktrees/user-auth--login/     # 登录功能独立开发环境
+  .worktrees/user-auth--register/  # 注册功能独立开发环境
+  .worktrees/payment--checkout/    # 支付功能独立开发环境
 
-📚 获取详细帮助:
-    git-pr-flow help <command>     # 命令详细说明
-    git-pr-flow help --json        # JSON格式帮助信息
-
-🔗 更多信息: https://github.com/chatterzhao/git-pr-flow
+获取帮助: git-pr-flow help
+版本信息: git-pr-flow --version
 EOF
 }
 
-# JSON格式帮助信息 (AI友好)
-show_help_json() {
-    cat << 'EOF'
-{
-  "tool": {
-    "name": "git-pr-flow",
-    "version": "0.1.0-mvp",
-    "description": "AI友好的Epic级高质量PR开发工具",
-    "purpose": "让AI和开发者都能轻松管理复杂项目的并行开发"
-  },
-  "commands": {
-    "init": {
-      "syntax": "git-pr-flow init [epic-name]",
-      "description": "初始化Epic开发环境", 
-      "parameters": {
-        "epic-name": {
-          "type": "string",
-          "required": false,
-          "pattern": "^[a-z0-9-]+$",
-          "description": "Epic名称，支持小写字母、数字、连字符"
-        }
-      },
-      "non_interactive": true,
-      "ai_usage": "自动选择合理的基础分支和默认配置"
-    },
-    "start": {
-      "syntax": "git-pr-flow start <epic/feature>",
-      "description": "开始子功能开发，创建worktree和分支",
-      "parameters": {
-        "epic/feature": {
-          "type": "string", 
-          "required": true,
-          "pattern": "^[a-z0-9-]+/[a-z0-9-]+$",
-          "example": "auth/login",
-          "description": "功能分支名，格式: epic名/功能名"
-        }
-      },
-      "features": ["自动分支切换", "worktree管理", "依赖检测"],
-      "non_interactive": true
-    },
-    "status": {
-      "syntax": "git-pr-flow status [--json]",
-      "description": "查看Epic进度仪表盘",
-      "options": {
-        "--json": "输出JSON格式，便于AI解析"
-      },
-      "output_format": ["text", "json"],
-      "non_interactive": true
-    },
-    "help": {
-      "syntax": "git-pr-flow help [command] [--json]",
-      "description": "显示帮助信息",
-      "options": {
-        "--json": "JSON格式输出",
-        "command": "特定命令的详细帮助"
-      }
-    }
-  },
-  "workflow": {
-    "typical_usage": [
-      "git-pr-flow init my-epic",
-      "git-pr-flow start my-epic/feature-1", 
-      "git-pr-flow status --json",
-      "git-pr-flow pr my-epic/feature-1",
-      "git-pr-flow ready my-epic"
-    ],
-    "ai_friendly_features": [
-      "非交互式模式支持",
-      "JSON格式输出",
-      "结构化错误信息", 
-      "一致的退出码",
-      "自动选择默认值"
-    ]
-  },
-  "global_options": {
-    "--json": "JSON格式输出 (推荐AI使用)",
-    "--debug": "启用调试信息输出到stderr",
-    "--help": "显示帮助信息",
-    "--version": "显示版本信息"
-  },
-  "exit_codes": {
-    "0": "成功",
-    "1": "一般错误",
-    "2": "参数错误",
-    "3": "环境错误 (如不在Git仓库中)"
-  },
-  "ai_best_practices": {
-    "output_parsing": "使用--json选项获取结构化输出",
-    "error_handling": "检查退出码和stderr输出",
-    "batch_operations": "命令支持非交互式批量执行",
-    "state_management": "通过status命令了解当前状态"
-  }
-}
-EOF
-}
 
 # 显示版本信息
 show_version() {
@@ -274,23 +166,7 @@ main() {
             cmd_workspace "$@"
             ;;
         help)
-            shift
-            # 解析help命令的选项
-            local help_format="text"
-            while [[ $# -gt 0 ]]; do
-                case $1 in
-                    --json)
-                        help_format="json"
-                        shift
-                        ;;
-                    *)
-                        # TODO: 实现特定命令的详细帮助
-                        ui_error "暂不支持特定命令帮助: $1"
-                        shift
-                        ;;
-                esac
-            done
-            show_help "$help_format"
+            show_help
             ;;
         *)
             ui_error "未知命令: $command"
