@@ -46,6 +46,24 @@ worktree_path_to_branch() {
     echo "${branch_part//--/\/}"
 }
 
+# 时间戳函数
+current_iso_timestamp() {
+    date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+current_local_timestamp() {
+    date +"%Y-%m-%d %H:%M:%S"
+}
+
+# 确保目录存在
+ensure_dir() {
+    local dir_path="$1"
+    if [[ ! -d "$dir_path" ]]; then
+        mkdir -p "$dir_path"
+        log_debug "创建目录: $dir_path"
+    fi
+}
+
 # 检查命令是否存在
 command_exists() {
     command -v "$1" >/dev/null 2>&1
