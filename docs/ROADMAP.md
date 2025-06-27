@@ -69,6 +69,24 @@ user-guide      init-command            # Week 3-4 init命令
 - 记录使用过程中的不便之处
 - 根据实际使用体验改进命令设计
 
+#### VS Code集成优化 🆕
+**核心改进**: 自动分支切换解决Git可视化问题
+
+```bash
+# 当执行 git-pr-flow start 时的完整流程
+git-pr-flow start auth/login
+# 1. 在 .worktrees/auth--login 中创建/切换工作环境
+# 2. 主仓库自动切换到 auth/login 分支 (如果不冲突)
+# 3. VS Code Git面板现在可以显示 auth/login 的文件变更
+# 4. 实现真正的"无缝开发体验"
+```
+
+**设计原则**:
+- 分支切换不影响其他worktree的工作
+- 如果主仓库正在使用目标分支，则跳过切换
+- 自动检测并处理分支冲突情况
+- 为用户提供清晰的切换状态反馈
+
 ### 📝 Dogfooding检查清单
 
 每个开发阶段都要问自己：
@@ -125,6 +143,8 @@ user-guide      init-command            # Week 3-4 init命令
   - [ ] 子功能分支创建
   - [ ] 依赖关系检测
   - [ ] 工作树切换逻辑
+  - [ ] **自动分支切换** - 主仓库跟随worktree切换 🆕
+  - [ ] VS Code Git面板集成优化
 
 #### Week 5-6: 状态和同步
 - [ ] **status命令实现**

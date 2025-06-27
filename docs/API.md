@@ -156,12 +156,17 @@ config_version: "1.0"
 ---
 
 #### `git-pr-flow start`
-开始新的子功能开发
+开始新的子功能开发 (含自动分支切换)
 
 **语法**:
 ```bash
-git-pr-flow start [子功能名]
+git-pr-flow start [子功能名] [选项]
 ```
+
+**新功能**: 自动分支切换
+- 主仓库自动切换到对应的功能分支
+- 使VS Code Git面板显示当前功能的文件变更
+- 解决worktree环境下的Git可视化问题
 
 **无参数使用** (列出现有子功能):
 ```bash
@@ -223,6 +228,10 @@ $ git-pr-flow start auth/register
 💡 VS Code集成提示:
   git-pr-flow code auth/register  # 在VS Code中打开此功能
   git-pr-flow workspace           # 生成多Epic工作区配置
+
+🔄 自动分支切换:
+  主仓库自动切换到 auth/register 分支 (如果可用)
+  便于VS Code Git面板显示当前功能的文件变更
 ```
 
 **核心理念体现**：
