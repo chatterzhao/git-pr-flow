@@ -5,7 +5,7 @@
 
 # start命令主函数
 cmd_start() {
-    local feature_name="$1"
+    local input_feature_name="$1"
     
     # 检查Epic配置
     if ! config_epic_exists; then
@@ -20,22 +20,26 @@ cmd_start() {
     fi
     
     # 如果没有提供功能名称，显示交互式选择
-    if [[ -z "$feature_name" ]]; then
+    if [[ -z "$input_feature_name" ]]; then
         if ! handle_start_interactive; then
             return 1
         fi
         return 0
     fi
     
+    # 标准化功能名称 (支持输入 epic/user-auth/login 或 user-auth/login)
+    local normalized_feature_name
+    normalized_feature_name=$(normalize_feature_name "$input_feature_name")
+    
     # 验证功能名称格式
-    if ! is_valid_feature_name "$feature_name"; then
-        ui_error "无效的功能名称: $feature_name"
-        ui_info "功能名称格式: epic-name/feature-name，如: auth/login, user-profile/avatar"
+    if ! is_valid_feature_name "$normalized_feature_name"; then
+        ui_error "无效的功能名称: $normalized_feature_name"
+        ui_info "功能名称格式: epic/epic-name/feature-name，如: epic/auth/login, epic/user-profile/avatar"
         return 1
     fi
     
     # 执行功能开发启动
-    start_feature_development "$feature_name"
+    start_feature_development "$normalized_feature_name"
 }
 
 # 交互式启动处理
@@ -442,37 +446,35 @@ show_epic_status() {
 is_valid_feature_name() {
     local feature_name="$1"
     
-    # 必须包含一个斜杠
-    if [[ ! "$feature_name" =~ / ]]; then
-        return 1
+    # 支持 epic/user-auth/login 格式
+    if [[ "$feature_name" =~ ^epic/([^/]+)/([^/]+)$ ]]; then
+        local epic_part="${BASH_REMATCH[1]}"
+        local feature_part="${BASH_REMATCH[2]}"
+        
+        # Epic部分验证
+        if ! is_valid_epic_name "$epic_part"; then
+            return 1
+        fi
+        
+        # 功能部分验证
+        if [[ -z "$feature_part" ]]; then
+            return 1
+        fi
+        
+        # 功能名称格式检查
+        if [[ ! "$feature_part" =~ ^[a-z0-9-]+$ ]]; then
+            return 1
+        fi
+        
+        # 不能以连字符开头或结尾
+        if [[ "$feature_part" =~ ^- ]] || [[ "$feature_part" =~ -$ ]]; then
+            return 1
+        fi
+        
+        return 0
     fi
     
-    # 解析Epic和功能名称
-    local epic_part feature_part
-    epic_part="${feature_name%%/*}"
-    feature_part="${feature_name#*/}"
-    
-    # Epic部分验证
-    if ! is_valid_epic_name "$epic_part"; then
-        return 1
-    fi
-    
-    # 功能部分验证
-    if [[ -z "$feature_part" ]]; then
-        return 1
-    fi
-    
-    # 功能名称格式检查
-    if [[ ! "$feature_part" =~ ^[a-z0-9-]+$ ]]; then
-        return 1
-    fi
-    
-    # 不能以连字符开头或结尾
-    if [[ "$feature_part" =~ ^- ]] || [[ "$feature_part" =~ -$ ]]; then
-        return 1
-    fi
-    
-    return 0
+    return 1
 }
 
 # 解析功能名称
@@ -481,17 +483,26 @@ parse_feature_name() {
     local epic_var="$2"
     local feature_var="$3"
     
-    if [[ ! "$feature_name" =~ / ]]; then
-        return 1
+    # 支持 epic/user-auth/login 格式
+    if [[ "$feature_name" =~ ^epic/([^/]+)/(.+)$ ]]; then
+        local epic_part="${BASH_REMATCH[1]}"
+        local feature_part="${BASH_REMATCH[2]}"
+        
+        # 使用eval设置变量
+        eval "$epic_var=\"$epic_part\""
+        eval "$feature_var=\"$feature_part\""
+        return 0
     fi
     
-    local epic_part feature_part
-    epic_part="${feature_name%%/*}"
-    feature_part="${feature_name#*/}"
+    # 兼容旧格式 user-auth/login (自动转换)
+    if [[ "$feature_name" =~ ^([^/]+)/(.+)$ ]]; then
+        local epic_part="${BASH_REMATCH[1]}"
+        local feature_part="${BASH_REMATCH[2]}"
+        
+        eval "$epic_var=\"$epic_part\""
+        eval "$feature_var=\"$feature_part\""
+        return 0
+    fi
     
-    # 使用eval设置变量（注意：在实际脚本中，考虑安全性）
-    eval "$epic_var=\"$epic_part\""
-    eval "$feature_var=\"$feature_part\""
-    
-    return 0
+    return 1
 }

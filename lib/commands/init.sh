@@ -5,31 +5,37 @@
 
 # init命令主函数
 cmd_init() {
-    local epic_name="$1"
+    local input_epic_name="$1"
     
     # 如果没有提供Epic名称，显示现有配置或提示输入
-    if [[ -z "$epic_name" ]]; then
+    if [[ -z "$input_epic_name" ]]; then
         if ! handle_init_interactive; then
             return 1
         fi
         return 0
     fi
     
-    # 验证Epic名称
-    if ! is_valid_epic_name "$epic_name"; then
-        ui_error "无效的Epic名称: $epic_name"
+    # 标准化Epic名称 (支持输入epic/user-auth或user-auth)
+    local base_epic_name
+    base_epic_name=$(get_base_epic_name "$input_epic_name")
+    local epic_branch_name
+    epic_branch_name=$(normalize_epic_name "$input_epic_name")
+    
+    # 验证基础Epic名称
+    if ! is_valid_epic_name "$base_epic_name"; then
+        ui_error "无效的Epic名称: $base_epic_name"
         ui_info "Epic名称应该使用小写字母、数字和连字符，如: auth, user-profile, payment-system"
         return 1
     fi
     
     # 检查是否已存在Epic配置
     if config_epic_exists; then
-        handle_existing_epic_config "$epic_name"
+        handle_existing_epic_config "$base_epic_name"
         return $?
     fi
     
     # 执行新Epic初始化
-    init_new_epic "$epic_name"
+    init_new_epic "$base_epic_name" "$epic_branch_name"
 }
 
 # 交互式初始化处理
@@ -127,15 +133,22 @@ handle_existing_epic_config() {
 
 # 初始化新Epic
 init_new_epic() {
-    local epic_name="$1"
+    local base_epic_name="$1"
+    local epic_branch_name="$2"
     
-    ui_loading "正在初始化Epic: $epic_name"
+    ui_loading "正在初始化Epic: $base_epic_name (分支: $epic_branch_name)"
     
     # 1. 获取Epic描述
     local description
-    description=$(ui_input "Epic描述" "")
-    if [[ -z "$description" ]]; then
-        description="$epic_name Epic功能开发"
+    if [[ ! -t 0 ]]; then
+        # 非交互式模式，使用默认描述
+        description="$base_epic_name Epic功能开发"
+        ui_info "使用默认描述: $description"
+    else
+        description=$(ui_input "Epic描述" "$base_epic_name Epic功能开发")
+        if [[ -z "$description" ]]; then
+            description="$base_epic_name Epic功能开发"
+        fi
     fi
     
     # 2. 智能检测和选择基分支
@@ -145,13 +158,14 @@ init_new_epic() {
         return 1
     fi
     
-    # 3. 生成工作树路径
+    # 3. 生成工作树路径 (使用epic--前缀)
     local worktree_base_path
-    worktree_base_path=$(generate_worktree_path "$epic_name")
+    worktree_base_path=$(generate_epic_worktree_path "$base_epic_name")
     
     # 4. 确认配置
     ui_subheader "配置确认"
-    echo "  Epic名称: $epic_name"
+    echo "  Epic名称: $base_epic_name"
+    echo "  Epic分支: $epic_branch_name"
     echo "  描述: $description"
     echo "  基础分支: $base_branch"
     echo "  工作树路径: $worktree_base_path"
@@ -162,16 +176,25 @@ init_new_epic() {
         return 1
     fi
     
-    # 5. 创建Epic配置文件
-    config_epic_create "$epic_name" "$description" "$base_branch" "$worktree_base_path"
+    # 5. 创建Epic分支
+    ui_loading "创建Epic分支: $epic_branch_name"
+    if ! git_create_epic_branch "$epic_branch_name" "$base_branch"; then
+        ui_error "Epic分支创建失败"
+        return 1
+    fi
     
-    # 6. 创建工作树目录结构
+    # 6. 创建Epic配置文件
+    config_epic_create "$base_epic_name" "$description" "$base_branch" "$worktree_base_path" "$epic_branch_name"
+    
+    # 7. 创建工作树目录结构
     ensure_dir "$(dirname "$worktree_base_path")"
     
-    # 7. 显示后续步骤
-    show_next_steps "$epic_name"
+    # 8. 显示后续步骤
+    show_next_steps "$base_epic_name"
     
-    ui_success "Epic '$epic_name' 初始化完成！"
+    ui_success "Epic '$base_epic_name' 初始化完成！"
+    ui_info "Epic分支: $epic_branch_name"
+    ui_info "工作树路径: $worktree_base_path"
     return 0
 }
 
@@ -248,7 +271,13 @@ select_base_branch() {
     fi
 }
 
-# 生成工作树路径
+# 生成Epic工作树路径 (带epic--前缀)
+generate_epic_worktree_path() {
+    local base_epic_name="$1"
+    echo ".worktrees/epic--$base_epic_name"
+}
+
+# 旧版本兼容 (已废弃)
 generate_worktree_path() {
     local epic_name="$1"
     echo ".worktrees/$epic_name"

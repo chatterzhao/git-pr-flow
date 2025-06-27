@@ -115,6 +115,15 @@ git_create_branch() {
     return 0
 }
 
+# 创建Epic分支 (基于现有函数的封装)
+git_create_epic_branch() {
+    local epic_branch_name="$1"
+    local base_branch="$2"
+    
+    ui_info "基于 '$base_branch' 创建Epic分支: $epic_branch_name"
+    git_create_branch "$epic_branch_name" "$base_branch"
+}
+
 # 切换分支
 git_checkout_branch() {
     local branch_name="$1"
