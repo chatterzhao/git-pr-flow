@@ -46,6 +46,32 @@ worktree_path_to_branch() {
     echo "${branch_part//--/\/}"
 }
 
+# Epic名称标准化 (确保有epic/前缀)
+normalize_epic_name() {
+    local epic_name="$1"
+    if [[ "$epic_name" =~ ^epic/ ]]; then
+        echo "$epic_name"
+    else
+        echo "epic/$epic_name"
+    fi
+}
+
+# 去除epic/前缀获取基础名称
+get_base_epic_name() {
+    local epic_name="$1"
+    echo "${epic_name#epic/}"
+}
+
+# 子功能名称标准化 (确保有epic/前缀)
+normalize_feature_name() {
+    local feature_name="$1"
+    if [[ "$feature_name" =~ ^epic/ ]]; then
+        echo "$feature_name"
+    else
+        echo "epic/$feature_name"
+    fi
+}
+
 # 时间戳函数
 current_iso_timestamp() {
     date -u +"%Y-%m-%dT%H:%M:%SZ"
