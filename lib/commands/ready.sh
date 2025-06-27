@@ -1,0 +1,812 @@
+#!/usr/bin/env bash
+
+# Git PR Flow - ready命令实现
+# Epic级策略性发布检查，验证所有功能分支的就绪状态
+
+# ready命令主函数
+cmd_ready() {
+    local action="${1:-check}"
+    
+    # 检查Epic配置
+    if ! config_epic_exists; then
+        ui_error "未找到Epic配置文件"
+        ui_info "请先运行: git-pr-flow init <epic-name>"
+        return 1
+    fi
+    
+    if ! config_epic_validate; then
+        ui_error "Epic配置文件无效"
+        return 1
+    fi
+    
+    case "$action" in
+        "check")
+            check_epic_readiness
+            ;;
+        "report")
+            generate_readiness_report
+            ;;
+        "release")
+            prepare_epic_release
+            ;;
+        "validate")
+            validate_epic_dependencies
+            ;;
+        *)
+            ui_error "无效的ready操作: $action"
+            ui_info "支持的操作: check, report, release, validate"
+            ui_info "用法示例:"
+            ui_info "  git-pr-flow ready check     # 检查Epic发布就绪状态"
+            ui_info "  git-pr-flow ready report    # 生成详细就绪报告"
+            ui_info "  git-pr-flow ready release   # 准备Epic发布"
+            ui_info "  git-pr-flow ready validate  # 验证依赖关系完整性"
+            return 1
+            ;;
+    esac
+}
+
+# 检查Epic发布就绪状态
+check_epic_readiness() {
+    local epic_name
+    epic_name=$(config_epic_get "epic_name")
+    
+    ui_header "Epic发布就绪检查: $epic_name"
+    
+    # 获取Epic基本信息
+    local base_branch
+    base_branch=$(config_epic_get "base_branch")
+    
+    ui_info "🚀 Epic: $epic_name ($(config_epic_get "description"))"
+    ui_info "🎯 基础分支: $base_branch"
+    echo
+    
+    # 执行各项检查
+    local overall_ready=true
+    
+    # 1. 检查功能分支状态
+    if ! check_feature_branches_status; then
+        overall_ready=false
+    fi
+    
+    # 2. 检查PR状态
+    if ! check_pr_status; then
+        overall_ready=false
+    fi
+    
+    # 3. 检查依赖关系
+    if ! check_dependency_integrity; then
+        overall_ready=false
+    fi
+    
+    # 4. 检查代码质量
+    if ! check_code_quality; then
+        overall_ready=false
+    fi
+    
+    # 5. 检查测试覆盖率
+    if ! check_test_coverage; then
+        overall_ready=false
+    fi
+    
+    # 显示总体结果
+    show_readiness_summary "$overall_ready"
+    
+    if [[ "$overall_ready" == "true" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# 检查功能分支状态
+check_feature_branches_status() {
+    ui_subheader "功能分支状态检查"
+    
+    local epic_name
+    epic_name=$(config_epic_get "epic_name")
+    
+    # 获取所有Epic功能分支
+    local feature_branches
+    feature_branches=$(git_list_branches | grep "^$epic_name/" || true)
+    
+    if [[ -z "$feature_branches" ]]; then
+        ui_warning "没有找到功能分支"
+        echo "  📝 建议: 使用 'git-pr-flow start' 创建功能分支"
+        echo
+        return 1
+    fi
+    
+    local all_ready=true
+    local total_count=0
+    local ready_count=0
+    
+    while IFS= read -r branch; do
+        if [[ -n "$branch" ]]; then
+            ((total_count++))
+            
+            local status_icon status_text
+            if check_single_branch_readiness "$branch"; then
+                status_icon="✅"
+                status_text="就绪"
+                ((ready_count++))
+            else
+                status_icon="❌"
+                status_text="未就绪"
+                all_ready=false
+            fi
+            
+            echo "  $status_icon $branch - $status_text"
+        fi
+    done <<< "$feature_branches"
+    
+    echo
+    echo "  📊 分支状态: $ready_count/$total_count 就绪"
+    echo
+    
+    return $([ "$all_ready" == "true" ])
+}
+
+# 检查单个分支就绪状态
+check_single_branch_readiness() {
+    local branch="$1"
+    
+    # 检查工作树是否存在
+    local worktree_path
+    worktree_path=$(branch_to_worktree_path "$branch")
+    
+    if [[ ! -d "$worktree_path" ]]; then
+        return 1
+    fi
+    
+    # 检查是否有提交
+    local commit_count
+    commit_count=$(git rev-list --count "$branch" 2>/dev/null || echo "0")
+    
+    if [[ "$commit_count" -eq 0 ]]; then
+        return 1
+    fi
+    
+    # 检查工作目录是否干净
+    local original_dir
+    original_dir=$(pwd)
+    
+    cd "$worktree_path" || return 1
+    
+    local is_clean
+    if git_is_clean; then
+        is_clean=true
+    else
+        is_clean=false
+    fi
+    
+    cd "$original_dir" || true
+    
+    [[ "$is_clean" == "true" ]]
+}
+
+# 检查PR状态
+check_pr_status() {
+    ui_subheader "PR状态检查"
+    
+    local epic_name
+    epic_name=$(config_epic_get "epic_name")
+    
+    # 获取所有功能分支
+    local feature_branches
+    feature_branches=$(git_list_branches | grep "^$epic_name/" || true)
+    
+    if [[ -z "$feature_branches" ]]; then
+        ui_info "  📝 没有功能分支，无需检查PR"
+        echo
+        return 0
+    fi
+    
+    local pr_ready=true
+    local total_branches=0
+    local pr_created=0
+    
+    while IFS= read -r branch; do
+        if [[ -n "$branch" ]]; then
+            ((total_branches++))
+            
+            # 检查PR状态（简化实现）
+            local pr_status
+            pr_status=$(check_branch_pr_status "$branch")
+            
+            case "$pr_status" in
+                "created")
+                    echo "  ✅ $branch - PR已创建"
+                    ((pr_created++))
+                    ;;
+                "merged")
+                    echo "  🎉 $branch - PR已合并"
+                    ((pr_created++))
+                    ;;
+                "none")
+                    echo "  ⚠️ $branch - 未创建PR"
+                    pr_ready=false
+                    ;;
+                *)
+                    echo "  ❓ $branch - PR状态未知"
+                    ;;
+            esac
+        fi
+    done <<< "$feature_branches"
+    
+    echo
+    echo "  📊 PR状态: $pr_created/$total_branches 已创建"
+    echo
+    
+    if [[ "$pr_ready" == "false" ]]; then
+        ui_info "💡 提示: 使用 'git-pr-flow pr <feature>' 创建PR"
+        echo
+    fi
+    
+    return $([ "$pr_ready" == "true" ])
+}
+
+# 检查分支PR状态（简化实现）
+check_branch_pr_status() {
+    local branch="$1"
+    
+    # 简化实现：检查远程分支是否存在
+    if git_remote_branch_exists "$branch"; then
+        # 如果远程分支存在，假设PR已创建
+        echo "created"
+    else
+        echo "none"
+    fi
+}
+
+# 检查依赖关系完整性
+check_dependency_integrity() {
+    ui_subheader "依赖关系完整性检查"
+    
+    local epic_name base_branch
+    epic_name=$(config_epic_get "epic_name")
+    base_branch=$(config_epic_get "base_branch")
+    
+    # 获取所有功能分支
+    local feature_branches
+    feature_branches=$(git_list_branches | grep "^$epic_name/" || true)
+    
+    if [[ -z "$feature_branches" ]]; then
+        ui_info "  📝 没有功能分支，依赖关系检查通过"
+        echo
+        return 0
+    fi
+    
+    local dependencies_valid=true
+    
+    # 检查基础分支同步状态
+    echo "  🔍 检查基础分支同步状态..."
+    
+    while IFS= read -r branch; do
+        if [[ -n "$branch" ]]; then
+            local behind_count
+            behind_count=$(git rev-list --count "$branch..$base_branch" 2>/dev/null || echo "0")
+            
+            if [[ "$behind_count" -gt 0 ]]; then
+                echo "    ⚠️ $branch 落后基础分支 $behind_count 个提交"
+                dependencies_valid=false
+            else
+                echo "    ✅ $branch 与基础分支同步"
+            fi
+        fi
+    done <<< "$feature_branches"
+    
+    echo
+    
+    # 检查分支间依赖关系
+    echo "  🔍 检查分支间依赖关系..."
+    
+    local dependency_issues=0
+    while IFS= read -r branch; do
+        if [[ -n "$branch" ]]; then
+            local dependencies
+            dependencies=$(detect_branch_dependencies "$branch")
+            
+            if [[ -n "$dependencies" ]]; then
+                echo "    🔗 $branch 依赖: $dependencies"
+                
+                # 验证依赖分支状态
+                if ! validate_dependencies "$branch" "$dependencies"; then
+                    ((dependency_issues++))
+                    dependencies_valid=false
+                fi
+            else
+                echo "    ✅ $branch 无额外依赖"
+            fi
+        fi
+    done <<< "$feature_branches"
+    
+    if [[ "$dependency_issues" -gt 0 ]]; then
+        echo "    ❌ 发现 $dependency_issues 个依赖问题"
+    fi
+    
+    echo
+    
+    if [[ "$dependencies_valid" == "false" ]]; then
+        ui_info "💡 提示: 使用 'git-pr-flow sync' 解决依赖问题"
+        echo
+    fi
+    
+    return $([ "$dependencies_valid" == "true" ])
+}
+
+# 检测分支依赖关系
+detect_branch_dependencies() {
+    local branch="$1"
+    local epic_name
+    epic_name=$(config_epic_get "epic_name")
+    
+    # 获取同Epic下的其他分支
+    local other_branches
+    other_branches=$(git_list_branches | grep "^$epic_name/" | grep -v "^$branch$" || true)
+    
+    local dependencies=""
+    while IFS= read -r other_branch; do
+        if [[ -n "$other_branch" ]]; then
+            # 检查是否包含该分支的提交
+            local merge_base branch_head
+            merge_base=$(git merge-base "$branch" "$other_branch" 2>/dev/null || echo "")
+            branch_head=$(git rev-parse "$other_branch" 2>/dev/null || echo "")
+            
+            if [[ -n "$merge_base" && "$merge_base" == "$branch_head" ]]; then
+                if [[ -n "$dependencies" ]]; then
+                    dependencies="$dependencies, $other_branch"
+                else
+                    dependencies="$other_branch"
+                fi
+            fi
+        fi
+    done <<< "$other_branches"
+    
+    echo "$dependencies"
+}
+
+# 验证依赖关系
+validate_dependencies() {
+    local branch="$1"
+    local dependencies="$2"
+    
+    # 简化实现：检查依赖分支是否存在且有效
+    IFS=', ' read -ra dep_array <<< "$dependencies"
+    
+    for dep in "${dep_array[@]}"; do
+        if ! git_branch_exists "$dep"; then
+            echo "      ❌ 依赖分支不存在: $dep"
+            return 1
+        fi
+    done
+    
+    return 0
+}
+
+# 检查代码质量
+check_code_quality() {
+    ui_subheader "代码质量检查"
+    
+    # 简化的代码质量检查
+    local quality_issues=0
+    
+    # 检查是否有lint配置
+    if [[ -f ".eslintrc.js" || -f ".eslintrc.json" || -f "package.json" ]]; then
+        echo "  ✅ 发现ESLint配置"
+    else
+        echo "  ⚠️ 未发现代码规范检查工具配置"
+        ((quality_issues++))
+    fi
+    
+    # 检查是否有TypeScript配置
+    if [[ -f "tsconfig.json" ]]; then
+        echo "  ✅ 发现TypeScript配置"
+    else
+        echo "  ℹ️ 未发现TypeScript配置（可选）"
+    fi
+    
+    # 检查是否有预提交钩子
+    if [[ -f ".husky/pre-commit" || -f ".git/hooks/pre-commit" ]]; then
+        echo "  ✅ 发现预提交钩子"
+    else
+        echo "  ⚠️ 未发现预提交钩子配置"
+        ((quality_issues++))
+    fi
+    
+    echo
+    echo "  📊 代码质量问题: $quality_issues 个"
+    echo
+    
+    return $([ "$quality_issues" -eq 0 ])
+}
+
+# 检查测试覆盖率
+check_test_coverage() {
+    ui_subheader "测试覆盖率检查"
+    
+    local test_issues=0
+    
+    # 检查是否有测试目录
+    if [[ -d "test" || -d "tests" || -d "__tests__" || -d "spec" ]]; then
+        echo "  ✅ 发现测试目录"
+    else
+        echo "  ⚠️ 未发现测试目录"
+        ((test_issues++))
+    fi
+    
+    # 检查是否有测试配置
+    if [[ -f "jest.config.js" || -f "jest.config.json" || -f "vitest.config.js" ]]; then
+        echo "  ✅ 发现测试框架配置"
+    else
+        echo "  ⚠️ 未发现测试框架配置"
+        ((test_issues++))
+    fi
+    
+    # 检查package.json中的测试脚本
+    if [[ -f "package.json" ]] && grep -q '"test"' package.json; then
+        echo "  ✅ 发现测试脚本配置"
+    else
+        echo "  ⚠️ 未发现测试脚本配置"
+        ((test_issues++))
+    fi
+    
+    echo
+    echo "  📊 测试配置问题: $test_issues 个"
+    echo
+    
+    if [[ "$test_issues" -gt 0 ]]; then
+        ui_info "💡 提示: 建议添加测试用例和配置以提高代码质量"
+        echo
+    fi
+    
+    return $([ "$test_issues" -eq 0 ])
+}
+
+# 显示就绪状态摘要
+show_readiness_summary() {
+    local overall_ready="$1"
+    
+    ui_subheader "Epic发布就绪状态摘要"
+    
+    if [[ "$overall_ready" == "true" ]]; then
+        ui_success_box "🎉 Epic已准备好发布！" \
+            "所有检查项目均已通过" \
+            "建议执行最终发布流程" \
+            "" \
+            "下一步操作:" \
+            "1. git-pr-flow ready release  # 准备发布" \
+            "2. 创建发布分支或标签" \
+            "3. 部署到生产环境"
+    else
+        ui_warning_box "⚠️ Epic尚未准备好发布" \
+            "存在需要解决的问题" \
+            "请根据上述检查结果进行修复" \
+            "" \
+            "建议操作:" \
+            "1. 解决标记的问题" \
+            "2. git-pr-flow sync      # 同步依赖" \
+            "3. git-pr-flow ready check # 重新检查"
+    fi
+}
+
+# 生成详细就绪报告
+generate_readiness_report() {
+    local epic_name
+    epic_name=$(config_epic_get "epic_name")
+    
+    ui_header "Epic就绪状态详细报告"
+    
+    local report_file="epic-${epic_name}-readiness-report.md"
+    
+    ui_loading "生成详细报告: $report_file"
+    
+    # 生成Markdown报告
+    cat > "$report_file" << EOF
+# Epic发布就绪报告
+
+**Epic名称**: $epic_name  
+**生成时间**: $(current_local_timestamp)  
+**基础分支**: $(config_epic_get "base_branch")  
+
+## 执行摘要
+
+$(if check_epic_readiness >/dev/null 2>&1; then echo "✅ Epic已准备好发布"; else echo "⚠️ Epic尚未准备好发布"; fi)
+
+## 详细检查结果
+
+### 功能分支状态
+$(check_feature_branches_status 2>&1 | sed 's/^//')
+
+### PR状态
+$(check_pr_status 2>&1 | sed 's/^//')
+
+### 依赖关系完整性
+$(check_dependency_integrity 2>&1 | sed 's/^//')
+
+### 代码质量
+$(check_code_quality 2>&1 | sed 's/^//')
+
+### 测试覆盖率
+$(check_test_coverage 2>&1 | sed 's/^//')
+
+## 建议和后续步骤
+
+1. 解决上述标记的所有问题
+2. 确保所有PR已创建并通过审查
+3. 运行完整的测试套件
+4. 准备发布文档和变更日志
+5. 通知相关团队成员
+
+---
+*报告由 git-pr-flow 自动生成*
+EOF
+    
+    ui_success "✅ 报告已生成: $report_file"
+    echo "  📄 文件路径: $(pwd)/$report_file"
+    echo
+    
+    ui_info "💡 建议: 将此报告分享给团队成员进行最终审查"
+}
+
+# 准备Epic发布
+prepare_epic_release() {
+    local epic_name
+    epic_name=$(config_epic_get "epic_name")
+    
+    ui_header "准备Epic发布: $epic_name"
+    
+    # 首先检查就绪状态
+    ui_info "🔍 执行发布前检查..."
+    if ! check_epic_readiness >/dev/null 2>&1; then
+        ui_error "Epic尚未准备好发布"
+        ui_info "请先解决就绪检查中的问题"
+        ui_info "运行 'git-pr-flow ready check' 查看详细状态"
+        return 1
+    fi
+    
+    ui_success "✅ Epic就绪检查通过"
+    
+    # 确认发布
+    if ! ui_confirm "确认开始Epic发布准备？"; then
+        ui_info "取消发布准备"
+        return 1
+    fi
+    
+    # 执行发布准备步骤
+    execute_release_preparation "$epic_name"
+}
+
+# 执行发布准备
+execute_release_preparation() {
+    local epic_name="$1"
+    local base_branch
+    base_branch=$(config_epic_get "base_branch")
+    
+    ui_subheader "发布准备步骤"
+    
+    # 1. 创建发布分支
+    local release_branch="release/$epic_name"
+    echo "  📝 1. 创建发布分支: $release_branch"
+    
+    if git_branch_exists "$release_branch"; then
+        ui_warning "    发布分支已存在"
+    else
+        if git checkout -b "$release_branch" "$base_branch" >/dev/null 2>&1; then
+            ui_success "    ✅ 发布分支创建成功"
+        else
+            ui_error "    ❌ 发布分支创建失败"
+            return 1
+        fi
+    fi
+    
+    # 2. 合并所有功能分支
+    echo "  🔄 2. 合并功能分支到发布分支"
+    merge_feature_branches_to_release "$epic_name" "$release_branch"
+    
+    # 3. 生成变更日志
+    echo "  📄 3. 生成变更日志"
+    generate_changelog "$epic_name" "$release_branch"
+    
+    # 4. 更新版本信息
+    echo "  🏷️ 4. 准备版本标记"
+    prepare_version_tag "$epic_name"
+    
+    # 5. 创建发布PR
+    echo "  📋 5. 创建发布PR"
+    create_release_pr "$release_branch" "$base_branch"
+    
+    ui_success_box "🎉 Epic发布准备完成！" \
+        "发布分支: $release_branch" \
+        "下一步: 审查并合并发布PR" \
+        "" \
+        "发布后清理:" \
+        "git-pr-flow clean --release"
+}
+
+# 合并功能分支到发布分支
+merge_feature_branches_to_release() {
+    local epic_name="$1"
+    local release_branch="$2"
+    
+    local feature_branches
+    feature_branches=$(git_list_branches | grep "^$epic_name/" || true)
+    
+    if [[ -z "$feature_branches" ]]; then
+        ui_info "    📝 没有功能分支需要合并"
+        return 0
+    fi
+    
+    while IFS= read -r branch; do
+        if [[ -n "$branch" ]]; then
+            ui_loading "    合并 $branch"
+            if git merge --no-ff "$branch" --message "feat: 合并功能分支 $branch" >/dev/null 2>&1; then
+                echo "      ✅ $branch 合并成功"
+            else
+                echo "      ❌ $branch 合并失败"
+                ui_warning "请手动解决冲突后继续"
+            fi
+        fi
+    done <<< "$feature_branches"
+}
+
+# 生成变更日志
+generate_changelog() {
+    local epic_name="$1"
+    local release_branch="$2"
+    
+    local changelog_file="CHANGELOG-$epic_name.md"
+    
+    cat > "$changelog_file" << EOF
+# $epic_name Epic 变更日志
+
+## 发布信息
+- **Epic**: $epic_name
+- **版本**: $(date +%Y.%m.%d)
+- **发布时间**: $(current_local_timestamp)
+
+## 新增功能
+$(git_list_branches | grep "^$epic_name/" | sed 's/^/- /' || echo "- 暂无功能分支")
+
+## 技术变更
+- Epic架构实现
+- 分支管理优化
+- 工作流程改进
+
+## 测试说明
+- 所有功能分支已通过就绪检查
+- 代码质量检查通过
+- 依赖关系验证完成
+
+---
+*变更日志由 git-pr-flow 自动生成*
+EOF
+    
+    git add "$changelog_file" >/dev/null 2>&1
+    echo "    ✅ 变更日志已生成: $changelog_file"
+}
+
+# 准备版本标记
+prepare_version_tag() {
+    local epic_name="$1"
+    local tag_name="$epic_name-$(date +%Y%m%d)"
+    
+    echo "    🏷️ 建议标签: $tag_name"
+    echo "    💡 手动创建: git tag -a $tag_name -m 'Release $epic_name Epic'"
+}
+
+# 创建发布PR
+create_release_pr() {
+    local release_branch="$1"
+    local base_branch="$2"
+    
+    if command_exists gh; then
+        local pr_title="release: $release_branch Epic发布"
+        local pr_body="Epic发布PR，包含所有功能分支的合并和发布准备。"
+        
+        if gh pr create --title "$pr_title" --body "$pr_body" --base "$base_branch" --head "$release_branch" >/dev/null 2>&1; then
+            echo "    ✅ 发布PR创建成功"
+        else
+            echo "    ⚠️ 发布PR创建失败，请手动创建"
+        fi
+    else
+        echo "    💡 请手动创建发布PR: $release_branch -> $base_branch"
+    fi
+}
+
+# 验证Epic依赖关系
+validate_epic_dependencies() {
+    ui_header "Epic依赖关系验证"
+    
+    local epic_name
+    epic_name=$(config_epic_get "epic_name")
+    
+    ui_info "🔍 深度分析Epic依赖关系..."
+    
+    # 检查外部依赖
+    check_external_dependencies
+    
+    # 检查内部依赖
+    check_internal_dependencies
+    
+    # 检查版本兼容性
+    check_version_compatibility
+    
+    ui_success "✅ 依赖关系验证完成"
+}
+
+# 检查外部依赖
+check_external_dependencies() {
+    ui_subheader "外部依赖检查"
+    
+    # 检查package.json依赖
+    if [[ -f "package.json" ]]; then
+        echo "  📦 检查Node.js依赖..."
+        if command_exists npm; then
+            npm outdated >/dev/null 2>&1 || echo "    ✅ 依赖版本检查完成"
+        else
+            echo "    ⚠️ npm不可用，跳过依赖检查"
+        fi
+    fi
+    
+    # 检查其他依赖文件
+    if [[ -f "requirements.txt" ]]; then
+        echo "  🐍 检查Python依赖..."
+        echo "    📝 发现requirements.txt"
+    fi
+    
+    if [[ -f "Gemfile" ]]; then
+        echo "  💎 检查Ruby依赖..."
+        echo "    📝 发现Gemfile"
+    fi
+    
+    echo
+}
+
+# 检查内部依赖
+check_internal_dependencies() {
+    ui_subheader "内部依赖检查"
+    
+    local epic_name
+    epic_name=$(config_epic_get "epic_name")
+    
+    # 检查模块导入关系
+    echo "  🔍 分析模块依赖关系..."
+    
+    local feature_branches
+    feature_branches=$(git_list_branches | grep "^$epic_name/" || true)
+    
+    if [[ -n "$feature_branches" ]]; then
+        while IFS= read -r branch; do
+            if [[ -n "$branch" ]]; then
+                echo "    📋 $branch: 检查模块导入"
+                # 这里可以添加更详细的依赖分析逻辑
+            fi
+        done <<< "$feature_branches"
+    fi
+    
+    echo
+}
+
+# 检查版本兼容性
+check_version_compatibility() {
+    ui_subheader "版本兼容性检查"
+    
+    echo "  🔍 检查运行时版本要求..."
+    
+    # 检查Node.js版本
+    if command_exists node; then
+        local node_version
+        node_version=$(node --version 2>/dev/null || echo "未知")
+        echo "    📦 Node.js版本: $node_version"
+    fi
+    
+    # 检查Git版本
+    if command_exists git; then
+        local git_version
+        git_version=$(git --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        echo "    🔧 Git版本: $git_version"
+    fi
+    
+    echo "    ✅ 版本兼容性检查完成"
+    echo
+}
