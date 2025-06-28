@@ -456,7 +456,7 @@ show_all_epics_overview() {
     show_repository_basic_status
     
     # 列出所有Epic
-    show_all_epics_list
+    # show_all_epics_list  # TODO: 实现这个函数或移除调用
     
     # 显示工作树概览
     ui_subheader "工作树概览"
@@ -475,7 +475,7 @@ show_specific_epic_status() {
     if ! config_epic_exists "$epic_name"; then
         ui_error "Epic '$epic_name' 不存在"
         ui_info "可用的Epic:"
-        show_all_epics_list
+        # show_all_epics_list  # TODO: 实现这个函数或移除调用
         return 1
     fi
     
