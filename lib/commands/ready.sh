@@ -14,7 +14,15 @@ cmd_ready() {
         return 1
     fi
     
-    if ! config_epic_validate; then
+    # 获取当前epic名称用于验证
+    local epic_name
+    epic_name=$(detect_current_epic)
+    if [[ -z "$epic_name" ]]; then
+        ui_error "无法检测当前Epic名称"
+        return 1
+    fi
+
+    if ! config_epic_validate "$epic_name"; then
         ui_error "Epic配置文件无效"
         return 1
     fi
