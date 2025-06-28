@@ -23,42 +23,86 @@ readonly VERSION="0.1.0-mvp"
 # 显示帮助信息
 show_help() {
     cat << EOF
-Git PR Flow - 高质量PR开发工具
+Git PR Flow - 让复杂项目自然产出高质量PR
 
-使用方法:
-    git-pr-flow <command> [options]
+目的: 解决大功能开发中的PR质量问题
+- 功能太大无法拆分，导致巨型PR难审查
+- 多个子功能相互依赖，提交时机难控制  
+- 分支切换频繁，开发上下文经常丢失
 
-核心命令:
-    init [epic-name]     初始化Epic开发环境
-    start [feature]      开始子功能开发 (含自动分支切换)
-    status               查看Epic进度仪表盘
-    sync                 智能同步依赖关系
-    pr [feature]         创建智能PR
-    ready                Epic级策略性发布
-    clean                清理工作环境
-    code [feature]       在VS Code中打开指定功能
-    workspace            生成VS Code多Epic工作区
+解决方案: Epic三层架构 + 并行工作树
+- Epic作为功能集合，子功能独立开发
+- 每个功能有独立工作环境，避免切换
+- 智能依赖管理，控制PR提交时机
 
-全局选项:
-    -h, --help          显示帮助信息
-    -v, --version       显示版本信息
-    --debug             启用调试模式
+术语定义：
+epic或epic-name: 功能集合，如：user-auth
+epic-name/feature: 子功能，如：user-auth/login
+epic/epic-name分支: Epic集成git分支，如：epic/user-auth（特殊分支命名，worktree目录名不需要“epic/”部分）
+epic/epic-name/feature分支: 子功能Git分支，如：epic/user-auth/login
 
-示例:
-    git-pr-flow init auth           # 初始化用户认证系统开发
-    git-pr-flow start auth/login    # 开始登录功能开发
-    git-pr-flow status              # 查看整体进度
-    git-pr-flow sync                # 同步依赖更新
-    git-pr-flow pr auth/login       # 创建登录功能PR
+基本使用流程:
+  # 1. 创建Epic，这里示例是：user-auth
+  git-pr-flow init user-auth
+  # 效果: 
+  # 会同时使用 git worktree 在根目录下创建 .worktrees/epic--user-auth/ 目录
+  # yaml 配置文件;
+  # 以及创建 epic/user-auth 分支 （自动补epic/）
 
-特色功能:
-    🔄 自动分支切换 - 主仓库跟随worktree自动切换分支
-    🎯 VS Code集成 - 完美的Git可视化支持
-    📊 Epic仪表盘 - 实时进度和依赖关系展示
+  # 2. 开发子功能
+  git-pr-flow start user-auth/login
+  # 效果: 
+  # 会同时使用 git worktree在根目录下创建 .worktrees/epic--user-auth--login/ （与epic--user-auth 目录并列，注意不是包含）；
+  # 还会创建git 分支 epic/user-auth/login（目录里目录名的--在git分支里是/）
 
-更多信息: https://github.com/chatterzhao/git-pr-flow
+  # 3. 开发到一定阶段，为子功能创建PR
+  git-pr-flow ready user-auth/login    # 🚪 质量门禁：子功能就绪检查
+  git-pr-flow pr user-auth/login       # 子功能 → Epic PR(这里的 Epic 是 epic/user-auth 分支)
+  # 效果: 子功能 → Epic分支的PR
+
+  # 4. 子功能清理 (合并到Epic后)
+  git-pr-flow clean user-auth/login
+  # → 检查是否已合并到Epic分支
+  # → 提示: "子功能 epic/user-auth/login 已合并到 epic/user-auth，清理工作树成功"
+
+  # 5. Epic所有子功能完成后
+  git-pr-flow ready user-auth      # 🚪 质量门禁：Epic就绪检查  
+  git-pr-flow pr epic/user-auth    # Epic分支 → 主分支的PR
+  # 效果: Epic分支 → 主分支的PR
+
+  # 6. Epic清理 (合并到主分支后) 
+  git-pr-flow clean user-auth
+  # → 检查是否已合并到主分支
+  # → 提示: "Epic epic/user-auth 已合并到 develop，清理整个Epic工作树成功"
+
+命令说明:
+    init <epic-name>          创建Epic开发环境 (工作树+分支+配置)
+    start <epic-name/feature> 开始子功能开发 (创建独立工作树和分支)
+    ready <target>           质量门禁检查 (target可以是子功能或Epic)
+    pr <target>              创建PR (子功能→Epic 或 Epic→主分支)
+    status                   显示Epic进度和分支状态
+    clean <target>           清理已合并的工作树和分支
+
+特点:
+- 非交互式友好，AI和脚本可直接调用
+- 自动选择合理默认值，减少决策负担
+- 清晰的状态反馈，便于理解执行结果
+
+参数格式:
+  epic-name: 小写字母数字连字符 (如: user-auth, payment-api)
+  epic-name/feature: Epic名/功能名 (如: user-auth/login)
+
+示例项目结构:
+  .worktrees/epic--user-auth/           # Epic集成开发环境
+  .worktrees/epic--user-auth--login/    # 登录子功能独立开发环境
+  .worktrees/epic--user-auth--register/ # 注册子功能独立开发环境
+  .worktrees/epic--payment--checkout/   # 支付功能独立开发环境
+
+获取帮助: git-pr-flow --help
+版本信息: git-pr-flow --version
 EOF
 }
+
 
 # 显示版本信息
 show_version() {
@@ -154,6 +198,9 @@ main() {
             shift
             source "$PROJECT_ROOT/lib/commands/workspace.sh"
             cmd_workspace "$@"
+            ;;
+        help)
+            show_help
             ;;
         *)
             ui_error "未知命令: $command"
