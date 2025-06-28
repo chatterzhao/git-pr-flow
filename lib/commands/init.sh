@@ -5,8 +5,38 @@
 
 # init命令主函数
 cmd_init() {
-    local input_epic_name="$1"
-    local input_base_branch="${2:-}"
+    local input_epic_name=""
+    local input_base_branch=""
+    local force_recreate=false
+    local use_existing=false
+    
+    # 解析参数
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -yaml)
+                force_recreate=true
+                shift
+                ;;
+            -*)
+                ui_error "未知选项: $1"
+                ui_info "用法: gpf init <epic-name> [base-branch] [-yaml]"
+                ui_info "  -yaml  重新编辑yaml配置文件"
+                ui_info "  无参数: 使用现有配置（非交互式模式）"
+                return 1
+                ;;
+            *)
+                if [[ -z "$input_epic_name" ]]; then
+                    input_epic_name="$1"
+                elif [[ -z "$input_base_branch" ]]; then
+                    input_base_branch="$1"
+                else
+                    ui_error "过多参数: $1"
+                    return 1
+                fi
+                shift
+                ;;
+        esac
+    done
     
     # 检查并确保在项目根目录执行
     ensure_project_root_directory
@@ -34,7 +64,7 @@ cmd_init() {
     
     # 检查是否已存在Epic配置
     if config_epic_exists "$base_epic_name"; then
-        handle_existing_epic_config "$base_epic_name"
+        handle_existing_epic_config "$base_epic_name" "$force_recreate" "$use_existing" "$input_base_branch"
         return $?
     fi
     
@@ -110,6 +140,10 @@ handle_init_interactive() {
 # 处理已存在的Epic配置
 handle_existing_epic_config() {
     local new_epic_name="$1"
+    local force_recreate="${2:-false}"
+    local use_existing="${3:-false}"
+    local input_base_branch="${4:-}"
+    
     local existing_epic_name
     existing_epic_name=$(config_epic_get "epic_name" "$new_epic_name")
     
@@ -117,22 +151,64 @@ handle_existing_epic_config() {
         ui_info "Epic '$new_epic_name' 已经初始化"
         config_epic_show "$new_epic_name"
         
-        if ui_confirm "是否要重新初始化？"; then
-            init_new_epic "$new_epic_name"
+        # 处理非交互式模式
+        if [[ "$force_recreate" == "true" ]]; then
+            ui_info "使用 -yaml 参数，重新初始化Epic配置"
+            init_new_epic "$new_epic_name" "epic/$new_epic_name" "$input_base_branch"
             return $?
-        else
+        elif [[ ! -t 0 ]] || [[ "$TERM" == "dumb" ]] || [[ -n "${GPF_NON_INTERACTIVE:-}" ]]; then
+            # 非交互式环境且无-yaml参数，使用现有配置并切换到Epic目录
+            ui_info "非交互式环境，使用现有Epic配置"
+            ui_info "如需重新配置，请使用: gpf init $new_epic_name [base-branch] -yaml"
+            ui_info "或手动编辑配置文件后重新运行命令"
+            
+            # 切换到Epic工作目录
+            local epic_worktree_path
+            epic_worktree_path=$(config_epic_get "worktree_path" "$new_epic_name")
+            if [[ -d "$epic_worktree_path" ]]; then
+                ui_info "切换到Epic工作目录: $epic_worktree_path"
+                cd "$epic_worktree_path" || {
+                    ui_error "无法切换到Epic工作目录"
+                    return 1
+                }
+            fi
             return 0
+        else
+            # 交互式环境，询问用户
+            if ui_confirm "是否要重新初始化？"; then
+                init_new_epic "$new_epic_name" "epic/$new_epic_name" "$input_base_branch"
+                return $?
+            else
+                return 0
+            fi
         fi
     else
         ui_warning "当前目录已有不同的Epic配置: $existing_epic_name"
         ui_info "要初始化的Epic: $new_epic_name"
         
-        if ui_confirm "是否要替换现有配置？"; then
-            init_new_epic "$new_epic_name"
+        # 处理非交互式模式
+        if [[ "$force_recreate" == "true" ]]; then
+            ui_info "使用 -yaml 参数，替换现有Epic配置"
+            init_new_epic "$new_epic_name" "epic/$new_epic_name" "$input_base_branch"
             return $?
-        else
-            ui_info "保持现有Epic配置: $existing_epic_name"
+        elif [[ ! -t 0 ]] || [[ "$TERM" == "dumb" ]] || [[ -n "${GPF_NON_INTERACTIVE:-}" ]]; then
+            ui_error "非交互式环境下不能自动替换不同的Epic配置"
+            ui_info "当前Epic: $existing_epic_name"
+            ui_info "目标Epic: $new_epic_name"
+            ui_info "请使用以下方式之一："
+            ui_info "  1. 强制替换: gpf init $new_epic_name [base-branch] -yaml"
+            ui_info "  2. 使用现有Epic: gpf init $existing_epic_name"
+            ui_info "  3. 手动删除配置文件后重新初始化"
             return 1
+        else
+            # 交互式环境，询问用户
+            if ui_confirm "是否要替换现有配置？"; then
+                init_new_epic "$new_epic_name" "epic/$new_epic_name" "$input_base_branch"
+                return $?
+            else
+                ui_info "保持现有Epic配置: $existing_epic_name"
+                return 1
+            fi
         fi
     fi
 }
