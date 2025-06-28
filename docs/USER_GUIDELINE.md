@@ -1,55 +1,93 @@
-# Git PR Flow 使用指南
+# Git PR Flow 完整使用指南
 
-> 从零开始，轻松掌握高质量PR的开发方式
+> 🎯 **从零开始的详细教程** - 让你真正掌握高质量PR开发方式
 
-## 🚀 开始之前
+## 📋 准备工作
 
-### 你将学会什么
+### 🔧 环境要求
+- Git 2.15+ (支持 `git worktree` 命令)
+- Bash 4.0+ 
+- 任何Git项目 (新项目或现有项目都可以)
 
-- 如何将大功能拆分成小而完整的PR
-- 如何在多个子功能之间并行开发
-- 如何控制PR提交的时机，不再被动频繁提交
-- 如何自动生成高质量的PR描述
-
-### 需要准备什么
-
-- 安装 git 命令行工具
-- 安装本工具：[git-pr-flow](https://github.com/chatterzhao/git-pr-flow)
-- 一个Git项目（任何项目都可以）
-- 5分钟时间体验完整流程
-
-## 📖 使用场景
-
-**假设你要开发用户认证系统**，包含：
-1. 基础登录功能
-2. 用户注册功能
-3. 双因子认证
-4. 社交登录集成
-
-使用传统方式，你要么提交一个巨大的PR（2000行代码），要么频繁提交小PR打扰审查者。
-
-**使用 Git PR Flow**，你可以：
-- 并行开发所有子功能
-- 每个子功能有独立的开发环境
-- 策略性选择PR提交时机
-- 自动管理依赖关系和冲突
-
-## 🎯 完整操作流程
-
-### 第1步：安装工具
-
+### 📦 安装GPF
 ```bash
 curl -fsSL https://github.com/chatterzhao/git-pr-flow/install.sh | bash
 
 # 验证安装
-git-pr-flow --version
+gpf --version  # 或 git-pr-flow --version
 ```
 
-### 第2步：初始化功能开发
+## 🎓 核心概念科普
+
+### 🏗️ Git Worktree 是什么？
+
+**传统Git只有一个工作目录：**
+```
+项目根目录/  ← 只能同时在一个分支工作
+├── src/
+├── docs/
+└── .git/
+```
+
+**Git Worktree让你有多个工作目录：**
+```
+项目根目录/
+├── src/
+├── docs/
+├── .git/
+└── .worktrees/
+    ├── epic--user-auth/         ← epic/user-auth 分支的工作目录
+    ├── epic--user-auth--login/  ← user-auth/login 分支的工作目录
+    └── epic--user-auth--register/ ← user-auth/register 分支的工作目录
+```
+
+> 💡 **为什么目录是并列的不是嵌套的？**  
+> 每个worktree都是独立的Git工作空间，就像独立的项目副本，不是文件夹的包含关系。这样你可以同时在多个分支工作而不需要切换。
+
+### 🌳 Git分支命名限制
+
+**Git有一个重要限制：分支名不能是另一个分支名的前缀**
 
 ```bash
+❌ 这样会冲突：
+epic/user-auth        # 父分支
+epic/user-auth/login  # 子分支 - Git禁止！
+
+✅ GPF的解决方案：
+epic/user-auth        # Epic集成分支
+user-auth/login       # 子功能分支 (去掉epic/前缀)
+user-auth/register    # 子功能分支
+```
+
+> 🔍 **这是Git的引用规则限制**  
+> Git将分支存储为引用（refs），路径 `refs/heads/epic/user-auth` 不能与 `refs/heads/epic/user-auth/login` 共存，因为前者是后者的父路径。
+
+### 🎯 Epic三层架构
+
+```
+develop (基础分支)
+   ↓ 基于develop创建Epic
+epic/user-auth (功能集成分支)
+   ↓ 基于Epic创建子功能
+user-auth/login, user-auth/register... (子功能分支)
+```
+
+## 📖 完整实战教程
+
+我们以开发**用户认证系统**为例，演示完整的GPF工作流：
+- 🔐 基础登录功能
+- 📝 用户注册功能  
+- 🔐 双因子认证
+- 🌐 社交登录集成
+
+### 🚀 第1步：初始化Epic开发环境
+
+```bash
+# 切换到你的项目目录
 cd your-project
-gpf init auth # 如果只有 init 没有后面参数，则会列出所有功能（子分支），或者要求输入功能名，用模板帮你创建
+
+# 初始化用户认证系统开发
+gpf init user-auth develop
 ```
 
 **这时会发生什么：**
