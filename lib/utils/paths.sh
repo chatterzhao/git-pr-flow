@@ -4,8 +4,8 @@
 # 统一所有路径计算和目录操作，支持跨平台兼容
 
 # 路径分隔符（跨平台兼容）
-readonly PATH_SEP="/"
-readonly WORKTREE_SEP="--"
+readonly GPF_GPF_PATH_SEP="/"
+readonly GPF_GPF_WORKTREE_SEP="--"
 
 # =====================================================
 # 项目根目录相关
@@ -69,7 +69,7 @@ is_in_worktree() {
 # 从Epic名称生成工作树路径
 get_epic_worktree_path() {
     local epic_name="$1"
-    echo ".worktrees/epic${WORKTREE_SEP}$epic_name"
+    echo ".worktrees/epic${GPF_WORKTREE_SEP}$epic_name"
 }
 
 # 从Epic名称生成绝对工作树路径
@@ -120,7 +120,7 @@ epic_config_exists() {
 get_branch_worktree_path() {
     local branch_name="$1"
     # 将 / 替换为 --
-    local worktree_name="${branch_name//${PATH_SEP}/${WORKTREE_SEP}}"
+    local worktree_name="${branch_name//${GPF_PATH_SEP}/${GPF_WORKTREE_SEP}}"
     echo ".worktrees/$worktree_name"
 }
 
@@ -300,7 +300,7 @@ list_feature_worktrees() {
             local worktree_name
             worktree_name=$(basename "$dir")
             # 将 -- 转换回 /
-            local feature_name="${worktree_name//${WORKTREE_SEP}/${PATH_SEP}}"
+            local feature_name="${worktree_name//${GPF_WORKTREE_SEP}/${GPF_PATH_SEP}}"
             echo "$feature_name"
         done
     fi
