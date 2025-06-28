@@ -5,7 +5,7 @@
 
 # ready命令主函数
 cmd_ready() {
-    local target_branch="$1"
+    local target_branch="${1:-}"
     
     # 加载path工具函数
     if [[ -f "$PROJECT_ROOT/lib/utils/paths.sh" ]]; then
@@ -22,7 +22,7 @@ cmd_ready() {
     fi
     
     # 验证目标分支格式 (应该是 xx/yy 格式)
-    if ! is_valid_feature_name "$target_branch"; then
+    if ! validate_feature_branch_format "$target_branch"; then
         ui_error "无效的分支格式: $target_branch"
         ui_info "分支格式应为: epic-name/feature-name，如: auth/login"
         return 1
@@ -30,6 +30,28 @@ cmd_ready() {
     
     # 执行完整的ready检查流程
     execute_full_ready_pipeline "$target_branch"
+}
+
+# 验证功能分支格式
+validate_feature_branch_format() {
+    local branch_name="$1"
+    
+    # 基本格式检查：应该包含 /
+    if [[ "$branch_name" != */* ]]; then
+        return 1
+    fi
+    
+    # 不应该以 epic/ 开头 (ready命令处理的是功能分支)
+    if [[ "$branch_name" == epic/* ]]; then
+        return 1
+    fi
+    
+    # 分支名不能为空
+    if [[ -z "$branch_name" ]]; then
+        return 1
+    fi
+    
+    return 0
 }
 
 # 智能分支选择
