@@ -6,6 +6,7 @@
 # init命令主函数
 cmd_init() {
     local input_epic_name="$1"
+    local input_base_branch="${2:-}"
     
     # 如果没有提供Epic名称，显示现有配置或提示输入
     if [[ -z "$input_epic_name" ]]; then
@@ -35,7 +36,7 @@ cmd_init() {
     fi
     
     # 执行新Epic初始化
-    init_new_epic "$base_epic_name" "$epic_branch_name"
+    init_new_epic "$base_epic_name" "$epic_branch_name" "$input_base_branch"
 }
 
 # 交互式初始化处理
@@ -68,7 +69,7 @@ handle_init_interactive() {
                 local epic_name
                 epic_name=$(config_epic_get "epic_name" "$current_epic")
                 if ui_confirm "确定要重新配置Epic '$epic_name' 吗？"; then
-                    init_new_epic "$epic_name"
+                    init_new_epic "$epic_name" "$(normalize_epic_name "$epic_name")" "$(normalize_epic_name "$epic_name")"
                     return $?
                 else
                     ui_info "取消重新配置"
@@ -98,7 +99,7 @@ handle_init_interactive() {
             fi
         done
         
-        init_new_epic "$epic_name"
+        init_new_epic "$epic_name" "$(normalize_epic_name "$epic_name")"
         return $?
     fi
 }
@@ -137,6 +138,7 @@ handle_existing_epic_config() {
 init_new_epic() {
     local base_epic_name="$1"
     local epic_branch_name="$2"
+    local input_base_branch="$3"
     
     ui_loading "正在初始化Epic: $base_epic_name (分支: $epic_branch_name)"
     
@@ -155,9 +157,21 @@ init_new_epic() {
     
     # 2. 智能检测和选择基分支
     local base_branch
-    if ! base_branch=$(select_base_branch); then
-        ui_error "基分支选择失败"
-        return 1
+    if [[ -n "$input_base_branch" ]]; then
+        # 使用提供的基分支
+        if git_branch_exists "$input_base_branch"; then
+            base_branch="$input_base_branch"
+            ui_info "使用指定基分支: $base_branch"
+        else
+            ui_error "指定的基分支不存在: $input_base_branch"
+            return 1
+        fi
+    else
+        # 智能选择基分支
+        if ! base_branch=$(select_base_branch); then
+            ui_error "基分支选择失败"
+            return 1
+        fi
     fi
     
     # 3. 生成工作树路径 (使用epic--前缀)
@@ -208,11 +222,24 @@ init_new_epic() {
 select_base_branch() {
     ui_subheader "基分支选择"
     
-    # 检测项目中现有的重要分支
+    # 非交互式环境：使用智能默认值
+    if [[ ! -t 0 ]]; then
+        ui_error "非交互式环境需要指定基分支参数"
+        ui_info "用法: git-pr-flow init <epic-name> <base-branch>"
+        ui_info "示例: git-pr-flow init ai-friendly develop"
+        return 1
+    fi
+    
+    # 交互式环境：检测项目中现有的重要分支
     local detected_branches=()
     local branch_descriptions=()
     
-    # 检测常见的主分支
+    # 检测常见的主分支（按优先级排序）
+    if git_branch_exists "develop"; then
+        detected_branches+=("develop")
+        branch_descriptions+=("develop (GitFlow开发分支) ⭐ 推荐")
+    fi
+    
     if git_branch_exists "main"; then
         detected_branches+=("main")
         branch_descriptions+=("main (GitHub主分支) ⭐ 推荐")
@@ -221,11 +248,6 @@ select_base_branch() {
     if git_branch_exists "master"; then
         detected_branches+=("master")
         branch_descriptions+=("master (传统主分支)")
-    fi
-    
-    if git_branch_exists "develop"; then
-        detected_branches+=("develop")
-        branch_descriptions+=("develop (GitFlow开发分支) ⭐ 推荐")
     fi
     
     if git_branch_exists "staging"; then
@@ -253,14 +275,10 @@ select_base_branch() {
     fi
     
     ui_info "检测到以下分支："
-    
-    # 非交互式环境：自动选择第一个分支
-    if [[ ! -t 0 ]]; then
-        local selected_branch="${detected_branches[0]}"
-        ui_info "非交互式环境，自动选择: $selected_branch"
-        echo "$selected_branch"
-        return 0
-    fi
+    for i in "${!detected_branches[@]}"; do
+        echo "  $((i+1)). ${branch_descriptions[$i]}"
+    done
+    echo
     
     local choice
     choice=$(ui_select_menu "选择基础分支" "${branch_descriptions[@]}")

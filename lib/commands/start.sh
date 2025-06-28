@@ -36,7 +36,7 @@ cmd_start() {
     # 验证功能名称格式
     if ! is_valid_feature_name "$normalized_feature_name"; then
         ui_error "无效的功能名称: $normalized_feature_name"
-        ui_info "功能名称格式: epic/epic-name/feature-name，如: epic/auth/login, epic/user-profile/avatar"
+        ui_info "功能名称格式: epic-name/feature-name，如: auth/login, user-profile/avatar"
         return 1
     fi
     
@@ -197,9 +197,13 @@ start_feature_development() {
     echo
     
     # 确认创建
-    if ! ui_confirm "确认启动功能开发？"; then
-        ui_info "取消功能开发启动"
-        return 1
+    if [[ -t 0 ]]; then
+        if ! ui_confirm "确认启动功能开发？"; then
+            ui_info "取消功能开发启动"
+            return 1
+        fi
+    else
+        ui_info "非交互式环境，自动确认启动功能开发"
     fi
     
     # 执行核心逻辑
@@ -253,7 +257,15 @@ execute_feature_start() {
     # 创建工作树和分支
     ui_loading "创建工作树和分支"
     
-    if ! git_create_worktree "$worktree_path" "$feature_name" "$base_for_branch"; then
+    # 生成功能分支名称（不包含epic/前缀）
+    local feature_branch_name
+    if [[ "$feature_name" == epic/* ]]; then
+        feature_branch_name=$(echo "$feature_name" | sed 's|^epic/||')
+    else
+        feature_branch_name="$feature_name"
+    fi
+    
+    if ! git_create_worktree "$worktree_path" "$feature_branch_name" "$base_for_branch"; then
         ui_error "创建工作树失败"
         return 1
     fi
@@ -287,10 +299,18 @@ perform_auto_branch_switch() {
         return 1
     }
     
+    # 计算实际的功能分支名称（去除epic/前缀）
+    local target_branch
+    if [[ "$feature_name" == epic/* ]]; then
+        target_branch=$(echo "$feature_name" | sed 's|^epic/||')
+    else
+        target_branch="$feature_name"
+    fi
+    
     # 执行自动分支切换
-    if git_auto_switch_branch "$feature_name"; then
+    if git_auto_switch_branch "$target_branch"; then
         ui_success "✅ 自动分支切换成功"
-        ui_info "💡 VS Code现在可以显示 '$feature_name' 的文件变更"
+        ui_info "💡 VS Code现在可以显示 '$target_branch' 的文件变更"
         ui_info "💡 主仓库Git面板将显示当前功能的修改状态"
     else
         ui_warning "⚠️ 自动分支切换失败或跳过"
@@ -326,9 +346,15 @@ show_feature_start_success() {
     echo
     
     # 自动分支切换状态
-    local current_main_branch
+    local current_main_branch target_branch
     current_main_branch=$(cd "$(git rev-parse --show-toplevel)" && git_current_branch)
-    if [[ "$current_main_branch" == "$feature_name" ]]; then
+    if [[ "$feature_name" == epic/* ]]; then
+        target_branch=$(echo "$feature_name" | sed 's|^epic/||')
+    else
+        target_branch="$feature_name"
+    fi
+    
+    if [[ "$current_main_branch" == "$target_branch" ]]; then
         echo "🔄 自动分支切换状态: ✅ 成功"
         echo "   主仓库当前分支: $current_main_branch"
         echo "   VS Code Git面板: 可显示当前功能的文件变更"
@@ -358,28 +384,29 @@ detect_feature_dependencies() {
     # 简单的依赖推荐逻辑
     # 实际项目中可以基于文件变更、提交历史等进行智能分析
     
-    ui_subheader "依赖关系检测"
-    echo "  检测到同Epic下的其他分支："
-    
-    local branches_array=()
-    while IFS= read -r branch; do
-        if [[ -n "$branch" ]]; then
-            branches_array+=("$branch")
-            echo "    📋 $branch"
+    {
+        ui_subheader "依赖关系检测"
+        echo "  检测到同Epic下的其他分支："
+        
+        local branches_array=()
+        while IFS= read -r branch; do
+            if [[ -n "$branch" ]]; then
+                branches_array+=("$branch")
+                echo "    📋 $branch"
+            fi
+        done <<< "$epic_branches"
+        
+        if [[ ${#branches_array[@]} -eq 0 ]]; then
+            echo "    (无)"
         fi
-    done <<< "$epic_branches"
-    
-    if [[ ${#branches_array[@]} -eq 0 ]]; then
-        echo "    (无)"
-        return 0
-    fi
-    
-    echo
+        
+        echo
+    } >&2
     
     # 依赖关系选择 (支持非交互式环境)
     if [[ ! -t 0 ]]; then
         # 非交互式环境：自动选择无依赖
-        ui_info "非交互式环境，自动选择: 无依赖 (基于基础分支)"
+        ui_info "非交互式环境，自动选择: 无依赖 (基于基础分支)" >&2
         return 0
     fi
     
@@ -461,35 +488,42 @@ show_epic_status() {
 is_valid_feature_name() {
     local feature_name="$1"
     
-    # 支持 epic/user-auth/login 格式
-    if [[ "$feature_name" =~ ^epic/([^/]+)/([^/]+)$ ]]; then
-        local epic_part="${BASH_REMATCH[1]}"
-        local feature_part="${BASH_REMATCH[2]}"
-        
-        # Epic部分验证
-        if ! is_valid_epic_name "$epic_part"; then
-            return 1
-        fi
-        
-        # 功能部分验证
-        if [[ -z "$feature_part" ]]; then
-            return 1
-        fi
-        
-        # 功能名称格式检查
-        if [[ ! "$feature_part" =~ ^[a-z0-9-]+$ ]]; then
-            return 1
-        fi
-        
-        # 不能以连字符开头或结尾
-        if [[ "$feature_part" =~ ^- ]] || [[ "$feature_part" =~ -$ ]]; then
-            return 1
-        fi
-        
-        return 0
+    # 支持两种格式：epic/user-auth/login 或 user-auth/login
+    local epic_part feature_part
+    
+    if [[ "$feature_name" == epic/* ]]; then
+        # epic/user-auth/login 格式
+        epic_part=$(echo "$feature_name" | sed 's|^epic/\([^/]*\)/.*|\1|')
+        feature_part=$(echo "$feature_name" | sed 's|^epic/[^/]*/\(.*\)|\1|')
+    elif [[ "$feature_name" == */* ]]; then
+        # user-auth/login 格式
+        epic_part=$(echo "$feature_name" | sed 's|^\([^/]*\)/.*|\1|')
+        feature_part=$(echo "$feature_name" | sed 's|^[^/]*/\(.*\)|\1|')
+    else
+        return 1
     fi
     
-    return 1
+    # 验证Epic部分
+    if [[ -z "$epic_part" ]] || ! is_valid_epic_name "$epic_part"; then
+        return 1
+    fi
+    
+    # 验证功能部分
+    if [[ -z "$feature_part" ]]; then
+        return 1
+    fi
+    
+    # 功能名称格式检查：只允许小写字母、数字、连字符
+    if [[ "$feature_part" =~ [^a-z0-9-] ]]; then
+        return 1
+    fi
+    
+    # 不能以连字符开头或结尾
+    if [[ "$feature_part" =~ ^- ]] || [[ "$feature_part" =~ -$ ]]; then
+        return 1
+    fi
+    
+    return 0
 }
 
 # 解析功能名称
@@ -499,24 +533,31 @@ parse_feature_name() {
     local feature_var="$3"
     
     # 支持 epic/user-auth/login 格式
-    if [[ "$feature_name" =~ ^epic/([^/]+)/(.+)$ ]]; then
-        local epic_part="${BASH_REMATCH[1]}"
-        local feature_part="${BASH_REMATCH[2]}"
+    if [[ "$feature_name" == epic/* ]]; then
+        local epic_part
+        local feature_part
+        epic_part=$(echo "$feature_name" | sed 's|^epic/\([^/]*\)/.*|\1|')
+        feature_part=$(echo "$feature_name" | sed 's|^epic/[^/]*/\(.*\)|\1|')
         
-        # 使用eval设置变量
-        eval "$epic_var=\"$epic_part\""
-        eval "$feature_var=\"$feature_part\""
-        return 0
+        if [[ -n "$epic_part" && -n "$feature_part" ]]; then
+            eval "$epic_var=\"$epic_part\""
+            eval "$feature_var=\"$feature_part\""
+            return 0
+        fi
     fi
     
     # 兼容旧格式 user-auth/login (自动转换)
-    if [[ "$feature_name" =~ ^([^/]+)/(.+)$ ]]; then
-        local epic_part="${BASH_REMATCH[1]}"
-        local feature_part="${BASH_REMATCH[2]}"
+    if [[ "$feature_name" == */* && "$feature_name" != epic/* ]]; then
+        local epic_part
+        local feature_part
+        epic_part=$(echo "$feature_name" | sed 's|^\([^/]*\)/.*|\1|')
+        feature_part=$(echo "$feature_name" | sed 's|^[^/]*/\(.*\)|\1|')
         
-        eval "$epic_var=\"$epic_part\""
-        eval "$feature_var=\"$feature_part\""
-        return 0
+        if [[ -n "$epic_part" && -n "$feature_part" ]]; then
+            eval "$epic_var=\"$epic_part\""
+            eval "$feature_var=\"$feature_part\""
+            return 0
+        fi
     fi
     
     return 1
