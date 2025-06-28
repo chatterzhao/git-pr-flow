@@ -11,7 +11,7 @@
 
 ### 📦 安装GPF
 ```bash
-curl -fsSL https://github.com/chatterzhao/git-pr-flow/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/chatterzhao/git-pr-flow/main/install.sh | bash
 
 # 验证安装
 gpf --version  # 或 git-pr-flow --version
