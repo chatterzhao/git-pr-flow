@@ -64,13 +64,61 @@ user-auth/register    # 子功能分支
 
 ### 🎯 Epic三层架构
 
+**🏗️ 架构层次说明：**
 ```
 develop (基础分支)
-   ↓ 基于develop创建Epic
-epic/user-auth (功能集成分支)
-   ↓ 基于Epic创建子功能
-user-auth/login, user-auth/register... (子功能分支)
+   ↓ gpf init user-auth develop
+epic/user-auth (Epic集成分支) → .worktrees/epic--user-auth/
+   ↓ gpf start user-auth/login
+user-auth/login (子功能分支) → .worktrees/user-auth--login/
+user-auth/register (子功能分支) → .worktrees/user-auth--register/
 ```
+
+**💡 关键理解：**
+- **Epic分支**：作为集成测试环境，包含完整项目代码
+- **子功能分支**：基于Epic分支，专注单一功能开发
+- **目录对应**：每个分支都有独立的工作目录，支持并行开发
+
+### 📈 Epic完整生命周期
+
+**🔄 标准Epic工作流：**
+```
+1️⃣ gpf init user-auth develop
+   ↓ 创建Epic集成环境
+   🔧 epic/user-auth分支 + .worktrees/epic--user-auth/目录
+
+2️⃣ gpf start user-auth/login
+   ↓ 开始第一个子功能
+   🌿 user-auth/login分支 + .worktrees/user-auth--login/目录
+
+3️⃣ 正常开发 (git add, commit, push)
+   ↓ 功能开发完成
+   ✅ 子功能代码就绪
+
+4️⃣ gpf ready 或 gpf pr user-auth/login
+   ↓ 创建PR集成到Epic
+   🔀 user-auth/login → epic/user-auth
+
+5️⃣ gpf start user-auth/register
+   ↓ 开始第二个子功能（基于已集成的Epic）
+   🌿 继承login功能，开发register功能
+
+6️⃣ 重复步骤3-4，完成所有子功能
+
+7️⃣ gpf ready (Epic级别)
+   ↓ Epic完整功能测试通过
+   🚀 epic/user-auth → develop (最终集成)
+
+8️⃣ gpf clean
+   ↓ 清理已合并的分支和worktree
+   🧹 释放磁盘空间
+```
+
+**🎯 Epic的核心价值：**
+- **并行开发**：多个子功能可以同时进行
+- **渐进集成**：子功能逐步集成到Epic环境测试
+- **风险控制**：Epic作为缓冲层，避免直接污染主分支
+- **完整测试**：Epic环境提供真实的集成测试场景
 
 ## 📖 完整实战教程
 
@@ -89,6 +137,13 @@ cd your-project
 # 初始化用户认证系统开发
 gpf init user-auth develop
 ```
+
+**📝 命令参数说明：**
+- `user-auth`：Epic名称，系统会自动创建 `epic/user-auth` 分支
+- `develop`：基础分支，Epic将基于此分支创建
+- **自动命名规则**：
+  - Git分支：`epic/user-auth` （系统自动添加epic/前缀）
+  - Worktree目录：`.worktrees/epic--user-auth` （/替换为--，因为目录名不支持/字符）
 
 **这时会发生什么：**
 ```
@@ -114,10 +169,23 @@ gpf init user-auth develop
 - 按回车确认
 
 **结果：**
-- 创建了完整的开发架构
-- 创建了 worktrees 及目录
-- 设置了独立的工作环境
-- 保存了配置，下次可以复用
+- ✅ 创建了 `epic/user-auth` 分支（基于develop）
+- ✅ 创建了 `.worktrees/epic--user-auth/` 工作目录（包含完整项目代码）
+- ✅ 生成了 `.git-pr-flow.yaml` 配置文件
+- ✅ 设置了独立的Epic集成测试环境
+
+**📁 目录结构变化：**
+```
+项目根目录/
+├── .git/
+├── .worktrees/
+│   └── epic--user-auth/           ← Epic工作目录
+│       ├── src/                   ← 完整项目代码
+│       ├── docs/
+│       ├── .git-pr-flow.yaml     ← Epic配置
+│       └── ...（所有项目文件）
+└── ...（原项目文件）
+```
 
 ### 第3步：开始第一个子功能
 
@@ -377,13 +445,17 @@ git-pr-flow ready
 
 Git PR Flow 使用简单的转换规则，让你看到分支名立即知道工作目录位置：
 
-| 分支名 | Worktree目录 | 说明 |
-|--------|-------------|------|
-| `auth/login` | `.worktrees/auth--login` | 登录功能开发 |
-| `auth/register` | `.worktrees/auth--register` | 注册功能开发 |
-| `payment/checkout` | `.worktrees/payment--checkout` | 支付功能开发 |
+**🔥 Epic分支命名规则：**
+| 命令 | Git分支 | Worktree目录 | 说明 |
+|------|---------|-------------|------|
+| `gpf init user-auth develop` | `epic/user-auth` | `.worktrees/epic--user-auth` | Epic集成分支（自动添加epic/前缀） |
+| `gpf start auth/login` | `auth/login` | `.worktrees/auth--login` | 子功能分支 |
+| `gpf start auth/register` | `auth/register` | `.worktrees/auth--register` | 子功能分支 |
 
-**转换规则**：分支名中的 `/` 替换为目录名中的 `--`
+**📐 核心转换规则：**
+1. **Epic前缀自动添加**：`gpf init xx` → 分支 `epic/xx`
+2. **目录名转换**：分支名中的 `/` 替换为目录名中的 `--`
+3. **文件系统兼容**：所有操作系统都支持 `--` 字符
 
 **为什么使用双横线？**
 - ✅ 所有操作系统文件系统都支持

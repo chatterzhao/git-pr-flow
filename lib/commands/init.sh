@@ -206,11 +206,34 @@ init_new_epic() {
         return 1
     fi
     
-    # 6. 创建Epic配置文件
+    # 6. 创建Epic工作树（必须在创建配置文件之前，确保当前不在Epic分支上）
+    ui_loading "创建Epic工作树: $worktree_base_path"
+    ensure_dir "$(dirname "$worktree_base_path")"
+    
+    # 检查并清理可能存在的目录
+    if [[ -d "$worktree_base_path" ]]; then
+        ui_warning "工作树目录已存在，清理中: $worktree_base_path"
+        rm -rf "$worktree_base_path"
+    fi
+    
+    # 确保当前不在Epic分支上（避免git worktree add冲突）
+    local current_branch
+    current_branch=$(git branch --show-current)
+    if [[ "$current_branch" == "$epic_branch_name" ]]; then
+        ui_info "切换到基础分支以创建工作树"
+        git checkout "$base_branch"
+    fi
+    
+    # 创建实际的git worktree
+    if ! git worktree add "$worktree_base_path" "$epic_branch_name"; then
+        ui_error "Epic工作树创建失败: $worktree_base_path"
+        return 1
+    fi
+    
+    # 7. 创建Epic配置文件（在工作树内）
     config_epic_create "$base_epic_name" "$description" "$base_branch" "$worktree_base_path" "$epic_branch_name"
     
-    # 7. 创建工作树目录结构
-    ensure_dir "$(dirname "$worktree_base_path")"
+    ui_success "Epic工作树创建成功: $worktree_base_path"
     
     # 8. 显示后续步骤
     show_next_steps "$base_epic_name"
