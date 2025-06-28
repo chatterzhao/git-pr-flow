@@ -18,7 +18,7 @@
 
 ### 安装
 ```bash
-curl -fsSL https://github.com/chatterzhao/git-pr-flow/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/chatterzhao/git-pr-flow/main/install.sh | bash
 ```
 
 ### 30秒体验
