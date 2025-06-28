@@ -257,6 +257,57 @@ wait_for_key() {
     echo
 }
 
+# 获取项目根目录的绝对路径
+get_project_root() {
+    # 尝试多种方法获取项目根目录
+    local project_root=""
+    
+    # 方法1: 从当前路径推断
+    local current_dir=$(pwd)
+    if [[ "$current_dir" == *"/.worktrees/"* ]]; then
+        # 在worktree中，推断项目根目录
+        if [[ "$current_dir" =~ ^(.*)/\.worktrees/ ]]; then
+            project_root="${BASH_REMATCH[1]}"
+        fi
+    else
+        # 使用git获取根目录
+        project_root=$(git rev-parse --show-toplevel 2>/dev/null) || true
+    fi
+    
+    # 方法2: 基于脚本位置推断
+    if [[ -z "$project_root" ]]; then
+        # 获取当前脚本的目录
+        local script_dir=""
+        if [[ -n "${BASH_SOURCE[0]}" ]]; then
+            script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+            if [[ -f "$script_dir/bin/git-pr-flow" ]]; then
+                project_root="$script_dir"
+            fi
+        fi
+    fi
+    
+    # 验证项目根目录
+    if [[ -n "$project_root" && -d "$project_root/.git" && -f "$project_root/bin/git-pr-flow" ]]; then
+        echo "$project_root"
+        return 0
+    fi
+    
+    return 1
+}
+
+# 获取相对于项目根目录的绝对路径
+get_project_path() {
+    local relative_path="$1"
+    local project_root
+    
+    project_root=$(get_project_root) || {
+        echo "Error: Cannot determine project root" >&2
+        return 1
+    }
+    
+    echo "$project_root/$relative_path"
+}
+
 # 确保在项目根目录执行
 ensure_project_root_directory() {
     local current_dir=$(pwd)
