@@ -141,9 +141,16 @@ epic_config_exists() {
 # 从分支名生成工作树路径（通用：支持epic/xx和xx/yy格式）
 get_branch_worktree_path() {
     local branch_name="$1"
-    # 将 / 替换为 --
-    local worktree_name="${branch_name//${GPF_PATH_SEP}/${GPF_WORKTREE_SEP}}"
-    echo ".worktrees/$worktree_name"
+    
+    if [[ "$branch_name" == epic/* ]]; then
+        # Epic分支: epic/xx → epic--xx
+        local worktree_name="${branch_name//${GPF_PATH_SEP}/${GPF_WORKTREE_SEP}}"
+        echo ".worktrees/$worktree_name"
+    else
+        # 功能分支: xx/yy → epic--xx--yy  
+        local worktree_name="${branch_name//${GPF_PATH_SEP}/${GPF_WORKTREE_SEP}}"
+        echo ".worktrees/epic${GPF_WORKTREE_SEP}$worktree_name"
+    fi
 }
 
 # 从分支名生成绝对工作树路径

@@ -313,6 +313,15 @@ execute_feature_start() {
         return 1
     fi
     
+    # 创建功能分支配置文件
+    local current_epic epic_name feature_description
+    current_epic=$(detect_current_epic)
+    epic_name=$(config_epic_get "epic_name" "$current_epic")
+    feature_description="实现${feature_name#*/}功能"
+    
+    ui_loading "创建功能分支配置文件"
+    config_feature_create "$feature_name" "$epic_name" "$feature_description" "$worktree_path"
+    
     ui_success "工作树创建成功: $worktree_path"
     return 0
 }
