@@ -1,0 +1,21 @@
+# Git PR Flow Epic配置文件
+# Epic: path-refactor
+# 创建于: 2025-06-28T07:48:44Z
+
+epic_name: "path-refactor"
+epic_branch: "epic/path-refactor"
+description: "path-refactor Epic功能开发"
+base_branch: "develop"
+worktree_path: ".worktrees/epic--path-refactor"
+config_version: "1.0"
+created_at: "2025-06-28T07:48:44Z"
+last_updated: "2025-06-28T07:48:44Z"
+
+# 自动化设置
+auto_switch_branch: true
+auto_sync: false
+auto_cleanup: false
+
+# 工作流设置
+workflow_type: "gitflow"
+pr_strategy: "progressive"
