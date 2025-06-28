@@ -374,14 +374,15 @@ check_branch_readiness() {
     local issues=0
     
     # 检查工作树状态
-    local worktree_path
-    worktree_path=$(get_branch_worktree_absolute_path "$branch")
+    local worktree_absolute_path worktree_relative_path
+    worktree_absolute_path=$(get_branch_worktree_absolute_path "$branch")
+    worktree_relative_path=$(get_branch_worktree_path "$branch")
     
-    if [[ ! -d "$worktree_path" ]]; then
-        ui_warning "  ⚠️ 工作树不存在: $worktree_path"
+    if [[ ! -d "$worktree_absolute_path" ]]; then
+        ui_warning "  ⚠️ 工作树不存在: $worktree_relative_path"
         ((issues++))
     else
-        ui_info "  ✅ 工作树存在: $worktree_path"
+        ui_info "  ✅ 工作树存在: $worktree_relative_path"
         
         # 检查工作目录是否干净
         local original_dir
@@ -492,7 +493,7 @@ $(validate_branch_dependencies "$branch" 2>&1 | sed 's/^//')
 $(check_branch_readiness "$branch" 2>&1 | sed 's/^//')
 
 ### 工作树信息
-- 工作树路径: $(get_branch_worktree_absolute_path "$branch" 2>/dev/null || echo "不存在")
+- 工作树路径: $(get_branch_worktree_path "$branch" 2>/dev/null || echo "不存在")
 - 最后提交: $(git log -1 --format="%s (%cr)" "$branch" 2>/dev/null || echo "无提交")
 
 ## 建议和后续步骤
