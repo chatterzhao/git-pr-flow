@@ -35,7 +35,7 @@ show_epic_status_dashboard() {
     # 检查Epic配置
     if ! config_epic_exists; then
         ui_warning "未找到Epic配置"
-        ui_info "请先运行: git-pr-flow init <epic-name>"
+        ui_info "请先运行: gpf init <epic-name>"
         echo
         show_repository_basic_status
         return 0
@@ -187,7 +187,7 @@ show_epic_worktrees_status() {
     
     if [[ "$has_epic_worktrees" == "false" ]]; then
         echo "  📝 当前没有活跃的工作树"
-        echo "  💡 使用 'git-pr-flow start $epic_name/feature-name' 创建新的功能开发环境"
+        echo "  💡 使用 'gpf start $epic_name/feature-name' 创建新的功能开发环境"
     fi
     echo
 }
@@ -282,7 +282,7 @@ show_epic_quick_actions() {
     epic_name=$(config_epic_get "epic_name")
     
     ui_subheader "快速操作"
-    echo "  🚀 开始新功能: git-pr-flow start $epic_name/feature-name"
+    echo "  🚀 开始新功能: gpf start $epic_name/feature-name"
     echo "  🔄 同步依赖关系: git-pr-flow sync"
     echo "  📋 创建PR: git-pr-flow pr $epic_name/feature-name"
     echo "  💻 VS Code集成: git-pr-flow code $epic_name/feature-name"
@@ -371,7 +371,7 @@ show_all_epics_overview() {
     
     if [[ -z "$epic_branches" ]]; then
         echo "  📝 当前没有Epic分支"
-        echo "  💡 使用 'git-pr-flow init <epic-name>' 开始第一个Epic"
+        echo "  💡 使用 'gpf init <epic-name>' 开始第一个Epic"
         echo
         return 0
     fi

@@ -11,7 +11,7 @@ cmd_sync() {
     # 检查Epic配置
     if ! config_epic_exists; then
         ui_error "未找到Epic配置文件"
-        ui_info "请先运行: git-pr-flow init <epic-name>"
+        ui_info "请先运行: gpf init <epic-name>"
         return 1
     fi
     
@@ -188,7 +188,7 @@ execute_dependency_sync() {
     
     if [[ ! -d "$worktree_path" ]]; then
         ui_error "功能分支工作树不存在: $worktree_path"
-        ui_info "请先运行: git-pr-flow start $feature_branch"
+        ui_info "请先运行: gpf start $feature_branch"
         return 1
     fi
     

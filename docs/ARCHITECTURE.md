@@ -170,7 +170,7 @@ handle_start_interactive() {
   current_epic=$(detect_current_epic)
   
   if [[ -z "$current_epic" ]]; then
-    ui_error "未检测到当前Epic环境，请先运行 git-pr-flow init"
+    ui_error "未检测到当前Epic环境，请先运行 gpf init"
     return 1
   fi
   

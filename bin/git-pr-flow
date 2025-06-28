@@ -43,35 +43,35 @@ epic-name/feature分支: 子功能Git分支，如：user-auth/login (注意：�
 
 基本使用流程:
   # 1. 创建Epic，这里示例是：user-auth  
-  git-pr-flow init user-auth develop   # 初始化用户认证系统开发
+  gpf init user-auth develop   # 初始化用户认证系统开发
   # 效果: 
   # 会同时使用 git worktree 在根目录下创建 .worktrees/epic--user-auth/ 目录
   # yaml 配置文件;
   # 以及创建 epic/user-auth 分支 （自动补epic/）
 
   # 2. 开发子功能
-  git-pr-flow start user-auth/login
+  gpf start user-auth/login
   # 效果: 
   # 会同时使用 git worktree在根目录下创建 .worktrees/epic--user-auth--login/ （与epic--user-auth 目录并列，注意不是包含）；
   # 还会创建git 分支 user-auth/login（注意：不含epic/前缀，避免与epic/user-auth冲突）
 
   # 3. 开发到一定阶段，为子功能创建PR
-  git-pr-flow ready user-auth/login    # 🚪 质量门禁：子功能就绪检查
-  git-pr-flow pr user-auth/login       # 子功能 → Epic PR(这里的 Epic 是 epic/user-auth 分支)
+  gpf ready user-auth/login    # 🚪 质量门禁：子功能就绪检查
+  gpf pr user-auth/login       # 子功能 → Epic PR(这里的 Epic 是 epic/user-auth 分支)
   # 效果: 子功能 → Epic分支的PR
 
   # 4. 子功能清理 (合并到Epic后)
-  git-pr-flow clean user-auth/login
+  gpf clean user-auth/login
   # → 检查是否已合并到Epic分支
   # → 提示: "子功能 user-auth/login 已合并到 epic/user-auth，清理工作树成功"
 
   # 5. Epic所有子功能完成后
-  git-pr-flow ready user-auth      # 🚪 质量门禁：Epic就绪检查  
-  git-pr-flow pr epic/user-auth    # Epic分支 → 主分支的PR
+  gpf ready user-auth      # 🚪 质量门禁：Epic就绪检查  
+  gpf pr epic/user-auth    # Epic分支 → 主分支的PR
   # 效果: Epic分支 → 主分支的PR
 
   # 6. Epic清理 (合并到主分支后) 
-  git-pr-flow clean user-auth
+  gpf clean user-auth
   # → 检查是否已合并到主分支
   # → 提示: "Epic epic/user-auth 已合并到 develop，清理整个Epic工作树成功"
 
@@ -98,8 +98,8 @@ epic-name/feature分支: 子功能Git分支，如：user-auth/login (注意：�
   .worktrees/epic--user-auth--register/ # 注册子功能独立开发环境
   .worktrees/epic--payment--checkout/   # 支付功能独立开发环境
 
-获取帮助: git-pr-flow --help
-版本信息: git-pr-flow --version
+获取帮助: gpf --help (或 git-pr-flow --help)
+版本信息: gpf --version (或 git-pr-flow --version)
 EOF
 }
 

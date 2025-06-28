@@ -42,13 +42,13 @@ Day 7: git checkout -b auth/2fa && 提交PR#4 (依赖PR#2，但PR#2还在修改)
 
 ```bash
 # 1. 初始化功能开发环境
-git-pr-flow init auth
+gpf init auth
 
 # 2. 并行开发多个子功能，每个都有独立环境
-git-pr-flow start auth/login                    # 在 .worktrees/auth--login 中开发
-git-pr-flow start auth/register --depends auth/login
-git-pr-flow start auth/2fa --depends auth/register  
-git-pr-flow start auth/social --depends auth/login
+gpf start auth/login                    # 在 .worktrees/auth--login 中开发
+gpf start auth/register --depends auth/login
+gpf start auth/2fa --depends auth/register  
+gpf start auth/social --depends auth/login
 
 # 3. 开发过程中保持同步，及时发现冲突
 git-pr-flow sync  # 一键同步所有依赖关系
@@ -159,17 +159,17 @@ curl -fsSL https://github.com/chatterzhao/git-pr-flow/install.sh | bash
 ### 体验完整工作流
 ```bash
 # 1. 初始化功能开发（选择基分支）
-git-pr-flow init auth
+gpf init auth
 # 📋 智能检测: main, develop, staging...
 # ✅ 选择适合的基分支 (如 develop)
 # ✅ 创建三层架构和工作树
 
 # 2. 开始第一个子功能
-git-pr-flow start auth/login
+gpf start auth/login
 # ✅ 独立工作环境，专注开发
 
 # 3. 开始第二个子功能（智能依赖检测）
-git-pr-flow start auth/register
+gpf start auth/register
 # 🔍 智能推荐依赖 auth/login
 # ✅ 交互选择，清晰的依赖关系
 

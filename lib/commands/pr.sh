@@ -11,7 +11,7 @@ cmd_pr() {
     # 检查Epic配置
     if ! config_epic_exists; then
         ui_error "未找到Epic配置文件"
-        ui_info "请先运行: git-pr-flow init <epic-name>"
+        ui_info "请先运行: gpf init <epic-name>"
         return 1
     fi
     
@@ -181,7 +181,7 @@ create_feature_pr() {
     
     if [[ ! -d "$worktree_path" ]]; then
         ui_error "功能分支工作树不存在: $worktree_path"
-        ui_info "请先运行: git-pr-flow start $feature_name"
+        ui_info "请先运行: gpf start $feature_name"
         return 1
     fi
     

@@ -12,7 +12,7 @@ cmd_start() {
     current_epic=$(detect_current_epic)
     if [[ -z "$current_epic" ]] || ! config_epic_exists "$current_epic"; then
         ui_error "未找到Epic配置文件"
-        ui_info "请先运行: git-pr-flow init <epic-name>"
+        ui_info "请先运行: gpf init <epic-name>"
         return 1
     fi
     

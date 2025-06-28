@@ -10,7 +10,7 @@ cmd_ready() {
     # 检查Epic配置
     if ! config_epic_exists; then
         ui_error "未找到Epic配置文件"
-        ui_info "请先运行: git-pr-flow init <epic-name>"
+        ui_info "请先运行: gpf init <epic-name>"
         return 1
     fi
     
@@ -111,7 +111,7 @@ check_feature_branches_status() {
     
     if [[ -z "$feature_branches" ]]; then
         ui_warning "没有找到功能分支"
-        echo "  📝 建议: 使用 'git-pr-flow start' 创建功能分支"
+        echo "  📝 建议: 使用 'gpf start' 创建功能分支"
         echo
         return 1
     fi

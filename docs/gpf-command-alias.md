@@ -17,8 +17,8 @@ ln -sf ~/.local/bin/git-pr-flow ~/.local/bin/gpf
 
 ## 使用示例
 以下命令等价：
-- `git-pr-flow init user-auth develop` ↔ `gpf init user-auth develop`
-- `git-pr-flow start user-auth/login` ↔ `gpf start user-auth/login`
+- `gpf init user-auth develop` ↔ `gpf init user-auth develop`
+- `gpf start user-auth/login` ↔ `gpf start user-auth/login`
 - `git-pr-flow status` ↔ `gpf status`
 
 ## 安装说明

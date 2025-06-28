@@ -225,8 +225,8 @@ select_base_branch() {
     # 非交互式环境：使用智能默认值
     if [[ ! -t 0 ]]; then
         ui_error "非交互式环境需要指定基分支参数"
-        ui_info "用法: git-pr-flow init <epic-name> <base-branch>"
-        ui_info "示例: git-pr-flow init ai-friendly develop"
+        ui_info "用法: gpf init <epic-name> <base-branch>"
+        ui_info "示例: gpf init ai-friendly develop"
         return 1
     fi
     
@@ -392,7 +392,7 @@ show_next_steps() {
         "接下来你可以：" \
         "" \
         "1. 开始第一个子功能开发：" \
-        "   git-pr-flow start $epic_name/your-feature" \
+        "   gpf start $epic_name/your-feature" \
         "" \
         "2. 查看Epic状态：" \
         "   git-pr-flow status" \

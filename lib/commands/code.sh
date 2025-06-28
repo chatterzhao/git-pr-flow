@@ -84,7 +84,7 @@ handle_code_interactive() {
         if [[ -n "$selected_path" ]]; then
             open_directory_in_vscode "$selected_path"
         else
-            ui_warning "功能分支没有工作树，请先运行 git-pr-flow start"
+            ui_warning "功能分支没有工作树，请先运行 gpf start"
         fi
     elif [[ $choice -eq $feature_count ]]; then
         # 当前目录
@@ -120,7 +120,7 @@ open_feature_in_vscode() {
     
     if [[ ! -d "$worktree_path" ]]; then
         ui_error "功能分支工作树不存在: $worktree_path"
-        ui_info "请先运行: git-pr-flow start $feature_name"
+        ui_info "请先运行: gpf start $feature_name"
         return 1
     fi
     

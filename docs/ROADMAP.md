@@ -73,8 +73,8 @@ user-guide      init-command            # Week 3-4 init命令
 **核心改进**: 自动分支切换解决Git可视化问题
 
 ```bash
-# 当执行 git-pr-flow start 时的完整流程
-git-pr-flow start auth/login
+# 当执行 gpf start 时的完整流程
+gpf start auth/login
 # 1. 在 .worktrees/auth--login 中创建/切换工作环境
 # 2. 主仓库自动切换到 auth/login 分支 (如果不冲突)
 # 3. VS Code Git面板现在可以显示 auth/login 的文件变更
@@ -170,8 +170,8 @@ git-pr-flow start auth/login
 
 #### Week 7-8: 交互式增强
 - [ ] **无参数命令支持**
-  - [ ] `git-pr-flow init` 无参数 → 列出现有Epic
-  - [ ] `git-pr-flow start` 无参数 → 列出子功能
+  - [ ] `gpf init` 无参数 → 列出现有Epic
+  - [ ] `gpf start` 无参数 → 列出子功能
   - [ ] 完整的交互式菜单系统
 
 - [ ] **智能推荐系统**
@@ -363,7 +363,7 @@ git-pr-flow start auth/login
 ### 立即开始 (本周)
 1. **创建GitHub仓库和基础结构**
 2. **设置开发环境和CI/CD**
-3. **实现第一个命令 (`git-pr-flow init`)**
+3. **实现第一个命令 (`gpf init`)**
 
 ### 短期目标 (1个月内)
 1. **完成MVP核心功能**

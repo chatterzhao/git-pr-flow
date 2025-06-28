@@ -13,17 +13,17 @@
 
 ### 核心命令
 
-#### `git-pr-flow init`
+#### `gpf init`
 初始化功能开发环境
 
 **语法**:
 ```bash
-git-pr-flow init [功能名称]
+gpf init [功能名称]
 ```
 
 **无参数使用** (列出现有功能):
 ```bash
-$ git-pr-flow init
+$ gpf init
 
 📋 检测到的现有功能配置:
 
@@ -52,7 +52,7 @@ $ git-pr-flow init
 
 **智能配置复用初始化**:
 ```bash
-$ git-pr-flow init auth
+$ gpf init auth
 
 ▶ 初始化功能开发环境
 
@@ -85,12 +85,12 @@ $ git-pr-flow init auth
 
 ✔ 功能环境就绪 (基于已有配置)
 💡 架构: develop ← epic/auth ← features
-ℹ 使用 'git-pr-flow start' 开始子功能开发
+ℹ 使用 'gpf start' 开始子功能开发
 ```
 
 **首次配置流程** (无配置文件时):
 ```bash
-$ git-pr-flow init auth
+$ gpf init auth
 
 🔍 检测已有配置...
 ℹ 未发现配置文件，开始新配置
@@ -112,7 +112,7 @@ $ git-pr-flow init auth
 # ... 继续正常配置流程 ...
 
 ✔ 配置完成，已保存到 .git-pr-flow.yaml
-💡 下次使用 'git-pr-flow init auth' 将直接复用此配置
+💡 下次使用 'gpf init auth' 将直接复用此配置
 ```
 
 **配置文件格式**:
@@ -155,12 +155,12 @@ config_version: "1.0"
 
 ---
 
-#### `git-pr-flow start`
+#### `gpf start`
 开始新的子功能开发 (含自动分支切换)
 
 **语法**:
 ```bash
-git-pr-flow start [子功能名] [选项]
+gpf start [子功能名] [选项]
 ```
 
 **新功能**: 自动分支切换
@@ -170,7 +170,7 @@ git-pr-flow start [子功能名] [选项]
 
 **无参数使用** (列出现有子功能):
 ```bash
-$ git-pr-flow start
+$ gpf start
 
 🔍 检测当前Epic环境: auth (用户认证系统)
 📋 现有子功能分支:
@@ -202,7 +202,7 @@ $ git-pr-flow start
 
 **智能交互式设计**:
 ```bash
-$ git-pr-flow start auth/register
+$ gpf start auth/register
 
 🔍 分析子功能: auth/register
   ✔ 检测到功能: auth (已存在)

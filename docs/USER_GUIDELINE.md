@@ -49,7 +49,7 @@ git-pr-flow --version
 
 ```bash
 cd your-project
-git-pr-flow init auth # 如果只有 init 没有后面参数，则会列出所有功能（子分支），或者要求输入功能名，用模板帮你创建
+gpf init auth # 如果只有 init 没有后面参数，则会列出所有功能（子分支），或者要求输入功能名，用模板帮你创建
 ```
 
 **这时会发生什么：**
@@ -84,7 +84,7 @@ git-pr-flow init auth # 如果只有 init 没有后面参数，则会列出所�
 ### 第3步：开始第一个子功能
 
 ```bash
-git-pr-flow start auth/login # 如果只有 start 没有后面参数，则会列出所有子功能（子分支）
+gpf start auth/login # 如果只有 start 没有后面参数，则会列出所有子功能（子分支）
 ```
 
 **这时会发生什么：**
@@ -116,7 +116,7 @@ git-pr-flow start auth/login # 如果只有 start 没有后面参数，则会列
 - 可以专注开发登录功能
 
 **注意：**
-由于我们使用了 worktrees，所以你随时可以 cd 进入另一个工作环境，传统cd 方式 或 git-pr-flow start auth/register。
+由于我们使用了 worktrees，所以你随时可以 cd 进入另一个工作环境，传统cd 方式 或 gpf start auth/register。
 
 ### 第4步：正常开发第一个功能
 
@@ -138,7 +138,7 @@ git commit -m "feat: 添加密码强度验证"
 ### 第5步：开始第二个子功能
 
 ```bash
-git-pr-flow start auth/register
+gpf start auth/register
 ```
 
 **这时会发生什么：**
@@ -496,8 +496,8 @@ login → register → social → 2fa (过长的依赖链)
 ```bash
 # 如果已经有功能分支，可以迁移到Epic模式
 git checkout existing-branch
-git-pr-flow init auth
-git-pr-flow start auth/existing --existing
+gpf init auth
+gpf start auth/existing --existing
 ```
 
 ### Q: 忘记当前在哪个分支？
@@ -552,7 +552,7 @@ git-pr-flow help quickstart
 
 **开始你的第一个Epic：**
 ```bash
-git-pr-flow init your-feature-name
+gpf init your-feature-name
 ```
 
 5分钟后，你就能体验到高质量PR开发的全新方式！
