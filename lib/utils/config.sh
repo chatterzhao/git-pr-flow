@@ -3,6 +3,9 @@
 # Git PR Flow - 配置管理工具
 # 处理配置文件读写、Epic配置管理等
 
+# 引入路径管理工具
+source "$(dirname "${BASH_SOURCE[0]}")/paths.sh"
+
 # 配置文件路径
 readonly PROJECT_CONFIG_FILE=".git/pr-config"
 readonly GLOBAL_CONFIG_FILE="$HOME/.gitprconfig"
@@ -11,19 +14,12 @@ readonly GLOBAL_CONFIG_FILE="$HOME/.gitprconfig"
 get_epic_config_file() {
     local epic_name="$1"
     if [[ -n "$epic_name" ]]; then
-        # 使用绝对路径获取Epic工作树目录中的配置文件
-        local project_root
-        project_root=$(get_project_root) || {
-            echo "Error: Cannot determine project root" >&2
-            return 1
-        }
-        local epic_worktree_path="$project_root/.worktrees/epic--$epic_name"
-        echo "$epic_worktree_path/.git-pr-flow.yaml"
+        # 使用新的路径API获取Epic配置文件路径
+        get_epic_config_absolute_path "$epic_name"
     else
         # 尝试从当前目录查找Epic配置
-        local current_dir=$(pwd)
-        if [[ "$current_dir" == *"/.worktrees/epic--"* ]]; then
-            # 当前在Epic工作树目录中，配置文件就在当前目录
+        if is_in_worktree; then
+            # 当前在worktree目录中，配置文件就在当前目录
             echo ".git-pr-flow.yaml"
         else
             # 尝试在项目根目录查找（向后兼容）
