@@ -33,7 +33,7 @@
 ```bash
 # 符号链接已创建
 $ ls -la ~/.local/bin/gpf
-lrwxr-xr-x@ 1 zhaoyu  staff  36  6 27 18:33 /Users/zhaoyu/.local/bin/gpf -> /Users/zhaoyu/.local/bin/git-pr-flow
+lrwxr-xr-x@ 1 user  staff  36  Jun 27 18:33 ~/.local/bin/gpf -> ~/.local/bin/git-pr-flow
 
 # 命令正常工作
 $ gpf --version

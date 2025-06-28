@@ -16,12 +16,12 @@
 [0;34mℹ️[0m   💡 建议运行: git-pr-flow sync
 
 ### 分支就绪状态  
-[1;33m⚠️[0m   ⚠️ 工作树不存在: /Users/zhaoyu/Downloads/coding/git-pr-cli/.worktrees/hooks-improvement--force-commit-support
+[1;33m⚠️[0m   ⚠️ 工作树不存在: .worktrees/hooks-improvement--force-commit-support
 [0;34mℹ️[0m   ✅ 分支有 73 个提交
 [1;33m⚠️[0m   ⚠️ 无法检查代码质量：工作树不存在
 
 ### 工作树信息
-- 工作树路径: /Users/zhaoyu/Downloads/coding/git-pr-cli/.worktrees/hooks-improvement--force-commit-support
+- 工作树路径: .worktrees/hooks-improvement--force-commit-support
 - 最后提交: 完善hooks改进文档和测试验证 (25 分钟前)
 
 ## 建议和后续步骤
