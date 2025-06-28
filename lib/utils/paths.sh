@@ -3,6 +3,12 @@
 # Git PR Flow - 路径管理工具
 # 统一所有路径计算和目录操作，支持跨平台兼容
 
+# 避免重复加载
+if [[ -n "${GPF_PATHS_LOADED:-}" ]]; then
+    return 0
+fi
+GPF_PATHS_LOADED=1
+
 # 路径分隔符（跨平台兼容）
 readonly GPF_PATH_SEP="/"
 readonly GPF_WORKTREE_SEP="--"
