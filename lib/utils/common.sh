@@ -32,7 +32,7 @@ trim() {
     echo "$var"
 }
 
-# 分支名与目录名转换
+# 分支名与目录名转换 (向后兼容)
 branch_to_worktree_path() {
     local branch_name="$1"
     echo ".worktrees/${branch_name//\//--}"

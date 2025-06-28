@@ -88,6 +88,23 @@ epic-name/feature分支: 子功能Git分支，如：user-auth/login (注意：�
 - 自动选择合理默认值，减少决策负担
 - 清晰的状态反馈，便于理解执行结果
 
+⚠️  工作流保护机制:
+GPF安装时会配置Git hooks来保护工作流完整性：
+
+🚫 禁止的提交操作:
+  - 在项目根目录的主分支(develop/main/master)上直接提交
+  - 在Epic分支(epic/xx)上直接开发和提交
+  
+✅ 推荐的开发流程:
+  - 使用 'gpf start xx/yy' 创建功能分支进行开发
+  - 在功能分支(.worktrees/xx--yy/)中正常提交
+  
+🔧 如需强制提交(紧急情况):
+  方法1: GPF_FORCE_COMMIT=1 git commit -m "紧急修复"
+  方法2: git commit -m "紧急修复 GPF_FORCE_COMMIT"
+  
+  ⚠️  强制提交会跳过工作流保护，请谨慎使用！
+
 参数格式:
   epic-name: 小写字母数字连字符 (如: user-auth, payment-api)
   epic-name/feature: Epic名/功能名 (如: user-auth/login)
