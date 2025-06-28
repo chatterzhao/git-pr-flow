@@ -456,7 +456,7 @@ show_all_epics_overview() {
     show_repository_basic_status
     
     # 列出所有Epic
-    # show_all_epics_list  # TODO: 实现这个函数或移除调用
+    show_all_epics_list
     
     # 显示工作树概览
     ui_subheader "工作树概览"
@@ -475,7 +475,7 @@ show_specific_epic_status() {
     if ! config_epic_exists "$epic_name"; then
         ui_error "Epic '$epic_name' 不存在"
         ui_info "可用的Epic:"
-        # show_all_epics_list  # TODO: 实现这个函数或移除调用
+        show_all_epics_list
         return 1
     fi
     
@@ -502,5 +502,77 @@ show_worktrees_summary() {
         echo "  💭 暂无工作树"
     else
         echo "  📊 总计: $worktree_count 个工作树"
+    fi
+}
+
+# 显示所有Epic列表
+show_all_epics_list() {
+    ui_subheader "Epic状态概览"
+    
+    local epic_count=0
+    local has_epics=false
+    
+    # 检查所有epic分支
+    local epic_branches
+    epic_branches=$(git branch -a | grep -E "epic/" | sed 's/^[* ] //' | sed 's/^remotes\/[^/]*\///' | sort -u || true)
+    
+    if [[ -n "$epic_branches" ]]; then
+        has_epics=true
+        while IFS= read -r branch; do
+            if [[ -n "$branch" ]]; then
+                local epic_name="${branch#epic/}"
+                local worktree_path=".worktrees/epic--$epic_name"
+                local status_icon config_status worktree_status
+                
+                # 检查配置文件状态
+                if config_epic_exists "$epic_name"; then
+                    config_status="✅"
+                else
+                    config_status="❌"
+                fi
+                
+                # 检查工作树状态
+                if [[ -d "$worktree_path" ]]; then
+                    worktree_status="🏠"
+                else
+                    worktree_status="📋"
+                fi
+                
+                # 获取子功能数量
+                local feature_count
+                feature_count=$(git branch | grep -c "^[* ] $epic_name/" 2>/dev/null || echo "0")
+                
+                echo "  $config_status $worktree_status $branch ($feature_count 个子功能)"
+                ((epic_count++))
+            fi
+        done <<< "$epic_branches"
+    fi
+    
+    # 检查工作树目录中的孤立epic（有目录但无分支）
+    if [[ -d ".worktrees" ]]; then
+        for worktree in .worktrees/epic--*/; do
+            if [[ -d "$worktree" ]]; then
+                local worktree_name
+                worktree_name=$(basename "$worktree")
+                local epic_name="${worktree_name#epic--}"
+                local branch_name="epic/$epic_name"
+                
+                # 检查是否有对应的分支
+                if ! git branch | grep -q "^[* ] $branch_name$"; then
+                    echo "  ⚠️  💼 $worktree_name (孤立工作树，无对应分支)"
+                    has_epics=true
+                    ((epic_count++))
+                fi
+            fi
+        done
+    fi
+    
+    if [[ "$has_epics" == "false" ]]; then
+        echo "  💭 暂无Epic"
+        echo "  💡 使用 'gpf init <epic-name>' 创建新Epic"
+    else
+        echo "  📊 总计: $epic_count 个Epic"
+        echo
+        echo "  图例: ✅=有配置 ❌=缺配置 🏠=有工作树 📋=仅分支 ⚠️=异常"
     fi
 }
