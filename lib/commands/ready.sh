@@ -5,55 +5,550 @@
 
 # ready命令主函数
 cmd_ready() {
-    local action="${1:-check}"
+    local target_branch="${1:-}"
     
-    # 检查Epic配置
-    if ! config_epic_exists; then
-        ui_error "未找到Epic配置文件"
-        ui_info "请先运行: gpf init <epic-name>"
+    # 加载path工具函数
+    if [[ -f "$PROJECT_ROOT/lib/utils/paths.sh" ]]; then
+        source "$PROJECT_ROOT/lib/utils/paths.sh"
+    fi
+    
+    # 如果没有参数，启动智能分支选择模式
+    if [[ -z "$target_branch" ]]; then
+        target_branch=$(smart_branch_selection)
+        if [[ -z "$target_branch" ]]; then
+            ui_info "已取消操作"
+            return 0
+        fi
+    fi
+    
+    # 验证目标分支格式 (应该是 xx/yy 格式)
+    if ! validate_feature_branch_format "$target_branch"; then
+        ui_error "无效的分支格式: $target_branch"
+        ui_info "分支格式应为: epic-name/feature-name，如: auth/login"
         return 1
     fi
     
-    # 获取当前epic名称用于验证
-    local epic_name
-    epic_name=$(detect_current_epic)
-    if [[ -z "$epic_name" ]]; then
-        ui_error "无法检测当前Epic名称"
-        return 1
-    fi
-
-    if ! config_epic_validate "$epic_name"; then
-        ui_error "Epic配置文件无效"
-        return 1
-    fi
-    
-    case "$action" in
-        "check")
-            check_epic_readiness
-            ;;
-        "report")
-            generate_readiness_report
-            ;;
-        "release")
-            prepare_epic_release
-            ;;
-        "validate")
-            validate_epic_dependencies
-            ;;
-        *)
-            ui_error "无效的ready操作: $action"
-            ui_info "支持的操作: check, report, release, validate"
-            ui_info "用法示例:"
-            ui_info "  git-pr-flow ready check     # 检查Epic发布就绪状态"
-            ui_info "  git-pr-flow ready report    # 生成详细就绪报告"
-            ui_info "  git-pr-flow ready release   # 准备Epic发布"
-            ui_info "  git-pr-flow ready validate  # 验证依赖关系完整性"
-            return 1
-            ;;
-    esac
+    # 执行完整的ready检查流程
+    execute_full_ready_pipeline "$target_branch"
 }
 
-# 检查Epic发布就绪状态
+# 验证功能分支格式
+validate_feature_branch_format() {
+    local branch_name="$1"
+    
+    # 基本格式检查：应该包含 /
+    if [[ "$branch_name" != */* ]]; then
+        return 1
+    fi
+    
+    # 不应该以 epic/ 开头 (ready命令处理的是功能分支)
+    if [[ "$branch_name" == epic/* ]]; then
+        return 1
+    fi
+    
+    # 分支名不能为空
+    if [[ -z "$branch_name" ]]; then
+        return 1
+    fi
+    
+    return 0
+}
+
+# 智能分支选择
+smart_branch_selection() {
+    ui_header "🚀 Ready 检查 - 智能分支选择"
+    
+    # 检测当前上下文
+    local context_type
+    context_type=$(detect_current_context_type)
+    
+    case "$context_type" in
+        "feature_worktree")
+            # 在功能分支目录中，直接使用当前分支
+            local current_feature
+            current_feature=$(detect_current_feature_name)
+            if [[ -n "$current_feature" ]]; then
+                ui_info "检测到当前功能分支: $current_feature"
+                echo "$current_feature"
+                return 0
+            fi
+            ;;
+        "epic_worktree")
+            # 在Epic目录中，列出该Epic的功能分支
+            local epic_name
+            epic_name=$(detect_current_epic_name)
+            if [[ -n "$epic_name" ]]; then
+                show_epic_branch_selection_menu "$epic_name"
+                return $?
+            fi
+            ;;
+        "project_root")
+            # 在项目根目录，列出所有功能分支
+            show_all_branch_selection_menu
+            return $?
+            ;;
+    esac
+    
+    # 如果上下文检测失败，回退到显示所有分支
+    ui_warning "无法检测当前上下文，显示所有可用分支"
+    show_all_branch_selection_menu
+}
+
+# 显示Epic下的分支选择菜单
+show_epic_branch_selection_menu() {
+    local epic_name="$1"
+    
+    # 获取Epic下的所有功能分支
+    local feature_branches
+    feature_branches=$(git_list_branches | grep "^$epic_name/" | sort)
+    
+    if [[ -z "$feature_branches" ]]; then
+        ui_warning "Epic '$epic_name' 下没有找到功能分支"
+        ui_info "使用 'gpf start $epic_name/feature-name' 创建功能分支"
+        return 1
+    fi
+    
+    # 构建选择选项（包含状态信息）
+    local options=()
+    local branch_array=()
+    
+    while IFS= read -r branch; do
+        if [[ -n "$branch" ]]; then
+            branch_array+=("$branch")
+            local status_info
+            status_info=$(get_branch_status_info "$branch")
+            options+=("$branch - $status_info")
+        fi
+    done <<< "$feature_branches"
+    
+    if [[ ${#options[@]} -eq 0 ]]; then
+        ui_warning "没有可用的功能分支"
+        return 1
+    fi
+    
+    ui_info "Epic: $epic_name"
+    local choice
+    choice=$(ui_select_menu "选择要检查的功能分支" "${options[@]}")
+    
+    if [[ $choice -ge 0 && $choice -lt ${#branch_array[@]} ]]; then
+        echo "${branch_array[$choice]}"
+        return 0
+    fi
+    
+    return 1
+}
+
+# 显示所有分支选择菜单  
+show_all_branch_selection_menu() {
+    # 获取所有功能分支（排除Epic分支）
+    local all_branches
+    all_branches=$(git_list_branches | grep "/" | grep -v "^epic/" | sort)
+    
+    if [[ -z "$all_branches" ]]; then
+        ui_warning "没有找到功能分支"
+        ui_info "使用 'gpf init epic-name' 创建Epic，然后使用 'gpf start epic-name/feature-name' 创建功能分支"
+        return 1
+    fi
+    
+    # 按Epic分组显示
+    local options=()
+    local branch_array=()
+    local current_epic=""
+    
+    while IFS= read -r branch; do
+        if [[ -n "$branch" ]]; then
+            local epic_part feature_part
+            epic_part=$(echo "$branch" | cut -d'/' -f1)
+            feature_part=$(echo "$branch" | cut -d'/' -f2-)
+            
+            if [[ "$epic_part" != "$current_epic" ]]; then
+                if [[ -n "$current_epic" ]]; then
+                    options+=("── Epic: $epic_part ──")
+                    branch_array+=("")
+                else
+                    current_epic="$epic_part"
+                fi
+                current_epic="$epic_part"
+            fi
+            
+            branch_array+=("$branch")
+            local status_info
+            status_info=$(get_branch_status_info "$branch")
+            options+=("  $feature_part - $status_info")
+        fi
+    done <<< "$all_branches"
+    
+    if [[ ${#branch_array[@]} -eq 0 ]]; then
+        ui_warning "没有可用的功能分支"
+        return 1
+    fi
+    
+    local choice
+    choice=$(ui_select_menu "选择要检查的功能分支" "${options[@]}")
+    
+    # 跳过分隔符行
+    while [[ $choice -ge 0 && $choice -lt ${#branch_array[@]} && -z "${branch_array[$choice]}" ]]; do
+        ui_warning "请选择具体的分支，而非分组标题"
+        choice=$(ui_select_menu "选择要检查的功能分支" "${options[@]}")
+    done
+    
+    if [[ $choice -ge 0 && $choice -lt ${#branch_array[@]} && -n "${branch_array[$choice]}" ]]; then
+        echo "${branch_array[$choice]}"
+        return 0
+    fi
+    
+    return 1
+}
+
+# 获取分支状态信息
+get_branch_status_info() {
+    local branch="$1"
+    
+    # 检查工作树是否存在
+    local worktree_path
+    worktree_path=$(get_branch_worktree_absolute_path "$branch" 2>/dev/null)
+    
+    if [[ ! -d "$worktree_path" ]]; then
+        echo "📋 仅分支 (无工作树)"
+        return 0
+    fi
+    
+    # 检查最后提交时间
+    local last_commit_time
+    last_commit_time=$(git log -1 --format="%cr" "$branch" 2>/dev/null || echo "未知时间")
+    
+    # 简单的就绪状态检查
+    if check_single_branch_readiness "$branch" >/dev/null 2>&1; then
+        echo "✅ 就绪 (最后提交: $last_commit_time)"
+    else
+        echo "⚠️ 待处理 (最后提交: $last_commit_time)"
+    fi
+}
+
+# 执行完整的ready检查流程
+execute_full_ready_pipeline() {
+    local target_branch="$1"
+    
+    ui_header "🚀 Ready 检查流程: $target_branch"
+    
+    # 验证分支存在性
+    if ! git_branch_exists "$target_branch"; then
+        ui_error "分支不存在: $target_branch"
+        return 1
+    fi
+    
+    local overall_success=true
+    local step=1
+    local total_steps=4
+    
+    # 步骤1: 验证依赖关系完整性
+    ui_subheader "[$step/$total_steps] 🔍 验证依赖关系完整性"
+    if validate_branch_dependencies "$target_branch"; then
+        ui_success "✅ 依赖关系验证通过"
+    else
+        ui_warning "⚠️ 依赖关系验证有警告"
+        overall_success=false
+    fi
+    ((step++))
+    echo
+    
+    # 步骤2: 检查代码质量和状态  
+    ui_subheader "[$step/$total_steps] 🔍 检查代码质量和状态"
+    if check_branch_readiness "$target_branch"; then
+        ui_success "✅ 代码质量检查通过"
+    else
+        ui_warning "⚠️ 代码质量检查有问题"
+        overall_success=false
+    fi
+    ((step++))
+    echo
+    
+    # 步骤3: 生成详细报告
+    ui_subheader "[$step/$total_steps] 📄 生成详细报告"
+    if generate_branch_readiness_report "$target_branch"; then
+        ui_success "✅ 详细报告已生成"
+    else
+        ui_warning "⚠️ 报告生成有问题"
+    fi
+    ((step++))
+    echo
+    
+    # 步骤4: 准备发布（仅在前面都通过时）
+    ui_subheader "[$step/$total_steps] 🚀 准备发布"
+    if [[ "$overall_success" == "true" ]]; then
+        if prepare_branch_release "$target_branch"; then
+            ui_success "✅ 发布准备完成"
+        else
+            ui_warning "⚠️ 发布准备有问题"
+        fi
+    else
+        ui_info "⏭️ 跳过发布准备 (前置检查未通过)"
+        ui_info "请解决上述问题后重新运行检查"
+    fi
+    
+    # 显示最终结果
+    show_pipeline_summary "$target_branch" "$overall_success"
+    
+    return $([ "$overall_success" == "true" ])
+}
+
+# 显示流程总结
+show_pipeline_summary() {
+    local branch="$1"
+    local success="$2"
+    
+    echo
+    ui_subheader "📊 Ready 检查总结"
+    
+    if [[ "$success" == "true" ]]; then
+        ui_success_box "🎉 分支已准备就绪！" \
+            "分支: $branch" \
+            "所有检查项目均已通过" \
+            "" \
+            "建议下一步操作:" \
+            "1. gpf pr $branch    # 创建PR" \
+            "2. 通知团队成员进行代码审查" \
+            "3. 合并后使用 gpf clean $branch"
+    else
+        ui_warning_box "⚠️ 分支尚未完全就绪" \
+            "分支: $branch" \
+            "存在需要关注的问题" \
+            "" \
+            "建议操作:" \
+            "1. 查看详细报告了解具体问题" \
+            "2. 解决标记的问题" \
+            "3. 重新运行: gpf ready $branch"
+    fi
+}
+
+# 验证分支依赖关系
+validate_branch_dependencies() {
+    local branch="$1"
+    
+    # 提取Epic名称
+    local epic_name
+    epic_name=$(echo "$branch" | cut -d'/' -f1)
+    
+    # 检查Epic配置是否存在
+    if ! config_epic_exists "$epic_name"; then
+        ui_warning "未找到Epic配置: $epic_name"
+        return 1
+    fi
+    
+    local base_branch
+    base_branch=$(config_epic_get "base_branch" "$epic_name")
+    
+    # 检查基础分支同步状态
+    local behind_count
+    behind_count=$(git rev-list --count "$branch..$base_branch" 2>/dev/null || echo "0")
+    
+    if [[ "$behind_count" -gt 0 ]]; then
+        ui_warning "  ⚠️ 分支落后基础分支 $behind_count 个提交"
+        ui_info "  💡 建议运行: git-pr-flow sync"
+        return 1
+    else
+        ui_info "  ✅ 与基础分支 ($base_branch) 同步"
+    fi
+    
+    # 检查分支间依赖关系
+    local dependencies
+    dependencies=$(detect_branch_dependencies "$branch")
+    
+    if [[ -n "$dependencies" ]]; then
+        ui_info "  🔗 检测到依赖: $dependencies"
+        # 验证依赖分支状态
+        if ! validate_dependencies "$branch" "$dependencies"; then
+            return 1
+        fi
+    else
+        ui_info "  ✅ 无额外依赖"
+    fi
+    
+    return 0
+}
+
+# 检查分支就绪状态
+check_branch_readiness() {
+    local branch="$1"
+    
+    local issues=0
+    
+    # 检查工作树状态
+    local worktree_path
+    worktree_path=$(get_branch_worktree_absolute_path "$branch")
+    
+    if [[ ! -d "$worktree_path" ]]; then
+        ui_warning "  ⚠️ 工作树不存在: $worktree_path"
+        ((issues++))
+    else
+        ui_info "  ✅ 工作树存在: $worktree_path"
+        
+        # 检查工作目录是否干净
+        local original_dir
+        original_dir=$(pwd)
+        
+        cd "$worktree_path" || return 1
+        
+        if git_is_clean; then
+            ui_info "  ✅ 工作目录干净"
+        else
+            ui_warning "  ⚠️ 工作目录有未提交的变更"
+            ui_info "  💡 请提交或暂存所有变更"
+            ((issues++))
+        fi
+        
+        cd "$original_dir" || true
+    fi
+    
+    # 检查提交历史
+    local commit_count
+    commit_count=$(git rev-list --count "$branch" 2>/dev/null || echo "0")
+    
+    if [[ "$commit_count" -eq 0 ]]; then
+        ui_warning "  ⚠️ 分支没有提交"
+        ((issues++))
+    else
+        ui_info "  ✅ 分支有 $commit_count 个提交"
+    fi
+    
+    # 简单的代码质量检查
+    check_code_quality_for_branch "$branch"
+    local quality_result=$?
+    
+    if [[ $quality_result -ne 0 ]]; then
+        ((issues++))
+    fi
+    
+    return $([ $issues -eq 0 ])
+}
+
+# 检查单个分支的代码质量
+check_code_quality_for_branch() {
+    local branch="$1"
+    local worktree_path
+    worktree_path=$(get_branch_worktree_absolute_path "$branch")
+    
+    if [[ ! -d "$worktree_path" ]]; then
+        ui_warning "  ⚠️ 无法检查代码质量：工作树不存在"
+        return 1
+    fi
+    
+    local original_dir issues
+    original_dir=$(pwd)
+    issues=0
+    
+    cd "$worktree_path" || return 1
+    
+    # 检查代码规范工具
+    if [[ -f "package.json" ]] && grep -q '"lint"' package.json; then
+        ui_info "  ✅ 发现lint脚本配置"
+    else
+        ui_info "  ℹ️ 未发现lint脚本配置（可选）"
+    fi
+    
+    # 检查测试配置
+    if [[ -d "test" || -d "tests" || -d "__tests__" ]] || grep -q '"test"' package.json 2>/dev/null; then
+        ui_info "  ✅ 发现测试配置"
+    else
+        ui_info "  ℹ️ 未发现测试配置（建议添加）"
+    fi
+    
+    cd "$original_dir" || true
+    
+    return $issues
+}
+
+# 生成分支就绪报告
+generate_branch_readiness_report() {
+    local branch="$1"
+    local epic_name
+    epic_name=$(echo "$branch" | cut -d'/' -f1)
+    local feature_name
+    feature_name=$(echo "$branch" | cut -d'/' -f2-)
+    
+    local report_file="ready-report-${branch//\//-}.md"
+    
+    ui_info "  📄 生成报告: $report_file"
+    
+    # 生成Markdown报告
+    cat > "$report_file" << EOF
+# Ready 检查报告
+
+**分支**: $branch  
+**Epic**: $epic_name  
+**功能**: $feature_name  
+**生成时间**: $(current_local_timestamp)  
+
+## 执行摘要
+
+$(if validate_branch_dependencies "$branch" >/dev/null 2>&1 && check_branch_readiness "$branch" >/dev/null 2>&1; then echo "✅ 分支已准备就绪"; else echo "⚠️ 分支有待处理问题"; fi)
+
+## 详细检查结果
+
+### 依赖关系验证
+$(validate_branch_dependencies "$branch" 2>&1 | sed 's/^//')
+
+### 分支就绪状态  
+$(check_branch_readiness "$branch" 2>&1 | sed 's/^//')
+
+### 工作树信息
+- 工作树路径: $(get_branch_worktree_absolute_path "$branch" 2>/dev/null || echo "不存在")
+- 最后提交: $(git log -1 --format="%s (%cr)" "$branch" 2>/dev/null || echo "无提交")
+
+## 建议和后续步骤
+
+1. 解决上述标记的所有问题
+2. 确保所有变更已提交
+3. 运行功能测试验证
+4. 准备创建PR: \`gpf pr $branch\`
+
+---
+*报告由 git-pr-flow ready 自动生成*
+EOF
+    
+    ui_info "  📍 报告位置: $(pwd)/$report_file"
+    
+    return 0
+}
+
+# 准备分支发布
+prepare_branch_release() {
+    local branch="$1"
+    
+    ui_info "  🚀 准备分支发布: $branch"
+    
+    # 检查远程分支状态
+    if git_remote_branch_exists "$branch"; then
+        ui_info "  📡 远程分支已存在"
+    else
+        ui_info "  📡 需要推送到远程仓库"
+        ui_info "  💡 建议运行: git push -u origin $branch"
+    fi
+    
+    # 检查PR状态
+    local pr_status
+    pr_status=$(check_branch_pr_status "$branch")
+    
+    case "$pr_status" in
+        "created")
+            ui_info "  📋 PR已创建"
+            ;;
+        "merged")
+            ui_success "  🎉 PR已合并"
+            ;;
+        "none")
+            ui_info "  📋 尚未创建PR"
+            ui_info "  💡 建议运行: gpf pr $branch"
+            ;;
+        *)
+            ui_info "  📋 PR状态: $pr_status"
+            ;;
+    esac
+    
+    return 0
+}
+
+# 检查Epic发布就绪状态 (保持向后兼容)
 check_epic_readiness() {
     local epic_name
     epic_name=$(config_epic_get "epic_name")
