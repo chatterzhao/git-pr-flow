@@ -122,7 +122,7 @@ get_pr_ready_features() {
     while IFS= read -r branch; do
         if [[ -n "$branch" ]]; then
             local worktree_path commit_count
-            worktree_path=$(branch_to_worktree_path "$branch")
+            worktree_path=$(get_branch_worktree_absolute_path "$branch")
             commit_count=$(git rev-list --count "$branch" 2>/dev/null || echo "0")
             
             # 检查是否有工作树且有提交
@@ -185,7 +185,7 @@ create_feature_pr() {
     
     # 获取工作树路径
     local worktree_path
-    worktree_path=$(branch_to_worktree_path "$feature_name")
+    worktree_path=$(get_branch_worktree_absolute_path "$feature_name")
     
     if [[ ! -d "$worktree_path" ]]; then
         ui_error "功能分支工作树不存在: $worktree_path"
@@ -227,7 +227,7 @@ analyze_pr_context() {
     "ahead_count": $(get_feature_ahead_count "$feature_name"),
     "dependencies": $(detect_pr_dependencies "$feature_name"),
     "changed_files": $(get_changed_files_count "$feature_name"),
-    "worktree_path": "$(branch_to_worktree_path "$feature_name")"
+    "worktree_path": "$(get_branch_worktree_absolute_path "$feature_name")"
 }
 EOF
 }
@@ -325,7 +325,7 @@ show_recent_commits() {
     
     # 切换到功能分支工作树
     local worktree_path original_dir
-    worktree_path=$(branch_to_worktree_path "$feature_name")
+    worktree_path=$(get_branch_worktree_absolute_path "$feature_name")
     original_dir=$(pwd)
     
     if [[ -d "$worktree_path" ]]; then
@@ -367,7 +367,7 @@ execute_pr_creation() {
     
     # 切换到功能分支工作树
     local worktree_path original_dir
-    worktree_path=$(branch_to_worktree_path "$feature_name")
+    worktree_path=$(get_branch_worktree_absolute_path "$feature_name")
     original_dir=$(pwd)
     
     cd "$worktree_path" || {

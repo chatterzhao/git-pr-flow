@@ -23,7 +23,7 @@ cmd_init() {
     local base_epic_name
     base_epic_name=$(get_base_epic_name "$input_epic_name")
     local epic_branch_name
-    epic_branch_name=$(normalize_epic_name "$input_epic_name")
+    epic_branch_name=$(to_epic_branch_name "$base_epic_name")
     
     # 验证基础Epic名称
     if ! is_valid_epic_name "$base_epic_name"; then
@@ -177,9 +177,9 @@ init_new_epic() {
         fi
     fi
     
-    # 3. 生成工作树路径 (使用epic--前缀)
+    # 3. 生成工作树路径 (使用统一路径管理)
     local worktree_base_path
-    worktree_base_path=$(generate_epic_worktree_path "$base_epic_name")
+    worktree_base_path=$(get_epic_worktree_absolute_path "$base_epic_name")
     
     # 4. 确认配置
     ui_subheader "配置确认"
@@ -235,7 +235,15 @@ init_new_epic() {
     
     ui_success "Epic工作树创建成功: $worktree_base_path"
     
-    # 8. 显示后续步骤
+    # 8. 自动切换到Epic工作目录
+    ui_info "切换到Epic工作目录..."
+    cd "$worktree_base_path" || {
+        ui_error "无法切换到Epic目录: $worktree_base_path"
+        return 1
+    }
+    ui_success "已切换到Epic工作目录: $worktree_base_path"
+    
+    # 9. 显示后续步骤
     show_next_steps "$base_epic_name"
     
     ui_success "Epic '$base_epic_name' 初始化完成！"
@@ -329,17 +337,6 @@ select_base_branch() {
     fi
 }
 
-# 生成Epic工作树路径 (带epic--前缀)
-generate_epic_worktree_path() {
-    local base_epic_name="$1"
-    echo ".worktrees/epic--$base_epic_name"
-}
-
-# 旧版本兼容 (已废弃)
-generate_worktree_path() {
-    local epic_name="$1"
-    echo ".worktrees/$epic_name"
-}
 
 # 显示详细配置信息
 show_detailed_config() {

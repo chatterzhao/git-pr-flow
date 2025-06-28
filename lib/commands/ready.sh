@@ -160,7 +160,7 @@ check_single_branch_readiness() {
     
     # 检查工作树是否存在
     local worktree_path
-    worktree_path=$(branch_to_worktree_path "$branch")
+    worktree_path=$(get_branch_worktree_absolute_path "$branch")
     
     if [[ ! -d "$worktree_path" ]]; then
         return 1

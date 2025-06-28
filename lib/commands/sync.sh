@@ -192,7 +192,7 @@ execute_dependency_sync() {
     
     # 切换到功能分支的工作树
     local worktree_path
-    worktree_path=$(branch_to_worktree_path "$feature_branch")
+    worktree_path=$(get_branch_worktree_absolute_path "$feature_branch")
     
     if [[ ! -d "$worktree_path" ]]; then
         ui_error "功能分支工作树不存在: $worktree_path"
@@ -307,7 +307,7 @@ execute_base_sync() {
     
     # 切换到功能分支的工作树
     local worktree_path
-    worktree_path=$(branch_to_worktree_path "$feature_branch")
+    worktree_path=$(get_branch_worktree_absolute_path "$feature_branch")
     
     if [[ ! -d "$worktree_path" ]]; then
         ui_error "功能分支工作树不存在: $worktree_path"

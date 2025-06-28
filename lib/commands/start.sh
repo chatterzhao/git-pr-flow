@@ -10,13 +10,13 @@ cmd_start() {
     # 智能目录切换：如果输入包含epic名称，自动切换到对应epic目录
     if [[ -n "$input_feature_name" && "$input_feature_name" == *"/"* ]]; then
         local epic_name="${input_feature_name%%/*}"  # 提取 / 前面的部分
-        local epic_worktree_path=".worktrees/epic--$epic_name"
+        local epic_worktree_path
+        epic_worktree_path=$(get_epic_worktree_absolute_path "$epic_name")
         
         # 检查当前是否已经在正确的epic目录中
         local current_dir=$(pwd)
-        local expected_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/$epic_worktree_path"
         
-        if [[ -d "$epic_worktree_path" ]] && [[ "$current_dir" != "$expected_dir" ]]; then
+        if [[ -d "$epic_worktree_path" ]] && [[ "$current_dir" != "$epic_worktree_path" ]]; then
             ui_info "检测到Epic '$epic_name'，切换到Epic工作目录"
             ui_info "从: $current_dir"
             ui_info "到: $epic_worktree_path"
@@ -108,7 +108,7 @@ handle_start_interactive() {
         while IFS= read -r branch; do
             existing_features+=("$branch")
             local worktree_path status_icon
-            worktree_path=$(branch_to_worktree_path "$branch")
+            worktree_path=$(get_branch_worktree_absolute_path "$branch")
             
             if [[ -d "$worktree_path" ]]; then
                 status_icon="🏠"
@@ -216,15 +216,14 @@ start_feature_development() {
         return 1
     fi
     
-    # 生成工作树路径
+    # 生成工作树路径 (使用统一路径管理)
     local worktree_path
-    worktree_path=$(branch_to_worktree_path "$feature_name")
+    worktree_path=$(get_branch_worktree_absolute_path "$feature_name")
     
-    ui_subheader "功能开发配置"
-    echo "  功能名称: $feature_name"
-    echo "  Epic: $epic_name"
-    echo "  子功能: $parsed_feature"
-    echo "  工作树路径: $worktree_path"
+    ui_subheader "🚀 准备创建功能开发环境"
+    echo "  📋 功能名称: $parsed_feature"
+    echo "  🎯 所属Epic: $epic_name"
+    echo "  📂 工作目录: $worktree_path"
     
     # 检查依赖关系
     local dependencies
@@ -234,9 +233,9 @@ start_feature_development() {
     fi
     
     if [[ -n "$dependencies" ]]; then
-        echo "  检测到依赖: $dependencies"
+        echo "  🔗 功能依赖: $dependencies"
     else
-        echo "  依赖关系: 无 (基础功能)"
+        echo "  🔗 功能依赖: 无（独立功能）"
     fi
     echo
     
@@ -507,7 +506,7 @@ show_epic_status() {
         
         while IFS= read -r branch; do
             local worktree_path status commits_info
-            worktree_path=$(branch_to_worktree_path "$branch")
+            worktree_path=$(get_branch_worktree_absolute_path "$branch")
             
             if [[ -d "$worktree_path" ]]; then
                 status="🏠 活跃"
@@ -643,7 +642,7 @@ auto_switch_to_epic_if_needed() {
     
     # 构建目标Epic的worktree路径
     local target_worktree_path
-    target_worktree_path=$(branch_to_worktree_path "epic--$target_epic_name")
+    target_worktree_path=$(get_epic_worktree_absolute_path "$target_epic_name")
     
     # 检查worktree是否存在
     if [[ ! -d "$target_worktree_path" ]]; then
@@ -656,12 +655,8 @@ auto_switch_to_epic_if_needed() {
     ui_info "🔄 智能Epic切换: $current_epic → $target_epic_name"
     ui_info "📁 切换到工作树: $target_worktree_path"
     
-    # 构建项目根目录的绝对路径
-    local project_root
-    project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-    
-    # 构建目标工作树的绝对路径
-    local target_worktree_abs_path="$project_root/$target_worktree_path"
+    # target_worktree_path 已经是绝对路径，直接使用
+    local target_worktree_abs_path="$target_worktree_path"
     
     # 构建相对于目标worktree的可执行文件路径
     local executable_path="../../bin/git-pr-flow"
