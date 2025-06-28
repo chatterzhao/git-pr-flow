@@ -68,7 +68,16 @@ detect_current_epic() {
 
 # 检查Epic配置文件是否存在
 config_epic_exists() {
-    local epic_name="$1"
+    local epic_name="${1:-}"
+    
+    # 如果没有提供epic名称，尝试检测当前epic
+    if [[ -z "$epic_name" ]]; then
+        epic_name=$(detect_current_epic)
+        if [[ -z "$epic_name" ]]; then
+            return 1
+        fi
+    fi
+    
     local config_file
     config_file=$(get_epic_config_file "$epic_name")
     [[ -f "$config_file" ]]
