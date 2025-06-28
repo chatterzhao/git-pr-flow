@@ -383,12 +383,17 @@ execute_pr_creation() {
         return 1
     fi
     
-    # 推送分支到远程
+    # 推送分支到远程 - 使用智能推送
     ui_info "📤 推送分支到远程仓库"
-    if ! git push origin "$feature_name" 2>/dev/null; then
-        ui_warning "推送失败，尝试强制推送"
-        if ! git push -f origin "$feature_name" 2>/dev/null; then
+    
+    # 引入智能推送工具
+    source "${PROJECT_ROOT}/lib/utils/smart-push.sh"
+    
+    if ! smart_push_branch "$feature_name" "false" "true"; then
+        ui_warning "常规推送失败，尝试强制推送"
+        if ! smart_push_branch "$feature_name" "true" "true"; then
             ui_error "无法推送分支到远程"
+            ui_info "运行 'gpf push --diagnose' 获取详细诊断"
             cd "$original_dir" || true
             return 1
         fi
