@@ -68,6 +68,22 @@ is_in_worktree() {
     [[ "$current_dir" == *"/.worktrees/"* ]]
 }
 
+# 检查当前是否在Epic工作树中
+is_in_epic_worktree() {
+    local current_dir=$(pwd)
+    [[ "$current_dir" == *"/.worktrees/epic--"* ]]
+}
+
+# 检查当前是否在功能分支工作树中
+is_in_feature_worktree() {
+    local current_dir=$(pwd)
+    # 在worktree中但不是Epic工作树
+    if [[ "$current_dir" == *"/.worktrees/"* && "$current_dir" != *"/.worktrees/epic--"* ]]; then
+        return 0
+    fi
+    return 1
+}
+
 # =====================================================
 # Epic路径相关
 # =====================================================
@@ -320,4 +336,154 @@ cleanup_invalid_worktrees() {
     if [[ -d "$project_root/.worktrees" ]]; then
         find "$project_root/.worktrees" -maxdepth 1 -type d -empty -delete 2>/dev/null || true
     fi
+}
+
+# =====================================================
+# 智能上下文检测和分析
+# =====================================================
+
+# 从当前目录检测Epic名称
+detect_current_epic_name() {
+    local current_dir=$(pwd)
+    
+    # 如果在Epic工作树中
+    if [[ "$current_dir" == *"/.worktrees/epic--"* ]]; then
+        # 提取Epic名称
+        echo "$current_dir" | sed 's|.*/\.worktrees/epic--\([^/]*\).*|\1|'
+        return 0
+    fi
+    
+    return 1
+}
+
+# 从当前目录检测功能分支名称
+detect_current_feature_name() {
+    local current_dir=$(pwd)
+    
+    # 如果在功能分支工作树中
+    if is_in_feature_worktree; then
+        local worktree_name
+        worktree_name=$(echo "$current_dir" | sed 's|.*/\.worktrees/\([^/]*\).*|\1|')
+        # 将 -- 转换回 /
+        echo "${worktree_name//${GPF_WORKTREE_SEP}/${GPF_PATH_SEP}}"
+        return 0
+    fi
+    
+    return 1
+}
+
+# 检测当前上下文类型
+# 返回: "project_root", "epic_worktree", "feature_worktree", "unknown"
+detect_current_context_type() {
+    if is_in_project_root; then
+        echo "project_root"
+    elif is_in_epic_worktree; then
+        echo "epic_worktree"
+    elif is_in_feature_worktree; then
+        echo "feature_worktree"
+    else
+        echo "unknown"
+    fi
+}
+
+# 获取当前上下文的完整信息
+get_current_context_info() {
+    local context_type
+    context_type=$(detect_current_context_type)
+    
+    case "$context_type" in
+        "project_root")
+            echo "type:project_root|path:$(pwd)|description:项目根目录"
+            ;;
+        "epic_worktree")
+            local epic_name
+            epic_name=$(detect_current_epic_name)
+            echo "type:epic_worktree|epic:$epic_name|path:$(pwd)|description:Epic工作树: $epic_name"
+            ;;
+        "feature_worktree")
+            local feature_name epic_name
+            feature_name=$(detect_current_feature_name)
+            epic_name=$(extract_epic_from_feature "$feature_name" 2>/dev/null || echo "unknown")
+            echo "type:feature_worktree|feature:$feature_name|epic:$epic_name|path:$(pwd)|description:功能分支工作树: $feature_name"
+            ;;
+        *)
+            echo "type:unknown|path:$(pwd)|description:未知上下文"
+            ;;
+    esac
+}
+
+# 检查命令是否适合当前上下文
+# 参数: 命令名称
+# 返回: 0=适合, 1=不适合
+is_command_suitable_for_context() {
+    local command="$1"
+    local context_type
+    context_type=$(detect_current_context_type)
+    
+    case "$command" in
+        "init"|"status"|"sync")
+            # 这些命令适合所有上下文
+            return 0
+            ;;
+        "start")
+            # start命令在项目根目录或Epic工作树中适合
+            if [[ "$context_type" == "project_root" || "$context_type" == "epic_worktree" ]]; then
+                return 0
+            fi
+            return 1
+            ;;
+        "ready"|"pr"|"clean")
+            # 这些命令需要在Epic或功能分支工作树中
+            if [[ "$context_type" == "epic_worktree" || "$context_type" == "feature_worktree" ]]; then
+                return 0
+            fi
+            return 1
+            ;;
+        *)
+            # 未知命令，假设适合
+            return 0
+            ;;
+    esac
+}
+
+# 为命令提供上下文建议
+# 参数: 命令名称
+get_context_suggestion_for_command() {
+    local command="$1"
+    local context_type
+    context_type=$(detect_current_context_type)
+    
+    if is_command_suitable_for_context "$command"; then
+        return 0
+    fi
+    
+    case "$command" in
+        "ready"|"pr"|"clean")
+            case "$context_type" in
+                "project_root")
+                    echo "该命令需要在Epic或功能分支工作树中运行"
+                    echo "建议操作:"
+                    echo "  1. 使用 'gpf status' 查看可用的Epic"
+                    echo "  2. 使用 'gpf init <epic-name>' 进入或创建Epic"
+                    echo "  3. 使用 'gpf start <epic-name>/<feature-name>' 进入或创建功能分支"
+                    ;;
+                *)
+                    echo "该命令不适合当前上下文"
+                    ;;
+            esac
+            ;;
+        "start")
+            case "$context_type" in
+                "feature_worktree")
+                    echo "您当前在功能分支工作树中"
+                    echo "建议操作:"
+                    echo "  1. 使用 'gpf ready' 完成当前功能"
+                    echo "  2. 或切换到Epic工作树: cd ../../.worktrees/epic--<epic-name>"
+                    ;;
+                *)
+                    echo "start命令在项目根目录或Epic工作树中效果最佳"
+                    ;;
+            esac
+            ;;
+    esac
 }
