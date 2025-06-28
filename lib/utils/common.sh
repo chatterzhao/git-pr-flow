@@ -266,9 +266,8 @@ get_project_root() {
     local current_dir=$(pwd)
     if [[ "$current_dir" == *"/.worktrees/"* ]]; then
         # 在worktree中，推断项目根目录
-        if [[ "$current_dir" =~ ^(.*)/\.worktrees/ ]]; then
-            project_root="${BASH_REMATCH[1]}"
-        fi
+        # 使用sed替代有问题的bash正则表达式
+        project_root=$(echo "$current_dir" | sed 's|/\.worktrees/.*||')
     else
         # 使用git获取根目录
         project_root=$(git rev-parse --show-toplevel 2>/dev/null) || true
