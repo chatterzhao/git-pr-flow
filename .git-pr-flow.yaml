@@ -1,21 +1,23 @@
-# Git PR Flow Epic配置文件
-# Epic: path-refactor
-# 创建于: 2025-06-28T07:48:44Z
+# Git PR Flow 功能分支配置文件
+# 功能分支: pr-command-fix/detect-epic-fix
+# 创建于: 2025-06-28T08:30:00Z
 
-epic_name: "path-refactor"
-epic_branch: "epic/path-refactor"
-description: "path-refactor Epic功能开发"
-base_branch: "develop"
-worktree_path: ".worktrees/epic--path-refactor"
+feature_name: "pr-command-fix/detect-epic-fix"
+epic_name: "pr-command-fix"
+epic_branch: "epic/pr-command-fix"
+description: "修复detect_current_epic函数的工作树路径解析逻辑"
+base_branch: "epic/pr-command-fix"
+worktree_path: ".worktrees/epic--pr-command-fix--detect-epic-fix"
 config_version: "1.0"
-created_at: "2025-06-28T07:48:44Z"
-last_updated: "2025-06-28T07:48:44Z"
+created_at: "2025-06-28T08:30:00Z"
+last_updated: "2025-06-28T08:30:00Z"
+branch_type: "feature"
 
-# 自动化设置
+# 功能设置
 auto_switch_branch: true
 auto_sync: false
 auto_cleanup: false
 
 # 工作流设置
 workflow_type: "gitflow"
-pr_strategy: "progressive"
+pr_strategy: "feature_to_epic"

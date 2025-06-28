@@ -74,10 +74,19 @@ cmd_pr() {
         return 1
     fi
     
-    # 如果没有提供功能名称，显示交互式选择
+    # 如果没有提供功能名称，根据当前上下文智能判断
     if [[ -z "$feature_name" ]]; then
-        if ! handle_pr_interactive; then
-            return 1
+        local context_result
+        context_result=$(detect_pr_context)
+        
+        if [[ -n "$context_result" ]]; then
+            # 自动检测到上下文，直接处理
+            handle_context_pr "$context_result" "$target_branch" "$push_remote"
+        else
+            # 无法自动检测，显示交互式选择
+            if ! handle_pr_interactive; then
+                return 1
+            fi
         fi
         return 0
     fi
@@ -93,6 +102,83 @@ cmd_pr() {
     
     # 执行PR创建
     create_feature_pr "$full_feature_name" "$target_branch" "$push_remote"
+}
+
+# 检测当前PR上下文
+detect_pr_context() {
+    local current_dir=$(pwd)
+    local current_branch=$(git branch --show-current 2>/dev/null || echo "")
+    
+    if [[ -z "$current_branch" ]]; then
+        return 1
+    fi
+    
+    # 检测当前位置类型
+    if [[ "$current_dir" == *"/.worktrees/epic--"*"--"* ]]; then
+        # 在功能分支工作树中：xx/yy -> epic/xx
+        echo "feature:$current_branch"
+        return 0
+    elif [[ "$current_dir" == *"/.worktrees/epic--"* ]]; then
+        # 在Epic分支工作树中：epic/xx -> develop
+        echo "epic:$current_branch"
+        return 0
+    fi
+    
+    # 如果在项目根目录，根据分支名判断
+    if [[ "$current_branch" == epic/* ]]; then
+        echo "epic:$current_branch"
+        return 0
+    elif [[ "$current_branch" == */* ]]; then
+        echo "feature:$current_branch"
+        return 0
+    fi
+    
+    return 1
+}
+
+# 处理上下文感知的PR创建
+handle_context_pr() {
+    local context="$1"
+    local target_branch="$2"
+    local push_remote="$3"
+    
+    local context_type="${context%%:*}"
+    local branch_name="${context#*:}"
+    
+    case "$context_type" in
+        "feature")
+            # 功能分支 → Epic分支
+            ui_info "🎯 检测到功能分支上下文: $branch_name"
+            local epic_name
+            epic_name=$(echo "$branch_name" | cut -d'/' -f1)
+            local default_target="epic/$epic_name"
+            
+            if [[ -z "$target_branch" ]]; then
+                target_branch="$default_target"
+            fi
+            
+            ui_info "📋 准备创建PR: $branch_name → $target_branch"
+            create_feature_pr "$branch_name" "$target_branch" "$push_remote"
+            ;;
+            
+        "epic")
+            # Epic分支 → develop分支
+            ui_info "🎯 检测到Epic分支上下文: $branch_name"
+            local default_target="develop"
+            
+            if [[ -z "$target_branch" ]]; then
+                target_branch="$default_target"
+            fi
+            
+            ui_info "📋 准备创建PR: $branch_name → $target_branch"
+            create_feature_pr "$branch_name" "$target_branch" "$push_remote"
+            ;;
+            
+        *)
+            ui_error "未知的上下文类型: $context_type"
+            return 1
+            ;;
+    esac
 }
 
 # 交互式PR创建处理
@@ -262,7 +348,18 @@ analyze_pr_context() {
     local feature_name="$1"
     local epic_name base_branch
     epic_name=$(config_epic_get "epic_name")
-    base_branch=$(config_epic_get "base_branch")
+    
+    # 智能检测当前环境并获取正确的base_branch
+    local worktree_path
+    worktree_path=$(get_branch_worktree_absolute_path "$feature_name")
+    
+    if config_feature_exists "$worktree_path"; then
+        # 功能分支：使用功能分支配置的base_branch
+        base_branch=$(config_feature_get "base_branch" "" "$worktree_path")
+    else
+        # Epic分支：使用Epic配置的base_branch
+        base_branch=$(config_epic_get "base_branch")
+    fi
     
     # 创建上下文对象
     cat << EOF
@@ -405,12 +502,31 @@ execute_pr_creation() {
     
     ui_loading "🚀 创建PR: $feature_name"
     
-    # 确定目标分支
+    # 确定目标分支 - 智能检测当前环境
     local final_target_branch
     if [[ -n "$target_branch" ]]; then
         final_target_branch="$target_branch"
     else
-        final_target_branch=$(config_epic_get "base_branch")
+        # 获取功能分支工作树路径并检测配置类型
+        local worktree_path
+        worktree_path=$(get_branch_worktree_absolute_path "$feature_name")
+        
+        # 检查是否存在功能分支配置文件
+        if config_feature_exists "$worktree_path"; then
+            # 功能分支：使用功能分支配置的base_branch
+            final_target_branch=$(config_feature_get "base_branch" "" "$worktree_path")
+            ui_info "检测到功能分支环境，目标分支: $final_target_branch"
+        else
+            # Epic分支：使用Epic配置的base_branch
+            final_target_branch=$(config_epic_get "base_branch")
+            ui_info "检测到Epic分支环境，目标分支: $final_target_branch"
+        fi
+        
+        # 如果仍然为空，使用默认值
+        if [[ -z "$final_target_branch" ]]; then
+            final_target_branch="develop"
+            ui_warning "无法检测目标分支，使用默认分支: develop"
+        fi
     fi
     
     # 切换到功能分支工作树

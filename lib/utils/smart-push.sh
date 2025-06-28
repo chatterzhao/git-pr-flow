@@ -155,7 +155,32 @@ smart_select_push_target() {
     
     log_debug "为分支 $branch 选择推送目标"
     
-    # 1. 优先检查分支的upstream配置
+    # 获取所有远程
+    local all_remotes
+    all_remotes=($(git remote 2>/dev/null || echo ""))
+    
+    if [[ ${#all_remotes[@]} -eq 0 ]]; then
+        ui_error "没有配置远程仓库"
+        return 1
+    fi
+    
+    # 1. 首先检查是否有多平台配置，多平台优先于单平台upstream
+    # 检查是否有配置多个pushurl的远程（如all）
+    for remote in "${all_remotes[@]}"; do
+        local pushurl_count
+        pushurl_count=$(git config --get-all "remote.$remote.pushurl" 2>/dev/null | wc -l | tr -d ' ')
+        
+        if [[ "$pushurl_count" -gt 1 ]]; then
+            # 验证多平台远程是否可用
+            if git push --dry-run "$remote" "$branch" >/dev/null 2>&1; then
+                log_debug "优先选择多平台远程: $remote (推送到 $pushurl_count 个平台)"
+                echo "$remote"
+                return 0
+            fi
+        fi
+    done
+    
+    # 2. 如果没有多平台配置，则使用已配置的upstream
     local upstream
     upstream=$(get_branch_upstream "$branch")
     if [[ -n "$upstream" ]]; then
@@ -165,40 +190,12 @@ smart_select_push_target() {
         return 0
     fi
     
-    # 2. 获取所有远程
-    local all_remotes
-    all_remotes=($(git remote 2>/dev/null || echo ""))
-    
-    if [[ ${#all_remotes[@]} -eq 0 ]]; then
-        ui_error "没有配置远程仓库"
-        return 1
-    fi
-    
     # 3. 标准配置检测：如果只有origin，直接使用
     if [[ ${#all_remotes[@]} -eq 1 && "${all_remotes[0]}" == "origin" ]]; then
         log_debug "检测到标准Git配置，使用origin"
         echo "origin"
         return 0
     fi
-    
-    # 4. 个性化配置检测：多平台优先策略
-    local selected_remote
-    
-    # 多平台优先策略：
-    # 1. 首先检查是否有配置多个pushurl的远程（如all）
-    for remote in "${all_remotes[@]}"; do
-        local pushurl_count
-        pushurl_count=$(git config --get-all "remote.$remote.pushurl" 2>/dev/null | wc -l | tr -d ' ')
-        
-        if [[ "$pushurl_count" -gt 1 ]]; then
-            # 验证多平台远程是否可用
-            if git push --dry-run "$remote" "$branch" >/dev/null 2>&1; then
-                log_debug "选择多平台远程: $remote (推送到 $pushurl_count 个平台)"
-                echo "$remote"
-                return 0
-            fi
-        fi
-    done
     
     # 标准优先级顺序：origin > github > gitee > 其他
     local priority_remotes=("origin" "github" "gitee")
@@ -404,9 +401,26 @@ suggest_push_solutions() {
     
     echo
     echo "  💡 手动推送选项:"
-    echo "    gpf pr --push-remote <remote>     # 指定远程仓库推送并创建PR"
-    echo "    gpf push --remote <remote>        # 单独推送到指定远程"
-    echo "    git push <remote> $branch         # 原生Git推送"
+    local all_remotes
+    all_remotes=($(git remote 2>/dev/null || echo ""))
+    
+    if [[ ${#all_remotes[@]} -gt 0 ]]; then
+        echo "    基于你的配置，可以使用："
+        for remote in "${all_remotes[@]}"; do
+            local remote_url
+            remote_url=$(git config "remote.$remote.url" 2>/dev/null || echo "")
+            echo "      gpf pr --push-remote $remote    # 推送到 $remote ($remote_url)"
+        done
+        echo
+        echo "    或者直接使用Git命令："
+        for remote in "${all_remotes[@]}"; do
+            echo "      git push $remote $branch"
+        done
+    else
+        echo "    gpf pr --push-remote <remote>     # 指定远程仓库推送并创建PR"
+        echo "    gpf push --remote <remote>        # 单独推送到指定远程"  
+        echo "    git push <remote> $branch         # 原生Git推送"
+    fi
     echo
 }
 
