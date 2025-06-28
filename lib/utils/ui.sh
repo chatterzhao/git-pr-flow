@@ -3,6 +3,12 @@
 # Git PR Flow - 用户界面工具
 # 提供交互式界面、颜色输出、进度显示等功能
 
+# 避免重复加载
+if [[ -n "${GPF_UI_LOADED:-}" ]]; then
+    return 0
+fi
+GPF_UI_LOADED=1
+
 # 颜色定义
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
