@@ -11,14 +11,19 @@ readonly GLOBAL_CONFIG_FILE="$HOME/.gitprconfig"
 get_epic_config_file() {
     local epic_name="$1"
     if [[ -n "$epic_name" ]]; then
-        # 在Epic工作树目录中查找配置文件
-        local epic_worktree_path=".worktrees/epic--$epic_name"
+        # 使用绝对路径获取Epic工作树目录中的配置文件
+        local project_root
+        project_root=$(get_project_root) || {
+            echo "Error: Cannot determine project root" >&2
+            return 1
+        }
+        local epic_worktree_path="$project_root/.worktrees/epic--$epic_name"
         echo "$epic_worktree_path/.git-pr-flow.yaml"
     else
         # 尝试从当前目录查找Epic配置
         local current_dir=$(pwd)
-        if [[ "$current_dir" =~ /\.worktrees/epic--([^/]+) ]]; then
-            # 当前在Epic工作树目录中
+        if [[ "$current_dir" == *"/.worktrees/epic--"* ]]; then
+            # 当前在Epic工作树目录中，配置文件就在当前目录
             echo ".git-pr-flow.yaml"
         else
             # 尝试在项目根目录查找（向后兼容）
@@ -34,9 +39,13 @@ detect_current_epic() {
     git_root=$(git rev-parse --show-toplevel 2>/dev/null) || return 1
     
     # 如果当前在Epic工作树目录中
-    if [[ "$current_dir" =~ /\.worktrees/epic--([^/]+) ]]; then
-        echo "${BASH_REMATCH[1]}"
-        return 0
+    if [[ "$current_dir" == *"/.worktrees/epic--"* ]]; then
+        local epic_name
+        epic_name=$(echo "$current_dir" | grep -o "epic--[^/]*" | sed 's/epic--//')
+        if [[ -n "$epic_name" ]]; then
+            echo "$epic_name"
+            return 0
+        fi
     fi
     
     # 如果在项目根目录，尝试查找可用的Epic配置
