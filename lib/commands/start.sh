@@ -7,22 +7,22 @@
 cmd_start() {
     local input_feature_name="$1"
     
-    # 检查Epic配置
-    local current_epic
-    current_epic=$(detect_current_epic)
-    if [[ -z "$current_epic" ]] || ! config_epic_exists "$current_epic"; then
-        ui_error "未找到Epic配置文件"
-        ui_info "请先运行: gpf init <epic-name>"
-        return 1
-    fi
-    
-    if ! config_epic_validate "$current_epic"; then
-        ui_error "Epic配置文件无效"
-        return 1
-    fi
-    
     # 如果没有提供功能名称，显示交互式选择
     if [[ -z "$input_feature_name" ]]; then
+        # 检查Epic配置
+        local current_epic
+        current_epic=$(detect_current_epic)
+        if [[ -z "$current_epic" ]] || ! config_epic_exists "$current_epic"; then
+            ui_error "未找到Epic配置文件"
+            ui_info "请先运行: gpf init <epic-name>"
+            return 1
+        fi
+        
+        if ! config_epic_validate "$current_epic"; then
+            ui_error "Epic配置文件无效"
+            return 1
+        fi
+        
         if ! handle_start_interactive; then
             return 1
         fi
@@ -37,6 +37,29 @@ cmd_start() {
     if ! is_valid_feature_name "$normalized_feature_name"; then
         ui_error "无效的功能名称: $normalized_feature_name"
         ui_info "功能名称格式: epic-name/feature-name，如: auth/login, user-profile/avatar"
+        return 1
+    fi
+    
+    # 提取目标Epic名称
+    local target_epic_name
+    target_epic_name=$(extract_epic_from_feature_name "$normalized_feature_name")
+    
+    # 智能Epic环境切换
+    if ! auto_switch_to_epic_if_needed "$target_epic_name" "$input_feature_name"; then
+        return 1
+    fi
+    
+    # 重新检查Epic配置（切换后）
+    local current_epic
+    current_epic=$(detect_current_epic)
+    if [[ -z "$current_epic" ]] || ! config_epic_exists "$current_epic"; then
+        ui_error "未找到Epic配置文件"
+        ui_info "请先运行: gpf init <epic-name>"
+        return 1
+    fi
+    
+    if ! config_epic_validate "$current_epic"; then
+        ui_error "Epic配置文件无效"
         return 1
     fi
     
@@ -560,5 +583,73 @@ parse_feature_name() {
         fi
     fi
     
+    return 1
+}
+
+# 从功能名称中提取Epic名称
+extract_epic_from_feature_name() {
+    local feature_name="$1"
+    
+    # 去除epic/前缀并提取Epic部分
+    if [[ "$feature_name" == epic/* ]]; then
+        echo "$feature_name" | sed 's|^epic/\([^/]*\)/.*|\1|'
+    else
+        echo "$feature_name" | sed 's|^\([^/]*\)/.*|\1|'
+    fi
+}
+
+# 智能Epic环境切换
+auto_switch_to_epic_if_needed() {
+    local target_epic_name="$1"
+    local original_feature_name="$2"
+    
+    # 获取当前Epic
+    local current_epic
+    current_epic=$(detect_current_epic)
+    
+    # 如果目标Epic与当前Epic相同，无需切换
+    if [[ "$current_epic" == "$target_epic_name" ]]; then
+        log_debug "当前已在正确的Epic环境中: $current_epic"
+        return 0
+    fi
+    
+    # 检查目标Epic是否存在
+    if ! config_epic_exists "$target_epic_name"; then
+        ui_error "目标Epic '$target_epic_name' 不存在"
+        ui_info "请先运行: gpf init $target_epic_name"
+        return 1
+    fi
+    
+    # 构建目标Epic的worktree路径
+    local target_worktree_path
+    target_worktree_path=$(branch_to_worktree_path "epic--$target_epic_name")
+    
+    # 检查worktree是否存在
+    if [[ ! -d "$target_worktree_path" ]]; then
+        ui_error "目标Epic工作树不存在: $target_worktree_path"
+        ui_info "Epic配置存在但工作树缺失，请重新初始化Epic"
+        return 1
+    fi
+    
+    # 显示切换信息
+    ui_info "🔄 智能Epic切换: $current_epic → $target_epic_name"
+    ui_info "📁 切换到工作树: $target_worktree_path"
+    
+    # 构建项目根目录的绝对路径
+    local project_root
+    project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+    
+    # 构建目标工作树的绝对路径
+    local target_worktree_abs_path="$project_root/$target_worktree_path"
+    
+    # 构建相对于目标worktree的可执行文件路径
+    local executable_path="../../bin/git-pr-flow"
+    
+    # 在目标Epic工作树中重新执行start命令
+    ui_info "🚀 在目标Epic环境中执行命令..."
+    cd "$target_worktree_abs_path" && exec "$executable_path" start "$original_feature_name"
+    
+    # 如果exec失败，返回错误
+    ui_error "Epic环境切换失败"
     return 1
 }
