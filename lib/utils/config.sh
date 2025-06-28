@@ -39,9 +39,13 @@ detect_current_epic() {
     git_root=$(git rev-parse --show-toplevel 2>/dev/null) || return 1
     
     # 如果当前在Epic工作树目录中
-    if [[ "$current_dir" =~ /\.worktrees/epic--([^/]+) ]]; then
-        echo "${BASH_REMATCH[1]}"
-        return 0
+    if [[ "$current_dir" == *"/.worktrees/epic--"* ]]; then
+        local epic_name
+        epic_name=$(echo "$current_dir" | grep -o "epic--[^/]*" | sed 's/epic--//')
+        if [[ -n "$epic_name" ]]; then
+            echo "$epic_name"
+            return 0
+        fi
     fi
     
     # 如果在项目根目录，尝试查找可用的Epic配置
