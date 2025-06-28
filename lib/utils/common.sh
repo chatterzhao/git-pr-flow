@@ -198,6 +198,38 @@ is_valid_branch_name() {
     return 0
 }
 
+# Epic名称验证
+is_valid_epic_name() {
+    local epic_name="$1"
+    
+    # 基本检查
+    if [[ -z "$epic_name" ]]; then
+        return 1
+    fi
+    
+    # 长度检查 (3-50字符)
+    if [[ ${#epic_name} -lt 3 || ${#epic_name} -gt 50 ]]; then
+        return 1
+    fi
+    
+    # 格式检查: 只允许小写字母、数字、连字符
+    if [[ ! "$epic_name" =~ ^[a-z0-9-]+$ ]]; then
+        return 1
+    fi
+    
+    # 不能以连字符开头或结尾
+    if [[ "$epic_name" =~ ^- ]] || [[ "$epic_name" =~ -$ ]]; then
+        return 1
+    fi
+    
+    # 不能包含连续的连字符
+    if [[ "$epic_name" =~ -- ]]; then
+        return 1
+    fi
+    
+    return 0
+}
+
 # 数组包含检查
 array_contains() {
     local element="$1"
