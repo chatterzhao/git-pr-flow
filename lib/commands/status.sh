@@ -5,12 +5,16 @@
 
 # status命令主函数
 cmd_status() {
-    local scope="${1:-epic}"
+    local target_epic_or_scope="${1:-}"
     
-    case "$scope" in
-        "epic")
-            show_epic_status_dashboard
-            ;;
+    # 如果没有参数，显示全局概览
+    if [[ -z "$target_epic_or_scope" ]]; then
+        show_all_epics_overview
+        return 0
+    fi
+    
+    # 检查是否是内置作用域
+    case "$target_epic_or_scope" in
         "global")
             show_global_status_dashboard
             ;;
@@ -21,36 +25,36 @@ cmd_status() {
             show_branches_status
             ;;
         *)
-            ui_error "无效的状态范围: $scope"
-            ui_info "支持的范围: epic, global, worktrees, branches"
-            return 1
+            # 尝试作为epic名称处理
+            show_specific_epic_status "$target_epic_or_scope"
             ;;
     esac
 }
 
 # Epic状态仪表盘
 show_epic_status_dashboard() {
-    ui_header "Epic进度仪表盘"
+    local epic_name="$1"
+    ui_header "Epic进度仪表盘: $epic_name"
     
     # 检查Epic配置
-    if ! config_epic_exists; then
-        ui_warning "未找到Epic配置"
-        ui_info "请先运行: gpf init <epic-name>"
+    if ! config_epic_exists "$epic_name"; then
+        ui_warning "未找到Epic配置: $epic_name"
+        ui_info "请先运行: gpf init $epic_name"
         echo
         show_repository_basic_status
         return 0
     fi
     
-    if ! config_epic_validate; then
-        ui_error "Epic配置文件损坏"
+    if ! config_epic_validate "$epic_name"; then
+        ui_error "Epic配置文件损坏: $epic_name"
         return 1
     fi
     
     # 基本Epic信息
-    show_epic_basic_info
+    show_epic_basic_info "$epic_name"
     
     # 分支架构图
-    show_epic_branch_architecture
+    show_epic_branch_architecture "$epic_name"
     
     # 工作树状态
     show_epic_worktrees_status
@@ -64,11 +68,12 @@ show_epic_status_dashboard() {
 
 # 显示Epic基本信息
 show_epic_basic_info() {
+    local target_epic="$1"
     local epic_name description base_branch created_at
-    epic_name=$(config_epic_get "epic_name")
-    description=$(config_epic_get "description")
-    base_branch=$(config_epic_get "base_branch")
-    created_at=$(config_epic_get "created_at")
+    epic_name=$(config_epic_get "epic_name" "$target_epic")
+    description=$(config_epic_get "description" "$target_epic")
+    base_branch=$(config_epic_get "base_branch" "$target_epic")
+    created_at=$(config_epic_get "created_at" "$target_epic")
     
     ui_subheader "Epic基本信息"
     echo "  🚀 Epic名称: $epic_name"
@@ -78,9 +83,9 @@ show_epic_basic_info() {
     
     # 自动化设置状态
     local auto_switch auto_sync auto_cleanup
-    auto_switch=$(config_epic_get "auto_switch_branch")
-    auto_sync=$(config_epic_get "auto_sync")
-    auto_cleanup=$(config_epic_get "auto_cleanup")
+    auto_switch=$(config_epic_get "auto_switch_branch" "$target_epic")
+    auto_sync=$(config_epic_get "auto_sync" "$target_epic")
+    auto_cleanup=$(config_epic_get "auto_cleanup" "$target_epic")
     
     echo "  🔄 自动分支切换: $(format_bool_status "$auto_switch")"
     echo "  🔄 自动同步: $(format_bool_status "$auto_sync")"
@@ -90,9 +95,10 @@ show_epic_basic_info() {
 
 # 显示Epic分支架构
 show_epic_branch_architecture() {
+    local target_epic="$1"
     local epic_name base_branch
-    epic_name=$(config_epic_get "epic_name")
-    base_branch=$(config_epic_get "base_branch")
+    epic_name=$(config_epic_get "epic_name" "$target_epic")
+    base_branch=$(config_epic_get "base_branch" "$target_epic")
     
     ui_subheader "分支架构"
     
@@ -440,4 +446,61 @@ format_bool_status() {
             echo "❌ 禁用"
             ;;
     esac
+}
+
+# 显示所有Epic概览
+show_all_epics_overview() {
+    ui_header "Git PR Flow 项目概览"
+    
+    # 显示项目基本信息
+    show_repository_basic_status
+    
+    # 列出所有Epic
+    show_all_epics_list
+    
+    # 显示工作树概览
+    ui_subheader "工作树概览"
+    show_worktrees_summary
+    
+    echo
+    ui_info "💡 使用 'gpf status <epic-name>' 查看特定Epic的详细状态"
+    ui_info "💡 使用 'gpf status global' 查看全局详细状态"
+}
+
+# 显示特定Epic状态
+show_specific_epic_status() {
+    local epic_name="$1"
+    
+    # 检查Epic是否存在
+    if ! config_epic_exists "$epic_name"; then
+        ui_error "Epic '$epic_name' 不存在"
+        ui_info "可用的Epic:"
+        show_all_epics_list
+        return 1
+    fi
+    
+    # 显示Epic详细状态
+    show_epic_status_dashboard "$epic_name"
+}
+
+# 工作树概览
+show_worktrees_summary() {
+    local worktree_count=0
+    
+    if [[ -d ".worktrees" ]]; then
+        for worktree in .worktrees/*/; do
+            if [[ -d "$worktree" ]]; then
+                local worktree_name
+                worktree_name=$(basename "$worktree")
+                echo "  📁 $worktree_name"
+                ((worktree_count++))
+            fi
+        done
+    fi
+    
+    if [[ $worktree_count -eq 0 ]]; then
+        echo "  💭 暂无工作树"
+    else
+        echo "  📊 总计: $worktree_count 个工作树"
+    fi
 }
