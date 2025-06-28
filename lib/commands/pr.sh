@@ -5,8 +5,50 @@
 
 # pr命令主函数
 cmd_pr() {
-    local feature_name="${1:-}"
-    local target_branch="${2:-}"
+    local feature_name=""
+    local target_branch=""
+    local push_remote=""
+    
+    # 解析参数
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --push-remote)
+                if [[ -n "$2" && "$2" != -* ]]; then
+                    push_remote="$2"
+                    shift 2
+                else
+                    ui_error "--push-remote 选项需要指定远程仓库名称"
+                    return 1
+                fi
+                ;;
+            --target)
+                if [[ -n "$2" && "$2" != -* ]]; then
+                    target_branch="$2"
+                    shift 2
+                else
+                    ui_error "--target 选项需要指定目标分支名称"
+                    return 1
+                fi
+                ;;
+            --help|-h)
+                show_pr_help
+                return 0
+                ;;
+            -*)
+                ui_error "未知选项: $1"
+                show_pr_help
+                return 1
+                ;;
+            *)
+                if [[ -z "$feature_name" ]]; then
+                    feature_name="$1"
+                elif [[ -z "$target_branch" ]]; then
+                    target_branch="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
     
     # 检查Epic配置
     if ! config_epic_exists; then
@@ -46,7 +88,7 @@ cmd_pr() {
     fi
     
     # 执行PR创建
-    create_feature_pr "$full_feature_name" "$target_branch"
+    create_feature_pr "$full_feature_name" "$target_branch" "$push_remote"
 }
 
 # 交互式PR创建处理
@@ -174,6 +216,7 @@ normalize_feature_name() {
 create_feature_pr() {
     local feature_name="$1"
     local target_branch="${2:-}"
+    local push_remote="${3:-}"
     
     ui_loading "准备创建PR: $feature_name"
     
@@ -207,7 +250,7 @@ create_feature_pr() {
     fi
     
     # 执行PR创建流程
-    execute_pr_creation "$feature_name" "$target_branch" "$pr_context"
+    execute_pr_creation "$feature_name" "$target_branch" "$pr_context" "$push_remote"
 }
 
 # 分析PR上下文
@@ -354,6 +397,7 @@ execute_pr_creation() {
     local feature_name="$1"
     local target_branch="$2"
     local pr_context="$3"
+    local push_remote="${4:-}"
     
     ui_loading "🚀 创建PR: $feature_name"
     
@@ -389,13 +433,27 @@ execute_pr_creation() {
     # 引入智能推送工具
     source "${PROJECT_ROOT}/lib/utils/smart-push.sh"
     
-    if ! smart_push_branch "$feature_name" "false" "true"; then
-        ui_warning "常规推送失败，尝试强制推送"
-        if ! smart_push_branch "$feature_name" "true" "true"; then
-            ui_error "无法推送分支到远程"
-            ui_info "运行 'gpf push --diagnose' 获取详细诊断"
-            cd "$original_dir" || true
-            return 1
+    if [[ -n "$push_remote" ]]; then
+        # 使用指定的远程推送
+        ui_info "使用指定远程: $push_remote"
+        if ! smart_push_to_remote "$feature_name" "$push_remote" "false" "true"; then
+            ui_warning "常规推送失败，尝试强制推送"
+            if ! smart_push_to_remote "$feature_name" "$push_remote" "true" "true"; then
+                ui_error "无法推送分支到远程: $push_remote"
+                cd "$original_dir" || true
+                return 1
+            fi
+        fi
+    else
+        # 使用智能推送
+        if ! smart_push_branch "$feature_name" "false" "true"; then
+            ui_warning "常规推送失败，尝试强制推送"
+            if ! smart_push_branch "$feature_name" "true" "true"; then
+                ui_error "无法推送分支到远程"
+                ui_info "运行 'gpf push --diagnose' 获取详细诊断"
+                cd "$original_dir" || true
+                return 1
+            fi
         fi
     fi
     
@@ -549,4 +607,41 @@ show_pr_next_steps() {
     echo "  git-pr-flow sync             # 同步其他分支变更"
     echo "  git-pr-flow ready            # 检查Epic发布就绪状态"
     echo
+}
+
+# 显示PR命令帮助信息
+show_pr_help() {
+    cat << EOF
+GPF PR命令 - 智能PR创建工具
+
+用法:
+  gpf pr [选项] [功能名称] [目标分支]
+
+选项:
+  --push-remote <remote>    指定推送的远程仓库
+  --target <branch>         指定目标分支
+  --help, -h                显示此帮助信息
+
+参数:
+  功能名称                  要创建PR的功能分支名称
+  目标分支                  PR的目标分支（默认为Epic基础分支）
+
+功能:
+  - 智能检测Git配置并适配不同的远程仓库设置
+  - 自动生成PR标题和描述
+  - 支持Epic上下文和依赖关系分析
+  - 提供详细的推送错误诊断和解决建议
+
+示例:
+  gpf pr feature-name                        # 创建PR，自动检测推送目标
+  gpf pr feature-name --push-remote github   # 指定推送到github远程
+  gpf pr feature-name develop                # 指定目标分支为develop
+  gpf pr --push-remote gitee feature-name    # 推送到gitee并创建PR
+
+推送失败时的解决方案:
+  1. 查看配置分析: gpf push --diagnose
+  2. 手动指定远程: gpf pr --push-remote <remote> <feature>
+  3. 原生Git推送: git push <remote> <branch>
+
+EOF
 }
