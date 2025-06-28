@@ -1,15 +1,15 @@
 # Git PR Flow Epic配置文件
-# Epic: path-refactor
-# 创建于: 2025-06-28T07:48:44Z
+# Epic: documentation-management
+# 创建于: 2025-06-28T14:13:39Z
 
-epic_name: "path-refactor"
-epic_branch: "epic/path-refactor"
-description: "path-refactor Epic功能开发"
+epic_name: "documentation-management"
+epic_branch: "epic/documentation-management"
+description: "documentation-management Epic功能开发"
 base_branch: "develop"
-worktree_path: ".worktrees/epic--path-refactor"
+worktree_path: "/Users/zhaoyu/Downloads/coding/git-pr-cli/.worktrees/epic--documentation-management"
 config_version: "1.0"
-created_at: "2025-06-28T07:48:44Z"
-last_updated: "2025-06-28T07:48:44Z"
+created_at: "2025-06-28T14:13:39Z"
+last_updated: "2025-06-28T14:13:39Z"
 
 # 自动化设置
 auto_switch_branch: true
