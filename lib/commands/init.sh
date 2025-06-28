@@ -8,6 +8,9 @@ cmd_init() {
     local input_epic_name="$1"
     local input_base_branch="${2:-}"
     
+    # 检查并确保在项目根目录执行
+    ensure_project_root_directory
+    
     # 如果没有提供Epic名称，显示现有配置或提示输入
     if [[ -z "$input_epic_name" ]]; then
         if ! handle_init_interactive; then

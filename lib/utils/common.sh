@@ -256,3 +256,54 @@ wait_for_key() {
     read -n 1 -s -r -p "$message"
     echo
 }
+
+# 确保在项目根目录执行
+ensure_project_root_directory() {
+    local current_dir=$(pwd)
+    local git_root
+    
+    # 检查是否在worktree目录中
+    if [[ "$current_dir" =~ /.worktrees/ ]]; then
+        ui_info "检测到在worktree目录中，自动切换到项目根目录"
+        ui_info "从: $current_dir"
+        
+        # 从worktree路径推断真实的项目根目录
+        # 例如: /path/to/project/.worktrees/epic--xxx -> /path/to/project
+        local real_root
+        if [[ "$current_dir" =~ ^(.*)/\.worktrees/ ]]; then
+            real_root="${BASH_REMATCH[1]}"
+        else
+            ui_error "无法从worktree路径推断项目根目录"
+            exit 1
+        fi
+        
+        ui_info "到: $real_root"
+        
+        # 验证推断的根目录是否为Git仓库
+        if [[ ! -d "$real_root/.git" ]]; then
+            ui_error "推断的根目录不是Git仓库: $real_root"
+            exit 1
+        fi
+        
+        # 切换到真实的项目根目录
+        cd "$real_root" || {
+            ui_error "无法切换到项目根目录: $real_root"
+            exit 1
+        }
+        
+        ui_success "已切换到项目根目录"
+    else
+        # 不在worktree中，使用git rev-parse获取根目录
+        if ! git_root=$(git rev-parse --show-toplevel 2>/dev/null); then
+            ui_error "当前不在Git仓库中"
+            exit 1
+        fi
+        
+        if [[ "$current_dir" != "$git_root" ]]; then
+            ui_warn "当前目录不是项目根目录"
+            ui_info "当前: $current_dir"
+            ui_info "根目录: $git_root"
+            ui_info "建议在项目根目录执行gpf命令"
+        fi
+    fi
+}
