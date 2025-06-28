@@ -1,214 +1,142 @@
-# Git PR Flow
+# Git PR Flow (GPF)
 
-> 开发一个 CLI 工具，自然产出高质量PR
+> 🚀 **自然产出高质量PR的命令行工具**  
+> 让大功能开发不再困难，享受并行开发的乐趣
 
-## 🤔 我们要解决什么问题？
+[![Version](https://img.shields.io/badge/version-0.1.0--mvp-blue)](#) [![License](https://img.shields.io/badge/license-MIT-green)](#)
 
-### 开发某个功能时的现实困境
+## 🎯 核心价值
 
-想象你要开发一个用户认证系统，包含登录、注册、2FA、社交登录四个子功能；或开发注册，也可能遇到要分多个子功能的情景：
+**解决大功能开发的3大痛点：**
+- 🔍 **巨型PR难审查** → 受控拆分，策略性提交
+- 🔗 **依赖管理混乱** → 智能依赖检测和同步
+- 🔄 **频繁分支切换** → 并行工作树，零上下文切换
 
-#### 传统方式 1：巨型PR ❌
-```bash
-# 开发3周后提交一个2000行的巨型PR
-git checkout -b feature/user-auth
-# ... 开发所有子功能 ...
-git commit -m "完整用户认证系统"
-```
+**一句话总结：** *让你能够并行开发多个子功能，在合适的时机组合提交高质量PR*
 
-**问题**：
-- 🔍 **审查困难** - 2000行代码，审查者看不完，容易走过场
-- ⚡ **风险集中** - 一旦出问题，整个功能回滚
-- 🔄 **反馈周期长** - 3周开发完才能获得反馈
-
-#### 传统方式 2：频繁小PR ❌
-```bash
-# 每完成一个子功能就立即提交PR
-Day 1: git checkout -b auth/login && 提交PR#1
-Day 3: git checkout -b auth/register && 提交PR#2 (依赖PR#1，但PR#1还在审查)
-Day 5: git checkout -b auth/login-fix && 提交PR#3 (又一个登录相关PR)
-Day 7: git checkout -b auth/2fa && 提交PR#4 (依赖PR#2，但PR#2还在修改)
-```
-
-**问题**：
-- 😵 **审查疲劳** - 审查者被频繁的小PR打扰
-- 🔗 **依赖混乱** - PR之间依赖关系不清，容易冲突
-- 🔄 **频繁切换** - 开发者在多个分支间切换，上下文丢失
-- ⏰ **节奏失控** - 开发完就必须PR，无法选择合适时机
-
-## ✨ Git PR Flow 解决方案
-
-### 受控的并行开发模式
-
-```bash
-# 1. 初始化功能开发环境
-gpf init auth
-
-# 2. 并行开发多个子功能，每个都有独立环境
-gpf start auth/login                    # 在 .worktrees/auth--login 中开发
-gpf start auth/register --depends auth/login
-gpf start auth/2fa --depends auth/register  
-gpf start auth/social --depends auth/login
-
-# 3. 开发过程中保持同步，及时发现冲突
-git-pr-flow sync  # 一键同步所有依赖关系
-
-# 4. 选择合适时机，有策略地提交PR
-Week 1: 提交 auth/login PR (基础功能稳定)
-Week 2: 同时提交 auth/register 和 auth/social PR (并行审查)
-Week 3: 提交 auth/2fa PR (依赖已合并)
-```
-
-### 核心优势
-
-| 问题 | 传统巨型PR | 传统频繁PR | **Git PR Flow** |
-|------|-----------|-----------|----------------|
-| **审查体验** | ❌ 2000行难审查 | ❌ 频繁打扰 | ✅ **200行精确PR，节奏可控** |
-| **开发效率** | ❌ 单线程开发 | ❌ 频繁切换分支 | ✅ **并行开发，独立环境** |
-| **依赖管理** | ❌ 内部耦合严重 | ❌ 依赖关系混乱 | ✅ **自动管理，关系清晰** |
-| **冲突处理** | ❌ 最后集中爆发 | ❌ 容易积累遗漏 | ✅ **及时发现，逐步解决** |
-| **PR节奏** | ❌ 一次性提交 | ❌ 被动频繁提交 | ✅ **主动控制，策略提交** |
-
-## 🚀 核心特性
-
-### 🔀 灵活的分支架构
-适配不同团队的分支策略，支持任意基分支的Epic三层架构
-```bash
-# 智能检测和选择基分支
-📋 检测到分支策略:
-├─ main (GitHub Flow)
-├─ develop (Git Flow)  
-├─ staging (预发布流)
-└─ release/v2.0 (发布分支)
-
-# 选择后的架构示例 (基于develop)
-develop (基础线) ← 您选择的基分支
-  ↑ 
-epic/auth (集成线) ← 功能完整性保证
-  ↑ ↑ ↑
-  ├── auth/login    # 子功能1
-  ├── auth/register # 子功能2  
-  └── auth/2fa      # 子功能3
-```
-
-### 🏠 独立工作环境
-每个子功能都有独立的工作树，避免分支切换的上下文丢失
-```bash
-.worktrees/
-├── auth--login/        # auth/login 分支工作树
-├── auth--register/     # auth/register 分支工作树  
-├── auth--2fa/          # auth/2fa 分支工作树
-└── payment--checkout/  # payment/checkout 分支工作树
-```
-
-### 📊 Epic进度仪表盘
-可视化整个功能的开发状态、完成度和健康指标
-```bash
-git-pr-flow status
-# 🚀 [Epic] 用户认证系统 - 总体进度: 67%
-# ├─ ✅ auth/login    (已完成) 
-# ├─ 🔄 auth/register (审核中，PR#124)
-# └─ 💻 auth/2fa      (开发中)
-```
-
-### ⏰ Epic级PR节奏控制
-支持子功能级和Epic级双重PR策略，完全受控的提交节奏
-```bash
-# 策略选择，而非被动频繁提交
-Strategy A: 渐进式发布 (子功能逐步发布)
-Strategy B: Epic整合发布 (完整功能一次发布)  
-Strategy C: 混合策略 (平衡风险和速度)
-```
-
-### 🎯 智能PR生成
-自动生成包含Epic上下文的完整PR描述，零手工编写
-```bash
-git-pr-flow pr auth/register
-# 自动生成：Epic全景图、依赖关系、测试验证、审查要点
-```
-
-## 📊 实际效果
-
-### 开发体验提升
-
-| 指标 | 传统方式 | Git PR Flow | 改善 |
-|------|---------|------------|------|
-| 分支切换成本 | 频繁stash/checkout | 独立工作树 | **消除100%** |
-| 功能完整性保证 | 缺乏集成验证 | Epic分支集成测试 | **95%可靠性** |
-| 依赖同步错误 | 手动merge易错 | Epic中转安全同步 | **减少90%** |
-| 冲突解决难度 | 积累后集中爆发 | 及时发现处理 | **减少80%** |
-| PR上下文缺失 | 手工编写描述 | 智能生成Epic上下文 | **节省95%时间** |
-| PR数量 | 要么1个巨型要么10个频繁 | Epic级策略控制 | **减少50%** |
-| 进度透明度 | 缺乏整体视图 | Epic仪表盘追踪 | **100%可视化** |
-
-### 团队协作效果
-
-- ✅ **审查质量提升** - Epic上下文完整，审查通过率从60%提升到90%
-- ✅ **审查体验改善** - 智能PR描述，审查效率提升，审查者不疲惫
-- ✅ **项目透明度** - Epic仪表盘让所有人了解功能完整进度
-- ✅ **开发效率提升** - 并行开发不阻塞，整体交付速度提升30%
-- ✅ **功能完整性** - Epic分支保证集成测试，发布风险大幅降低
-
-## 🎯 5分钟快速开始
+## ⚡ 快速开始
 
 ### 安装
 ```bash
 curl -fsSL https://github.com/chatterzhao/git-pr-flow/install.sh | bash
 ```
 
-### 体验完整工作流
+### 30秒体验
 ```bash
-# 1. 初始化功能开发（选择基分支）
-gpf init auth
-# 📋 智能检测: main, develop, staging...
-# ✅ 选择适合的基分支 (如 develop)
-# ✅ 创建三层架构和工作树
+# 1. 初始化用户认证系统开发
+gpf init user-auth develop
 
-# 2. 开始第一个子功能
-gpf start auth/login
-# ✅ 独立工作环境，专注开发
+# 2. 并行开发多个子功能
+gpf start user-auth/login      # 独立环境开发登录
+gpf start user-auth/register   # 独立环境开发注册
 
-# 3. 开始第二个子功能（智能依赖检测）
-gpf start auth/register
-# 🔍 智能推荐依赖 auth/login
-# ✅ 交互选择，清晰的依赖关系
-
-# 4. 保持依赖同步（包含基分支）
-git-pr-flow sync
-# ✅ develop → epic → 子功能的完整同步
-# ✅ 及时发现冲突，统一管理
-
-# 5. 查看Epic进度仪表盘
-git-pr-flow status
-# 📊 可视化三层架构状态
-# 📈 Epic完成度和健康指标
-
-# 6. 智能PR创建
-git-pr-flow pr auth/login
-# 🎯 自动生成包含Epic上下文的PR描述
-# 🔗 明确标识基分支和依赖关系
-
-# 7. Epic级策略性发布
-git-pr-flow ready
-# ⏰ 选择渐进式或整合式发布到基分支 (develop)
+# 3. 策略性提交PR
+gpf ready user-auth/login && gpf pr user-auth/login    # 基础功能先提交
+gpf ready user-auth/register && gpf pr user-auth/register  # 依赖功能后提交
 ```
 
-**结果**：自然产出高质量、小而完整、依赖清晰的PR！
+## 🏗️ 核心概念
 
-## 📖 完整文档
+### Epic三层架构
+```
+develop (主分支)
+   ↓
+epic/user-auth (功能集成分支)
+   ↓
+user-auth/login, user-auth/register... (子功能分支)
+```
 
-### 📘 使用文档
-- **[API参考](API.md)** - 完整命令行接口和使用示例
-- **[交互设计](UX.md)** - 用户体验和界面说明
+### 并行工作树
+```
+项目根目录/
+├── .worktrees/
+│   ├── epic--user-auth/           # Epic集成环境
+│   ├── epic--user-auth--login/    # 登录独立环境
+│   └── epic--user-auth--register/ # 注册独立环境
+└── 你的项目文件...
+```
 
-### 🔧 技术文档  
-- **[架构设计](ARCHITECTURE.md)** - 系统架构和技术实现
-- **[开发指南](DEVELOPMENT.md)** - 贡献代码和开发环境
+> 💡 **为什么目录是并列的不是嵌套的？**  
+> 这是Git worktree的特性，每个worktree都是独立的工作空间，不是文件夹的包含关系
 
-## 🤝 贡献
+## 🔄 工作流对比
 
-欢迎提交Issue和PR！请参考 **[开发指南](DEVELOPMENT.md)**
+### ❌ 传统方式的问题
 
-## 📄 许可证
+**巨型PR模式：**
+```bash
+git checkout -b feature/user-auth
+# ... 开发3周，2000行代码 ...
+git commit -m "完整用户认证系统"  # 审查者崩溃
+```
 
-MIT License
+**频繁小PR模式：**
+```bash
+Day 1: PR#1 auth/login
+Day 3: PR#2 auth/register (依赖PR#1，但PR#1还在审查)
+Day 5: PR#3 auth/login-fix (又一个登录PR...)
+Day 7: PR#4 auth/2fa (依赖PR#2，但PR#2还在修改)
+```
+
+### ✅ GPF受控并行模式
+
+```bash
+# Week 1: 并行开发，独立环境
+gpf start user-auth/login      # 在 .worktrees/epic--user-auth--login 开发
+gpf start user-auth/register   # 在 .worktrees/epic--user-auth--register 开发
+gpf start user-auth/2fa        # 在 .worktrees/epic--user-auth--2fa 开发
+
+# Week 2: 策略性提交
+gpf pr user-auth/login         # 基础功能稳定后提交
+# 继续开发其他功能...
+
+# Week 3: 有序提交
+gpf pr user-auth/register      # 登录稳定后提交注册
+gpf pr user-auth/2fa          # 注册稳定后提交2FA
+```
+
+**关键优势：**
+- 🔄 **并行开发**：多个子功能同时开发，提高效率
+- 🎯 **受控节奏**：选择合适时机提交，不再被动
+- 📋 **依赖清晰**：自动管理功能间依赖关系
+- 🔍 **审查友好**：每个PR都是完整且独立的功能
+
+## 📚 学习路径
+
+### 🚀 5分钟快速上手
+阅读本README了解核心概念，跟着快速开始体验基本流程
+
+### 📖 完整学习指南  
+👉 **[用户使用指南 →](USER_GUIDELINE.md)**
+- 详细的分步教程
+- 每个命令的执行效果展示
+- 常见问题和解决方案
+- 最佳实践建议
+
+### 🔧 深入了解
+- **[API文档](API.md)** - 所有命令的详细说明
+- **[架构设计](ARCHITECTURE.md)** - 技术实现原理
+- **[开发指南](DEVELOPMENT.md)** - 贡献代码指南
+
+## 🎉 为什么选择GPF？
+
+✅ **零学习成本** - 基于熟悉的Git操作，5分钟上手  
+✅ **AI友好设计** - 非交互式模式，LLM可直接调用  
+✅ **VS Code集成** - 自动分支切换，Git面板显示当前功能变更  
+✅ **团队协作** - 清晰的依赖关系，透明的开发进度  
+✅ **质量保证** - 内置质量门禁，确保PR质量  
+
+## 🤝 社区与支持
+
+- 🐛 **问题反馈**: [GitHub Issues](https://github.com/chatterzhao/git-pr-flow/issues)
+- 💡 **功能建议**: [GitHub Discussions](https://github.com/chatterzhao/git-pr-flow/discussions)
+- 📖 **详细文档**: [完整使用指南](USER_GUIDELINE.md)
+
+---
+
+**🚀 开始你的第一个Epic：**
+```bash
+gpf init your-feature-name develop
+```
+
+*5分钟后，你就能体验到高质量PR开发的全新方式！*
