@@ -3,6 +3,9 @@
 # Git PR Flow - status命令实现
 # Epic进度仪表盘，显示整体状态、分支关系、工作树状态等
 
+# 引入路径管理工具
+source "$(dirname "${BASH_SOURCE[0]}")/../utils/paths.sh"
+
 # status命令主函数
 cmd_status() {
     local target_epic_or_scope="${1:-}"
@@ -521,18 +524,17 @@ show_all_epics_list() {
         while IFS= read -r branch; do
             if [[ -n "$branch" ]]; then
                 local epic_name="${branch#epic/}"
-                local worktree_path=".worktrees/epic--$epic_name"
                 local status_icon config_status worktree_status
                 
-                # 检查配置文件状态
-                if config_epic_exists "$epic_name"; then
+                # 检查配置文件状态（使用新的路径API）
+                if epic_config_exists "$epic_name"; then
                     config_status="✅"
                 else
                     config_status="❌"
                 fi
                 
-                # 检查工作树状态
-                if [[ -d "$worktree_path" ]]; then
+                # 检查工作树状态（使用新的路径API）
+                if epic_worktree_exists "$epic_name"; then
                     worktree_status="🏠"
                 else
                     worktree_status="📋"
