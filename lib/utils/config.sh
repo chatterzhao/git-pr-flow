@@ -37,7 +37,18 @@ detect_current_epic() {
     # 如果当前在Epic工作树目录中
     if [[ "$current_dir" == *"/.worktrees/epic--"* ]]; then
         local epic_name
-        epic_name=$(echo "$current_dir" | grep -o "epic--[^/]*" | sed 's/epic--//')
+        local worktree_name
+        worktree_name=$(echo "$current_dir" | grep -o "epic--[^/]*" | sed 's/epic--//')
+        
+        # 检查是否是功能分支工作树格式: epic-name--feature-name
+        if [[ "$worktree_name" == *"--"* ]]; then
+            # 功能分支工作树：提取Epic名称（第一个--之前的部分）
+            epic_name="${worktree_name%%--*}"
+        else
+            # Epic工作树：直接使用
+            epic_name="$worktree_name"
+        fi
+        
         if [[ -n "$epic_name" ]]; then
             echo "$epic_name"
             return 0
