@@ -7,6 +7,27 @@
 cmd_start() {
     local input_feature_name="$1"
     
+    # 智能目录切换：如果输入包含epic名称，自动切换到对应epic目录
+    if [[ -n "$input_feature_name" && "$input_feature_name" == *"/"* ]]; then
+        local epic_name="${input_feature_name%%/*}"  # 提取 / 前面的部分
+        local epic_worktree_path=".worktrees/epic--$epic_name"
+        
+        # 检查当前是否已经在正确的epic目录中
+        local current_dir=$(pwd)
+        local expected_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/$epic_worktree_path"
+        
+        if [[ -d "$epic_worktree_path" ]] && [[ "$current_dir" != "$expected_dir" ]]; then
+            ui_info "检测到Epic '$epic_name'，切换到Epic工作目录"
+            ui_info "从: $current_dir"
+            ui_info "到: $epic_worktree_path"
+            cd "$epic_worktree_path" || {
+                ui_error "无法切换到Epic目录: $epic_worktree_path"
+                return 1
+            }
+            ui_success "已切换到Epic工作目录"
+        fi
+    fi
+    
     # 如果没有提供功能名称，显示交互式选择
     if [[ -z "$input_feature_name" ]]; then
         # 检查Epic配置
