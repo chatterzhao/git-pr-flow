@@ -21,6 +21,10 @@ cmd_pr() {
                     return 1
                 fi
                 ;;
+            --multi-platform)
+                push_remote="multi-platform"
+                shift
+                ;;
             --target)
                 if [[ -n "$2" && "$2" != -* ]]; then
                     target_branch="$2"
@@ -433,7 +437,46 @@ execute_pr_creation() {
     # 引入智能推送工具
     source "${PROJECT_ROOT}/lib/utils/smart-push.sh"
     
-    if [[ -n "$push_remote" ]]; then
+    if [[ "$push_remote" == "multi-platform" ]]; then
+        # 多平台推送模式：分别推送到所有可用的远程平台
+        ui_info "🚀 多平台推送模式"
+        
+        local platform_remotes=()
+        local all_remotes
+        all_remotes=($(git remote 2>/dev/null || echo ""))
+        
+        # 自动检测代码托管平台远程
+        platform_remotes=($(detect_hosting_platform_remotes))
+        
+        if [[ ${#platform_remotes[@]} -eq 0 ]]; then
+            ui_error "没有找到可用的平台远程"
+            cd "$original_dir" || true
+            return 1
+        fi
+        
+        ui_info "检测到 ${#platform_remotes[@]} 个平台: ${platform_remotes[*]}"
+        
+        # 分别推送到每个平台
+        local push_success=0
+        for remote in "${platform_remotes[@]}"; do
+            ui_info "📤 推送到 $remote"
+            if smart_push_to_remote "$feature_name" "$remote" "false" "false"; then
+                ui_success "✅ $remote 推送成功"
+                ((push_success++))
+            else
+                ui_warning "❌ $remote 推送失败"
+            fi
+        done
+        
+        if [[ $push_success -eq 0 ]]; then
+            ui_error "所有平台推送都失败"
+            cd "$original_dir" || true
+            return 1
+        fi
+        
+        ui_success "🎉 成功推送到 $push_success/${#platform_remotes[@]} 个平台"
+        
+    elif [[ -n "$push_remote" ]]; then
         # 使用指定的远程推送
         ui_info "使用指定远程: $push_remote"
         if ! smart_push_to_remote "$feature_name" "$push_remote" "false" "true"; then
@@ -619,6 +662,7 @@ GPF PR命令 - 智能PR创建工具
 
 选项:
   --push-remote <remote>    指定推送的远程仓库
+  --multi-platform          推送到所有配置的平台（github, gitee等）
   --target <branch>         指定目标分支
   --help, -h                显示此帮助信息
 
@@ -633,10 +677,11 @@ GPF PR命令 - 智能PR创建工具
   - 提供详细的推送错误诊断和解决建议
 
 示例:
-  gpf pr feature-name                        # 创建PR，自动检测推送目标
+  gpf pr feature-name                        # 创建PR，自动检测推送目标（优先all远程）
   gpf pr feature-name --push-remote github   # 指定推送到github远程
+  gpf pr feature-name --multi-platform       # 推送到所有平台（github + gitee）
+  gpf pr feature-name --push-remote all      # 使用all远程同时推送多平台
   gpf pr feature-name develop                # 指定目标分支为develop
-  gpf pr --push-remote gitee feature-name    # 推送到gitee并创建PR
 
 推送失败时的解决方案:
   1. 查看配置分析: gpf push --diagnose

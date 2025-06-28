@@ -110,6 +110,35 @@ get_branch_upstream() {
     return 1
 }
 
+# 检测代码托管平台远程（排除本地和非托管平台远程）
+detect_hosting_platform_remotes() {
+    local all_remotes
+    all_remotes=($(git remote 2>/dev/null || echo ""))
+    
+    local platform_remotes=()
+    
+    for remote in "${all_remotes[@]}"; do
+        local remote_url
+        remote_url=$(git config "remote.$remote.url" 2>/dev/null || echo "")
+        
+        # 检测是否是代码托管平台（基于URL模式）
+        if [[ "$remote_url" =~ (github\.com|gitee\.com|gitlab\.com|bitbucket\.org|codeberg\.org|gitea\.|gogs\.) ]]; then
+            # 验证是否可推送
+            if git push --dry-run "$remote" HEAD >/dev/null 2>&1; then
+                platform_remotes+=("$remote")
+            fi
+        elif [[ "$remote" != "origin" && "$remote" != "upstream" ]]; then
+            # 对于非标准命名的远程，也检查是否可推送（可能是自建Git服务）
+            if git push --dry-run "$remote" HEAD >/dev/null 2>&1; then
+                # 简单启发式：如果不是origin/upstream，且可推送，可能是托管平台
+                platform_remotes+=("$remote")
+            fi
+        fi
+    done
+    
+    echo "${platform_remotes[@]}"
+}
+
 # =====================================================
 # 智能推送策略
 # =====================================================
@@ -152,11 +181,27 @@ smart_select_push_target() {
         return 0
     fi
     
-    # 4. 个性化配置检测：智能选择最佳远程
+    # 4. 个性化配置检测：多平台优先策略
     local selected_remote
     
-    # 优先级顺序：origin > github > gitee > all > 其他
-    local priority_remotes=("origin" "github" "gitee" "all")
+    # 多平台优先策略：
+    # 1. 首先检查是否有配置多个pushurl的远程（如all）
+    for remote in "${all_remotes[@]}"; do
+        local pushurl_count
+        pushurl_count=$(git config --get-all "remote.$remote.pushurl" 2>/dev/null | wc -l | tr -d ' ')
+        
+        if [[ "$pushurl_count" -gt 1 ]]; then
+            # 验证多平台远程是否可用
+            if git push --dry-run "$remote" "$branch" >/dev/null 2>&1; then
+                log_debug "选择多平台远程: $remote (推送到 $pushurl_count 个平台)"
+                echo "$remote"
+                return 0
+            fi
+        fi
+    done
+    
+    # 标准优先级顺序：origin > github > gitee > 其他
+    local priority_remotes=("origin" "github" "gitee")
     
     for remote in "${priority_remotes[@]}"; do
         if [[ " ${all_remotes[*]} " == *" $remote "* ]]; then
