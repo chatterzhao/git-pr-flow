@@ -321,7 +321,7 @@ show_recent_commits() {
     local feature_name="$1"
     local limit="${2:-5}"
     
-    ui_subheader "最近提交 (前$limit个)"
+    ui_subheader "最近提交 (前${limit}个)"
     
     # 切换到功能分支工作树
     local worktree_path original_dir
