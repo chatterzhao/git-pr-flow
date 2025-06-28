@@ -4,8 +4,8 @@
 # 统一所有路径计算和目录操作，支持跨平台兼容
 
 # 路径分隔符（跨平台兼容）
-readonly GPF_GPF_PATH_SEP="/"
-readonly GPF_GPF_WORKTREE_SEP="--"
+readonly GPF_PATH_SEP="/"
+readonly GPF_WORKTREE_SEP="--"
 
 # =====================================================
 # 项目根目录相关
