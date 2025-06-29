@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
-# Git PR Flow - start命令实现
+# Git PR Flow - start命令实现  
 # 开始子功能开发，含自动分支切换和依赖关系检测
+
+# 引入配置重构后的系统
+[[ -f "$(dirname "${BASH_SOURCE[0]}")/../utils/config-context-bridge.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../utils/config-context-bridge.sh"
 
 # start命令主函数
 cmd_start() {
@@ -30,17 +33,12 @@ cmd_start() {
     
     # 如果没有提供功能名称，显示交互式选择
     if [[ -z "$input_feature_name" ]]; then
-        # 检查Epic配置
+        # 检查Epic环境
         local current_epic
         current_epic=$(detect_current_epic)
         if [[ -z "$current_epic" ]] || ! config_epic_exists "$current_epic"; then
-            ui_error "未找到Epic配置文件"
-            ui_info "请先运行: gpf init <epic-name>"
-            return 1
-        fi
-        
-        if ! config_epic_validate "$current_epic"; then
-            ui_error "Epic配置文件无效"
+            ui_error "未检测到有效的Epic环境"
+            ui_info "请确认当前目录为Epic工作树，或先运行: gpf init <epic-name>"
             return 1
         fi
         
@@ -70,17 +68,12 @@ cmd_start() {
         return 1
     fi
     
-    # 重新检查Epic配置（切换后）
+    # 重新检查Epic环境（切换后）
     local current_epic
     current_epic=$(detect_current_epic)
     if [[ -z "$current_epic" ]] || ! config_epic_exists "$current_epic"; then
-        ui_error "未找到Epic配置文件"
-        ui_info "请先运行: gpf init <epic-name>"
-        return 1
-    fi
-    
-    if ! config_epic_validate "$current_epic"; then
-        ui_error "Epic配置文件无效"
+        ui_error "未检测到有效的Epic环境"
+        ui_info "请确认当前目录为Epic工作树，或先运行: gpf init <epic-name>"
         return 1
     fi
     
@@ -269,9 +262,14 @@ execute_feature_start() {
     local worktree_path="$2"
     local dependencies="$3"
     
+    # 引入上下文推导系统
+    source "$(dirname "${BASH_SOURCE[0]}")/../utils/context.sh"
+    
     local current_epic base_branch
-    current_epic=$(detect_current_epic)
-    base_branch=$(config_epic_get "base_branch" "$current_epic")
+    current_epic=$(context_detect_current_epic)
+    
+    # 功能分支应该基于Epic分支创建，而不是Epic的base_branch
+    base_branch="epic/$current_epic"
     
     # 确定基础分支
     local base_for_branch="$base_branch"
@@ -312,6 +310,16 @@ execute_feature_start() {
         ui_error "创建工作树失败"
         return 1
     fi
+    
+    # 创建功能分支配置文件
+    local current_epic epic_name feature_description
+    current_epic=$(detect_current_epic)
+    epic_name=$(config_epic_get "epic_name" "$current_epic")
+    feature_description="实现${feature_name#*/}功能"
+    
+    # 功能分支不再创建YAML配置文件
+    # 所有配置信息通过上下文推导获取
+    ui_info "功能分支配置通过上下文推导管理，无需创建配置文件"
     
     ui_success "工作树创建成功: $worktree_path"
     return 0

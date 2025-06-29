@@ -80,6 +80,7 @@ epic-name/feature分支: 子功能Git分支，如：user-auth/login (注意：�
     start <epic-name/feature> 开始子功能开发 (创建独立工作树和分支)
     ready <target>           质量门禁检查 (target可以是子功能或Epic)
     pr <target>              创建PR (子功能→Epic 或 Epic→主分支)
+    push [options] [branch]  智能推送到远程仓库 (适配各种Git配置)
     status                   显示Epic进度和分支状态
     clean <target>           清理已合并的工作树和分支
 
@@ -195,6 +196,11 @@ main() {
             shift
             source "$PROJECT_ROOT/lib/commands/pr.sh"
             cmd_pr "$@"
+            ;;
+        push)
+            shift
+            source "$PROJECT_ROOT/lib/commands/push.sh"
+            cmd_push "$@"
             ;;
         ready)
             shift

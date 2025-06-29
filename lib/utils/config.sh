@@ -37,7 +37,18 @@ detect_current_epic() {
     # 如果当前在Epic工作树目录中
     if [[ "$current_dir" == *"/.worktrees/epic--"* ]]; then
         local epic_name
-        epic_name=$(echo "$current_dir" | grep -o "epic--[^/]*" | sed 's/epic--//')
+        local worktree_name
+        worktree_name=$(echo "$current_dir" | grep -o "epic--[^/]*" | sed 's/epic--//')
+        
+        # 检查是否是功能分支工作树格式: epic-name--feature-name
+        if [[ "$worktree_name" == *"--"* ]]; then
+            # 功能分支工作树：提取Epic名称（第一个--之前的部分）
+            epic_name="${worktree_name%%--*}"
+        else
+            # Epic工作树：直接使用
+            epic_name="$worktree_name"
+        fi
+        
         if [[ -n "$epic_name" ]]; then
             echo "$epic_name"
             return 0
@@ -155,6 +166,10 @@ config_epic_create() {
     # 确保配置文件目录存在
     ensure_dir "$(dirname "$config_file")"
     
+    # 使用相对路径而不是绝对路径
+    local relative_worktree_path
+    relative_worktree_path=$(get_epic_worktree_path "$epic_name")
+    
     cat > "$config_file" << EOF
 # Git PR Flow Epic配置文件
 # Epic: $epic_name
@@ -164,7 +179,7 @@ epic_name: "$epic_name"
 epic_branch: "$epic_branch_name"
 description: "$description"
 base_branch: "$base_branch"
-worktree_path: "$worktree_path"
+worktree_path: "$relative_worktree_path"
 config_version: "1.0"
 created_at: "$(current_iso_timestamp)"
 last_updated: "$(current_iso_timestamp)"
@@ -180,6 +195,88 @@ pr_strategy: "progressive"
 EOF
     
     ui_success "创建Epic配置文件: $config_file"
+}
+
+# 创建功能分支配置文件
+config_feature_create() {
+    local feature_name="$1"
+    local epic_name="$2"
+    local description="$3"
+    local feature_worktree_path="$4"
+    
+    # 生成配置文件路径
+    local config_file="$feature_worktree_path/.git-pr-flow.yaml"
+    
+    # 确保配置文件目录存在
+    ensure_dir "$(dirname "$config_file")"
+    
+    # 功能分支的base_branch应该是epic分支
+    local epic_branch="epic/$epic_name"
+    
+    # 使用相对路径
+    local relative_worktree_path
+    relative_worktree_path=$(get_branch_worktree_path "$feature_name")
+    
+    cat > "$config_file" << EOF
+# Git PR Flow 功能分支配置文件
+# 功能分支: $feature_name
+# 创建于: $(current_iso_timestamp)
+
+feature_name: "$feature_name"
+epic_name: "$epic_name"
+epic_branch: "$epic_branch"
+description: "$description"
+base_branch: "$epic_branch"
+worktree_path: "$relative_worktree_path"
+config_version: "1.0"
+created_at: "$(current_iso_timestamp)"
+last_updated: "$(current_iso_timestamp)"
+branch_type: "feature"
+
+# 功能设置
+auto_switch_branch: true
+auto_sync: false
+auto_cleanup: false
+
+# 工作流设置
+workflow_type: "gitflow"
+pr_strategy: "feature_to_epic"
+EOF
+    
+    ui_success "创建功能分支配置文件: $config_file"
+}
+
+# 读取功能分支配置
+config_feature_get() {
+    local key="$1"
+    local default="$2"
+    local feature_worktree_path="$3"
+    
+    # 如果没有提供工作树路径，尝试检测当前功能分支路径
+    if [[ -z "$feature_worktree_path" ]]; then
+        feature_worktree_path=$(pwd)
+    fi
+    
+    local config_file="$feature_worktree_path/.git-pr-flow.yaml"
+    
+    if [[ -f "$config_file" ]]; then
+        local value
+        value=$(grep "^$key:" "$config_file" 2>/dev/null | cut -d':' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//;s/^"//;s/"$//')
+        
+        if [[ -n "$value" ]]; then
+            echo "$value"
+            return 0
+        fi
+    fi
+    
+    echo "$default"
+}
+
+# 检查功能分支配置是否存在
+config_feature_exists() {
+    local feature_worktree_path="${1:-$(pwd)}"
+    local config_file="$feature_worktree_path/.git-pr-flow.yaml"
+    [[ -f "$config_file" ]]
 }
 
 # 更新Epic配置的最后修改时间

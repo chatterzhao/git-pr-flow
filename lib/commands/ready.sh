@@ -467,9 +467,18 @@ generate_branch_readiness_report() {
     local feature_name
     feature_name=$(echo "$branch" | cut -d'/' -f2-)
     
-    local report_file="ready-report-${branch//\//-}.md"
+    local project_root
+    project_root=$(get_project_root_path) || {
+        ui_error "无法获取项目根目录"
+        return 1
+    }
     
-    ui_info "  📄 生成报告: $report_file"
+    # 确保 docs/ready-report 目录存在
+    mkdir -p "$project_root/docs/ready-report"
+    
+    local report_file="$project_root/docs/ready-report/ready-report-${branch//\//-}.md"
+    
+    ui_info "  📄 生成报告: docs/ready-report/ready-report-${branch//\//-}.md"
     
     # 生成Markdown报告
     cat > "$report_file" << EOF
@@ -507,7 +516,7 @@ $(check_branch_readiness "$branch" 2>&1 | sed 's/^//')
 *报告由 git-pr-flow ready 自动生成*
 EOF
     
-    ui_info "  📍 报告位置: $(pwd)/$report_file"
+    ui_info "  📍 报告位置: docs/ready-report/ready-report-${branch//\//-}.md"
     
     return 0
 }
@@ -1000,9 +1009,18 @@ generate_readiness_report() {
     
     ui_header "Epic就绪状态详细报告"
     
-    local report_file="epic-${epic_name}-readiness-report.md"
+    local project_root
+    project_root=$(get_project_root_path) || {
+        ui_error "无法获取项目根目录"
+        return 1
+    }
     
-    ui_loading "生成详细报告: $report_file"
+    # 确保 docs/ready-report 目录存在
+    mkdir -p "$project_root/docs/ready-report"
+    
+    local report_file="$project_root/docs/ready-report/epic-${epic_name}-readiness-report.md"
+    
+    ui_loading "生成详细报告: docs/ready-report/epic-${epic_name}-readiness-report.md"
     
     # 生成Markdown报告
     cat > "$report_file" << EOF
@@ -1045,8 +1063,8 @@ $(check_test_coverage 2>&1 | sed 's/^//')
 *报告由 git-pr-flow 自动生成*
 EOF
     
-    ui_success "✅ 报告已生成: $report_file"
-    echo "  📄 文件路径: $(pwd)/$report_file"
+    ui_success "✅ 报告已生成: docs/ready-report/epic-${epic_name}-readiness-report.md"
+    echo "  📄 文件路径: docs/ready-report/epic-${epic_name}-readiness-report.md"
     echo
     
     ui_info "💡 建议: 将此报告分享给团队成员进行最终审查"
