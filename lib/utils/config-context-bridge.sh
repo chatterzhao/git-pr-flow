@@ -132,9 +132,10 @@ config_epic_validate() {
     
     # 检查项目配置
     if gpf_project_config_exists; then
-        echo "✅ Epic配置验证通过 (使用上下文推导)"
+        # 验证通过，无需输出（验证函数应该静默成功）
+        true
     else
-        echo "⚠️  未找到项目配置，建议运行 'gpf init' 初始化"
+        echo "⚠️  未找到项目配置，建议运行 'gpf init' 初始化" >&2
     fi
     
     return 0
