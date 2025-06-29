@@ -3,10 +3,89 @@
 # Git PR Flow - sync命令实现
 # 智能同步依赖关系，处理Epic内分支间的同步和合并
 
+# 引入环境检测工具
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$SCRIPT_DIR/../utils/environment.sh"
+
 # sync命令主函数
 cmd_sync() {
-    local scope="${1:-deps}"
-    local target="${2:-}"
+    local scope=""
+    local target=""
+    local non_interactive="false"
+    local auto_confirm="false"
+    local sync_strategy=""
+    local conflict_action=""  # 明确的冲突处理动作
+    
+    # 解析命令行参数
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --non-interactive|-n)
+                non_interactive="true"
+                set_non_interactive_mode
+                shift
+                ;;
+            --auto-confirm|-y)
+                auto_confirm="true"
+                export GPF_AUTO_CONFIRM="true"
+                shift
+                ;;
+            --strategy)
+                if [[ -n "$2" && "$2" != -* ]]; then
+                    sync_strategy="$2"
+                    export GPF_SYNC_STRATEGY="$sync_strategy"
+                    shift 2
+                else
+                    ui_error "--strategy 选项需要指定策略值 (deps|base|all)"
+                    return 1
+                fi
+                ;;
+            --abort)
+                conflict_action="abort"
+                shift
+                ;;
+            --skip)
+                conflict_action="skip"
+                shift
+                ;;
+            --accept-source)
+                conflict_action="accept-source"
+                shift
+                ;;
+            --accept-target)
+                conflict_action="accept-target"
+                shift
+                ;;
+            --help|-h)
+                show_sync_help
+                return 0
+                ;;
+            -*)
+                ui_error "未知选项: $1"
+                show_sync_help
+                return 1
+                ;;
+            *)
+                if [[ -z "$scope" ]]; then
+                    scope="$1"
+                elif [[ -z "$target" ]]; then
+                    target="$1"
+                else
+                    ui_error "过多的参数: $1"
+                    show_sync_help
+                    return 1
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # 设置默认值
+    scope="${scope:-deps}"
+    
+    # 记录操作日志（如果需要）
+    if [[ "$non_interactive" == "true" ]]; then
+        log_non_interactive_operation "sync" "scope=$scope target=$target conflict_action=$conflict_action"
+    fi
     
     # 检查Epic配置
     if ! config_epic_exists; then
@@ -227,17 +306,9 @@ execute_dependency_sync() {
         show_sync_summary "$feature_branch" "$dependency_branch"
     else
         ui_error "❌ 依赖同步失败，可能存在冲突"
-        ui_info "请手动解决冲突后提交，或运行 git merge --abort 取消合并"
         
-        # 显示冲突文件
-        local conflict_files
-        conflict_files=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
-        if [[ -n "$conflict_files" ]]; then
-            ui_warning "冲突文件:"
-            while IFS= read -r file; do
-                echo "    ⚠️ $file"
-            done <<< "$conflict_files"
-        fi
+        # 处理冲突
+        handle_merge_conflict "$feature_branch" "$dependency_branch" "$conflict_action"
     fi
     
     cd "$original_dir" || true
@@ -337,7 +408,9 @@ execute_base_sync() {
         show_sync_summary "$feature_branch" "$base_branch"
     else
         ui_error "❌ 基础分支同步失败，存在冲突"
-        ui_info "请手动解决冲突后提交，或运行 git merge --abort 取消合并"
+        
+        # 处理冲突
+        handle_merge_conflict "$feature_branch" "$base_branch" "$conflict_action"
     fi
     
     cd "$original_dir" || true
@@ -513,4 +586,247 @@ show_sync_summary() {
     
     ui_info "💡 建议: 运行测试确保同步后的代码正常工作"
     ui_info "💡 提示: 使用 'git-pr-flow status' 查看Epic整体状态"
+}
+
+# 处理合并冲突 - AI友好的冲突信息展示
+handle_merge_conflict() {
+    local feature_branch="$1"
+    local source_branch="$2"
+    local conflict_action="${3:-}"  # 可选的明确处理动作
+    
+    # 显示详细的冲突分析
+    show_detailed_conflict_info "$feature_branch" "$source_branch"
+    
+    # 根据是否有明确的处理动作决定行为
+    if [[ -n "$conflict_action" ]]; then
+        # 有明确的处理动作，执行相应操作
+        execute_conflict_resolution "$conflict_action"
+    else
+        # 没有明确动作，显示指导信息并中止合并
+        show_conflict_resolution_guide "$feature_branch" "$source_branch"
+        git merge --abort >/dev/null 2>&1 || true
+        return 1
+    fi
+}
+
+# 显示详细的冲突信息（AI友好）
+show_detailed_conflict_info() {
+    local feature_branch="$1"
+    local source_branch="$2"
+    
+    ui_error "❌ 合并冲突检测"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo
+    
+    # 基本信息
+    echo "📋 冲突概况:"
+    echo "  源分支: $source_branch"
+    echo "  目标分支: $feature_branch"
+    echo "  冲突原因: 两个分支修改了相同的文件区域"
+    echo
+    
+    # 冲突文件列表
+    local conflict_files
+    conflict_files=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
+    if [[ -n "$conflict_files" ]]; then
+        echo "⚠️ 冲突文件列表:"
+        local file_count=0
+        while IFS= read -r file; do
+            ((file_count++))
+            echo "  $file_count. $file"
+            
+            # 显示每个文件的冲突统计
+            local conflict_sections
+            conflict_sections=$(grep -c "^<<<<<<< " "$file" 2>/dev/null || echo "0")
+            echo "     └─ 冲突区域: $conflict_sections 处"
+        done <<< "$conflict_files"
+        echo
+    fi
+    
+    # 冲突详细分析
+    echo "🔍 冲突分析:"
+    local total_conflicts=0
+    while IFS= read -r file; do
+        if [[ -n "$file" ]]; then
+            local file_conflicts
+            file_conflicts=$(grep -c "^<<<<<<< " "$file" 2>/dev/null || echo "0")
+            total_conflicts=$((total_conflicts + file_conflicts))
+            
+            echo "  📄 $file:"
+            echo "     └─ 冲突标记: $file_conflicts 处"
+            
+            # 显示冲突预览（前3行）
+            if [[ $file_conflicts -gt 0 ]]; then
+                echo "     └─ 预览:"
+                grep -A 2 -B 1 "^<<<<<<< " "$file" 2>/dev/null | head -6 | while IFS= read -r line; do
+                    echo "        $line"
+                done
+                if [[ $file_conflicts -gt 1 ]]; then
+                    echo "        ... (还有 $((file_conflicts - 1)) 处冲突)"
+                fi
+            fi
+            echo
+        fi
+    done <<< "$conflict_files"
+    
+    echo "📊 冲突统计:"
+    echo "  总冲突文件: $(echo "$conflict_files" | wc -l | tr -d ' ') 个"
+    echo "  总冲突区域: $total_conflicts 处"
+    echo
+}
+
+# 显示冲突解决指导（AI友好）
+show_conflict_resolution_guide() {
+    local feature_branch="$1" 
+    local source_branch="$2"
+    
+    echo "🛠️ 冲突解决选项:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo
+    
+    echo "选项1: 手动解决冲突"
+    echo "  📝 适用场景: 需要仔细合并代码逻辑"
+    echo "  📝 操作步骤:"
+    echo "     1. 编辑冲突文件，解决 <<<<<<< ======= >>>>>>> 标记"
+    echo "     2. 运行: git add <已解决的文件>"
+    echo "     3. 运行: git commit"
+    echo "  📝 风险等级: 低（推荐）"
+    echo
+    
+    echo "选项2: 放弃此次合并"
+    echo "  📝 适用场景: 暂时无法处理冲突，需要稍后再试"
+    echo "  📝 执行命令: gpf sync --abort"
+    echo "  📝 风险等级: 无"
+    echo
+    
+    echo "选项3: 跳过冲突分支"
+    echo "  📝 适用场景: 确认当前分支可以暂时跳过"
+    echo "  📝 执行命令: gpf sync --skip"
+    echo "  📝 风险等级: 中等（可能导致功能不完整）"
+    echo
+    
+    echo "选项4: 使用源分支内容"
+    echo "  📝 适用场景: 确认源分支的更改更重要"
+    echo "  📝 执行命令: gpf sync --accept-source"
+    echo "  📝 风险等级: 高（会丢失当前分支的更改）"
+    echo
+    
+    echo "选项5: 使用目标分支内容"
+    echo "  📝 适用场景: 确认当前分支的内容应该保留"
+    echo "  📝 执行命令: gpf sync --accept-target"
+    echo "  📝 风险等级: 高（会忽略源分支的更改）"
+    echo
+    
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "💡 AI助手建议:"
+    echo "如果你是AI助手，请仔细阅读上述冲突信息和解决选项。"
+    echo "基于冲突的性质和上下文，选择最合适的解决方案。"
+    echo "然后使用相应的命令重新执行同步操作。"
+    echo
+    echo "⚠️ 重要提醒:"
+    echo "同步操作已被中止以避免数据丢失。"
+    echo "请明确选择处理方式后，使用带参数的命令重新执行。"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+# 执行冲突解决
+execute_conflict_resolution() {
+    local action="$1"
+    
+    case "$action" in
+        "abort")
+            ui_info "🔄 中止合并操作"
+            git merge --abort >/dev/null 2>&1 || true
+            return 1
+            ;;
+        "skip")
+            ui_warning "⏭️ 跳过当前冲突分支"
+            git merge --abort >/dev/null 2>&1 || true
+            return 2  # 特殊返回码表示跳过
+            ;;
+        "accept-source")
+            ui_warning "⚠️ 接受源分支内容（丢失当前分支更改）"
+            git merge --abort >/dev/null 2>&1 || true
+            git merge -X theirs HEAD >/dev/null 2>&1
+            ;;
+        "accept-target")
+            ui_warning "⚠️ 接受目标分支内容（忽略源分支更改）"
+            git merge --abort >/dev/null 2>&1 || true
+            git merge -X ours HEAD >/dev/null 2>&1
+            ;;
+        *)
+            ui_error "未知的冲突解决动作: $action"
+            return 1
+            ;;
+    esac
+}
+
+# 显示sync命令帮助信息
+show_sync_help() {
+    cat << 'EOF'
+Git PR Flow - sync 命令
+
+用法:
+  gpf sync [选项] [范围] [目标]
+
+范围:
+  deps        同步当前功能的依赖关系 (默认)
+  base        同步基础分支变更
+  all         同步整个Epic的所有分支
+  feature     同步特定功能分支
+
+基础选项:
+  -y, --auto-confirm        自动确认安全操作
+  --strategy <策略>         指定同步策略 (deps|base|all)
+  -h, --help               显示此帮助信息
+
+冲突解决选项 (用于明确处理冲突):
+  --abort                  中止当前合并操作
+  --skip                   跳过冲突分支，继续处理其他分支
+  --accept-source          使用源分支内容 (丢失当前分支更改)
+  --accept-target          使用目标分支内容 (忽略源分支更改)
+
+基础示例:
+  gpf sync                              # 同步当前功能依赖
+  gpf sync base                         # 同步基础分支
+  gpf sync all                          # 同步整个Epic
+  gpf sync feature auth/login           # 同步特定功能分支
+
+冲突处理工作流:
+  1. 执行 gpf sync                      # 显示详细冲突信息
+  2. 阅读冲突分析和解决选项
+  3. 选择处理方式:
+     - 手动解决: 编辑文件后 git add + git commit
+     - 中止合并: gpf sync --abort
+     - 跳过分支: gpf sync --skip
+     - 接受源分支: gpf sync --accept-source
+     - 接受目标分支: gpf sync --accept-target
+
+AI助手友好设计:
+  当遇到冲突时，sync命令会显示:
+  ✅ 详细的冲突文件列表和统计
+  ✅ 每个冲突的具体位置和预览
+  ✅ 明确的解决选项和风险说明
+  ✅ 具体的命令建议
+
+  AI助手可以：
+  1. 阅读详细的冲突信息
+  2. 理解每种解决方案的适用场景和风险
+  3. 基于上下文选择合适的处理方式
+  4. 使用明确的参数重新执行命令
+
+安全设计原则:
+  - 默认展示信息，不做危险决策
+  - 冲突处理需要明确的参数表达意图  
+  - 高风险操作会显示警告信息
+  - 操作可逆，支持中止和重试
+
+高级示例:
+  # 分析冲突后的明确处理
+  gpf sync base                         # 1. 显示冲突信息
+  gpf sync base --skip                  # 2. 决定跳过冲突分支
+  
+  # 自动确认安全操作
+  gpf sync -y --strategy all            # 自动确认，但冲突仍需明确处理
+EOF
 }
