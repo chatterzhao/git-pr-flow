@@ -11,11 +11,17 @@
 # 配置文件路径定义
 # ============================================================================
 
-readonly GPF_CONFIG_DIR=".gpf"
-readonly GPF_MAIN_CONFIG="$GPF_CONFIG_DIR/config.yaml"
-readonly GPF_USER_PREFERENCES="$GPF_CONFIG_DIR/user-preferences.yaml"
-readonly GPF_EPICS_INDEX="$GPF_CONFIG_DIR/epics.yaml"
-readonly GPF_CONFIG_VERSION="1.0"
+# 获取项目根目录的 .gpf 配置路径
+get_project_root_gpf_dir() {
+    local project_root
+    project_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+        echo "." # 如果不在 git 仓库中，使用当前目录
+    }
+    echo "$project_root/.gpf"
+}
+
+# Configuration version for this module
+GPF_CONFIG_VERSION="${GPF_CONFIG_VERSION:-1.0}"
 
 # ============================================================================
 # 项目配置文件操作
@@ -23,19 +29,25 @@ readonly GPF_CONFIG_VERSION="1.0"
 
 # 检查 .gpf 目录是否存在
 gpf_config_dir_exists() {
-    [[ -d "$GPF_CONFIG_DIR" ]]
+    local gpf_dir
+    gpf_dir=$(get_project_root_gpf_dir)
+    [[ -d "$gpf_dir" ]]
 }
 
 # 检查项目配置是否存在
 gpf_project_config_exists() {
-    [[ -f "$GPF_MAIN_CONFIG" ]]
+    local gpf_dir
+    gpf_dir=$(get_project_root_gpf_dir)
+    [[ -f "$gpf_dir/config.yaml" ]]
 }
 
 # 创建 .gpf 目录结构
 create_gpf_directory() {
-    if [[ ! -d "$GPF_CONFIG_DIR" ]]; then
-        mkdir -p "$GPF_CONFIG_DIR"
-        echo "✅ 创建 .gpf 配置目录"
+    local gpf_dir
+    gpf_dir=$(get_project_root_gpf_dir)
+    if [[ ! -d "$gpf_dir" ]]; then
+        mkdir -p "$gpf_dir"
+        echo "✅ 创建 .gpf 配置目录: $gpf_dir"
     fi
 }
 
@@ -53,13 +65,17 @@ create_project_config() {
     
     create_gpf_directory
     
+    local gpf_dir
+    gpf_dir=$(get_project_root_gpf_dir)
+    local config_file="$gpf_dir/config.yaml"
+    
     # 如果没有指定 epic_base_branch，则不设置（留空，后续会触发交互式选择）
     local epic_base_line=""
     if [[ -n "$epic_base_branch" ]]; then
         epic_base_line="  epic_base_branch: \"$epic_base_branch\""
     fi
     
-    cat > "$GPF_MAIN_CONFIG" << EOF
+    cat > "$config_file" << EOF
 # Git PR Flow 项目配置文件  
 # 项目: $project_name
 # 创建于: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -99,7 +115,7 @@ integrations:
     auto_workspace: true
 EOF
 
-    echo "✅ 创建项目配置: $GPF_MAIN_CONFIG"
+    echo "✅ 创建项目配置: $config_file"
 }
 
 # 创建用户偏好配置文件
@@ -189,20 +205,46 @@ read_project_config() {
     local key="$1"
     local default="$2"
     
-    if [[ ! -f "$GPF_MAIN_CONFIG" ]]; then
+    local gpf_dir config_file
+    gpf_dir=$(get_project_root_gpf_dir)
+    config_file="$gpf_dir/config.yaml"
+    
+    if [[ ! -f "$config_file" ]]; then
         echo "$default"
         return 1
     fi
     
-    # 简单的 YAML 解析
-    local value
-    value=$(grep -E "^[[:space:]]*${key}:" "$GPF_MAIN_CONFIG" | head -1 | sed -E 's/^[[:space:]]*[^:]+:[[:space:]]*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/")
-    
-    if [[ -n "$value" ]]; then
-        echo "$value"
-    else
-        echo "$default"
-    fi
+    # 简化配置结构的特殊处理
+    case "$key" in
+        "name")
+            # 从目录名推导项目名称
+            echo "$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+            ;;
+        "type")
+            # 返回固定的工作流类型
+            echo "gitflow"
+            ;;
+        "base_branch"|"epic_base_branch")
+            get_epic_base_branch
+            ;;
+        "worktree_dir")
+            # 从配置中读取或使用默认值
+            local value
+            value=$(awk '/^worktree:/{flag=1; next} /^[a-zA-Z]/ && flag{flag=0} flag && /worktree_dir:/{gsub(/[" ]/, "", $2); print $2}' "$config_file")
+            echo "${value:-.worktrees}"
+            ;;
+        *)
+            # 简单的 YAML 解析
+            local value
+            value=$(grep -E "^[[:space:]]*${key}:" "$config_file" | head -1 | sed -E 's/^[[:space:]]*[^:]+:[[:space:]]*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/")
+            
+            if [[ -n "$value" ]]; then
+                echo "$value"
+            else
+                echo "$default"
+            fi
+            ;;
+    esac
 }
 
 # 读取用户偏好配置
@@ -210,24 +252,43 @@ read_user_preference() {
     local key="$1"
     local default="$2"
     
-    if [[ ! -f "$GPF_USER_PREFERENCES" ]]; then
-        echo "$default"
-        return 1
-    fi
-    
-    local value
-    value=$(grep -E "^[[:space:]]*${key}:" "$GPF_USER_PREFERENCES" | head -1 | sed -E 's/^[[:space:]]*[^:]+:[[:space:]]*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/")
-    
-    if [[ -n "$value" ]]; then
-        echo "$value"
-    else
-        echo "$default"
-    fi
+    # 简化版本：返回默认的用户偏好设置
+    case "$key" in
+        "auto_switch_branch")
+            echo "true"
+            ;;
+        "auto_sync")
+            echo "false"
+            ;;
+        "auto_cleanup")
+            echo "false"
+            ;;
+        *)
+            echo "$default"
+            ;;
+    esac
 }
 
 # 获取 Epic 基础分支
 get_epic_base_branch() {
-    read_project_config "epic_base_branch" ""
+    local gpf_dir config_file
+    gpf_dir=$(get_project_root_gpf_dir)
+    config_file="$gpf_dir/config.yaml"
+    
+    if [[ ! -f "$config_file" ]]; then
+        echo ""
+        return 1
+    fi
+    
+    # 读取 epic 节点下的 epic_base_branch
+    local value
+    value=$(awk '/^epic:/{flag=1; next} /^[a-zA-Z]/ && flag{flag=0} flag && /epic_base_branch:/{gsub(/[" ]/, "", $2); print $2}' "$config_file")
+    echo "$value"
+}
+
+# 获取项目基础分支（兼容函数）
+get_project_base_branch() {
+    get_epic_base_branch
 }
 
 # 智能获取 Epic 基础分支（包含交互式选择逻辑）
@@ -610,36 +671,27 @@ show_project_config() {
 
 # 验证配置文件完整性
 validate_project_config() {
-    echo "🔍 验证项目配置..."
-    
     local errors=0
     
-    # 检查必需文件
-    if [[ ! -f "$GPF_MAIN_CONFIG" ]]; then
-        echo "❌ 缺少主配置文件: $GPF_MAIN_CONFIG"
-        ((errors++))
-    fi
+    # 检查主配置文件
+    local gpf_dir config_file
+    gpf_dir=$(get_project_root_gpf_dir)
+    config_file="$gpf_dir/config.yaml"
     
-    # 检查配置版本
-    if [[ -f "$GPF_MAIN_CONFIG" ]]; then
-        local config_version
-        config_version=$(read_project_config "version" "")
-        if [[ "$config_version" != "$GPF_CONFIG_VERSION" ]]; then
-            echo "⚠️  配置版本不匹配: $config_version (期望: $GPF_CONFIG_VERSION)"
-        fi
+    if [[ ! -f "$config_file" ]]; then
+        ((errors++))
     fi
     
     # 检查基础分支是否存在
     local base_branch
-    base_branch=$(get_project_base_branch)
-    if ! git show-ref --verify --quiet "refs/heads/$base_branch"; then
-        echo "⚠️  基础分支不存在: $base_branch"
+    base_branch=$(get_epic_base_branch)
+    if [[ -n "$base_branch" ]] && ! git show-ref --verify --quiet "refs/heads/$base_branch" 2>/dev/null; then
+        ((errors++))
     fi
     
     if [[ $errors -eq 0 ]]; then
-        echo "✅ 配置验证通过"
+        return 0
     else
-        echo "❌ 发现 $errors 个配置错误"
         return 1
     fi
 }
