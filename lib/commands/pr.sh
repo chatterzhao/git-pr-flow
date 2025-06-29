@@ -4,8 +4,8 @@
 # 智能PR创建，支持Epic上下文、依赖关系和策略性发布
 
 # 引入环境检测工具
-SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-source "$SCRIPT_DIR/../utils/environment.sh"
+COMMAND_SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$COMMAND_SCRIPT_DIR/../utils/environment.sh"
 
 # 引入配置重构后的系统
 [[ -f "$(dirname "${BASH_SOURCE[0]}")/../utils/config-context-bridge.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../utils/config-context-bridge.sh"

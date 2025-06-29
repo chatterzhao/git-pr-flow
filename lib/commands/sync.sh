@@ -4,8 +4,8 @@
 # 智能同步依赖关系，处理Epic内分支间的同步和合并
 
 # 引入环境检测工具
-SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-source "$SCRIPT_DIR/../utils/environment.sh"
+COMMAND_SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$COMMAND_SCRIPT_DIR/../utils/environment.sh"
 
 # sync命令主函数
 cmd_sync() {

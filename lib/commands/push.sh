@@ -4,8 +4,8 @@
 # 提供适配不同Git配置的智能推送功能
 
 # 引入环境检测工具
-SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-source "$SCRIPT_DIR/../utils/environment.sh"
+COMMAND_SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$COMMAND_SCRIPT_DIR/../utils/environment.sh"
 
 # 引入依赖
 source "$(dirname "${BASH_SOURCE[0]}")/../utils/ui.sh"

@@ -4,8 +4,8 @@
 # 智能环境清理，支持工作树、分支、Epic级清理
 
 # 引入环境检测工具
-SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-source "$SCRIPT_DIR/../utils/environment.sh"
+COMMAND_SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$COMMAND_SCRIPT_DIR/../utils/environment.sh"
 
 # clean命令主函数
 cmd_clean() {
