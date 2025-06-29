@@ -235,23 +235,24 @@ init_new_epic() {
     fi
     
     # 2. 智能检测和选择基分支
+    # 引入项目配置系统以获取智能基分支选择功能
+    source "$(dirname "${BASH_SOURCE[0]}")/../utils/project-config.sh"
+    
     local base_branch
-    if [[ -n "$input_base_branch" ]]; then
-        # 使用提供的基分支
-        if git_branch_exists "$input_base_branch"; then
-            base_branch="$input_base_branch"
-            ui_info "使用指定基分支: $base_branch"
-        else
-            ui_error "指定的基分支不存在: $input_base_branch"
-            return 1
-        fi
-    else
-        # 智能选择基分支
-        if ! base_branch=$(select_base_branch); then
-            ui_error "基分支选择失败"
-            return 1
-        fi
+    base_branch=$(get_epic_base_branch_interactive "$input_base_branch")
+    
+    if [[ -z "$base_branch" ]]; then
+        ui_error "无法确定基分支"
+        return 1
     fi
+    
+    # 验证基分支是否存在
+    if ! git_branch_exists "$base_branch"; then
+        ui_error "基分支不存在: $base_branch"
+        return 1
+    fi
+    
+    ui_info "使用基分支: $base_branch"
     
     # 3. 生成工作树路径 (使用统一路径管理)
     local worktree_base_path
@@ -312,11 +313,11 @@ init_new_epic() {
     
     # 确保项目配置已初始化
     if ! gpf_project_config_exists; then
+        # 如果项目配置不存在，用用户指定的base_branch作为epic_base_branch来初始化
         init_project_config "$base_branch"
     fi
     
-    # 添加Epic到索引而不是创建YAML文件
-    add_epic_to_index "$base_epic_name" "$description" "$base_branch"
+    # Epic 信息通过 Git 分支管理，不需要额外存储
     
     ui_success "Epic工作树创建成功: $worktree_base_path"
     

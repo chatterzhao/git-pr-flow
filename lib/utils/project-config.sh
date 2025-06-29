@@ -41,7 +41,7 @@ create_gpf_directory() {
 
 # 创建项目主配置文件
 create_project_config() {
-    local base_branch="${1:-$(detect_base_branch "project")}"
+    local epic_base_branch="${1:-}"
     local project_root
     project_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
         echo "❌ 错误: 不在 Git 仓库中"
@@ -53,15 +53,20 @@ create_project_config() {
     
     create_gpf_directory
     
+    # 如果没有指定 epic_base_branch，则不设置（留空，后续会触发交互式选择）
+    local epic_base_line=""
+    if [[ -n "$epic_base_branch" ]]; then
+        epic_base_line="  epic_base_branch: \"$epic_base_branch\""
+    fi
+    
     cat > "$GPF_MAIN_CONFIG" << EOF
-# Git PR Flow 项目配置文件
+# Git PR Flow 项目配置文件  
 # 项目: $project_name
 # 创建于: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 project:
   name: "$project_name"
-  base_branch: "$base_branch"
-  root_path: "$(pwd)"
+$epic_base_line
   
 config:
   version: "$GPF_CONFIG_VERSION"
@@ -220,9 +225,87 @@ read_user_preference() {
     fi
 }
 
-# 获取项目基础分支
-get_project_base_branch() {
-    read_project_config "base_branch" "develop"
+# 获取 Epic 基础分支
+get_epic_base_branch() {
+    read_project_config "epic_base_branch" ""
+}
+
+# 智能获取 Epic 基础分支（包含交互式选择逻辑）
+get_epic_base_branch_interactive() {
+    local specified_branch="$1"  # 用户通过命令行指定的分支
+    
+    # 1. 如果用户指定了分支，直接使用
+    if [[ -n "$specified_branch" ]]; then
+        echo "$specified_branch"
+        return 0
+    fi
+    
+    # 2. 尝试从项目配置读取
+    local config_branch
+    config_branch=$(get_epic_base_branch)
+    if [[ -n "$config_branch" ]]; then
+        echo "$config_branch"
+        return 0
+    fi
+    
+    # 3. 如果没有配置，需要交互式选择
+    echo "🔍 检测可用的基础分支..." >&2
+    
+    # 获取常见的基础分支
+    local available_branches=()
+    for branch in main master develop; do
+        if git show-ref --verify --quiet "refs/heads/$branch"; then
+            available_branches+=("$branch")
+        fi
+    done
+    
+    # 添加当前分支作为选项
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    if [[ -n "$current_branch" ]] && [[ ! " ${available_branches[*]} " =~ " $current_branch " ]]; then
+        available_branches+=("$current_branch")
+    fi
+    
+    if [[ ${#available_branches[@]} -eq 0 ]]; then
+        echo "❌ 没有找到可用的基础分支" >&2
+        return 1
+    fi
+    
+    # 交互式选择
+    if [[ -t 0 ]]; then  # 交互式环境
+        echo "📋 请选择 Epic 的基础分支:" >&2
+        for i in "${!available_branches[@]}"; do
+            echo "  $((i+1)). ${available_branches[i]}" >&2
+        done
+        echo >&2
+        
+        while true; do
+            echo -n "请输入序号 (1-${#available_branches[@]}): " >&2
+            read -r choice
+            
+            if [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 1 ]] && [[ $choice -le ${#available_branches[@]} ]]; then
+                local selected_branch="${available_branches[$((choice-1))]}"
+                echo "$selected_branch"
+                
+                # 询问是否保存为默认配置
+                echo -n "是否将 '$selected_branch' 保存为项目默认的 Epic 基础分支? (y/N): " >&2
+                read -r save_choice
+                if [[ "$save_choice" =~ ^[Yy] ]]; then
+                    update_project_config "epic_base_branch" "$selected_branch"
+                fi
+                
+                return 0
+            else
+                echo "⚠️  无效选择，请重新输入" >&2
+            fi
+        done
+    else
+        # 非交互式环境，使用第一个可用分支
+        local default_branch="${available_branches[0]}"
+        echo "ℹ️  非交互式环境，自动选择: $default_branch" >&2
+        echo "$default_branch"
+        return 0
+    fi
 }
 
 # 获取工作流类型
