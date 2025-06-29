@@ -165,6 +165,13 @@ gpf_init_with_context() {
 **目标**: 实现基于 Git 上下文的配置信息推导
 
 #### 子任务:
+- [ ] **修复 start 命令的 base_branch 逻辑问题** ⚠️ **优先级最高**
+  - **问题描述**: `gpf start` 创建功能分支时错误地使用 Epic 的 `base_branch`（develop），导致功能分支基于 develop 而不是 epic 分支创建
+  - **根本原因**: 读取 YAML 配置中的 `base_branch` 字段，但该字段对 Epic 和 Feature 有不同含义
+  - **正确逻辑**: 功能分支应该基于 Epic 分支创建，而不是读取 Epic 配置中的 `base_branch`
+  - **临时修复**: 在 start 命令中硬编码使用 `epic/xxx` 分支作为功能分支的基础
+  - **长期解决**: 通过上下文推导自动确定正确的基础分支
+
 - [ ] **实现 `detect_epic_context()` 函数**
   - 从目录路径推导 Epic 信息
   - 从 Git 分支名推导 Epic 信息
@@ -179,6 +186,7 @@ gpf_init_with_context() {
   - 智能检测项目默认分支
   - 支持多种分支命名约定
   - 优先级：develop > main > master
+  - **关键**: 区分 Epic 的 base_branch (develop) 和 Feature 的 base_branch (epic/xxx)
 
 - [ ] **创建上下文推导测试套件**
   - 覆盖各种目录结构场景
