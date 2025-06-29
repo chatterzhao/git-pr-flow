@@ -1,0 +1,23 @@
+# Git PR Flow 功能分支配置文件
+# 功能分支: epic/documentation-fixes/ready-command-docs
+# 创建于: 2025-06-29T04:20:33Z
+
+feature_name: "epic/documentation-fixes/ready-command-docs"
+epic_name: "documentation-fixes"
+epic_branch: "epic/documentation-fixes"
+description: "实现documentation-fixes/ready-command-docs功能"
+base_branch: "epic/documentation-fixes"
+worktree_path: ".worktrees/epic--documentation-fixes--ready-command-docs"
+config_version: "1.0"
+created_at: "2025-06-29T04:20:33Z"
+last_updated: "2025-06-29T04:20:33Z"
+branch_type: "feature"
+
+# 功能设置
+auto_switch_branch: true
+auto_sync: false
+auto_cleanup: false
+
+# 工作流设置
+workflow_type: "gitflow"
+pr_strategy: "feature_to_epic"
