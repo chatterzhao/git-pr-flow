@@ -54,13 +54,20 @@ config_epic_validate() {
 # 替代 config_epic_get 函数
 config_epic_get() {
     local key="$1"
-    local epic_name="$2"
+    local epic_name="${2:-}"
+    
+    # 如果没有提供epic_name，尝试从当前上下文推导
+    if [[ -z "$epic_name" ]]; then
+        epic_name=$(detect_current_epic 2>/dev/null || echo "")
+    fi
     
     # 优先级：上下文推导 > 项目配置 > 默认值
     local value=""
     
     # 尝试从上下文推导获取
-    value=$(context_epic_get "$key" "$epic_name" 2>/dev/null)
+    if [[ -n "$epic_name" ]]; then
+        value=$(context_epic_get "$key" "$epic_name" 2>/dev/null)
+    fi
     if [[ -n "$value" ]] && [[ "$value" != "N/A" ]]; then
         echo "$value"
         return 0
