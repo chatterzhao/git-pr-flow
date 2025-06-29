@@ -20,7 +20,7 @@ detect_epic_context() {
     local worktree_path=""
     
     # 方法1: 从目录路径推导
-    if [[ "$current_dir" =~ \.worktrees/epic--([^-/]+)$ ]]; then
+    if [[ "$current_dir" =~ \.worktrees/epic--([^/]+)$ ]]; then
         epic_name="${BASH_REMATCH[1]}"
         epic_branch="epic/$epic_name"
         worktree_path=".worktrees/epic--$epic_name"
