@@ -7,6 +7,9 @@
 COMMAND_SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 source "$COMMAND_SCRIPT_DIR/../utils/environment.sh"
 
+# 引入配置重构后的系统
+[[ -f "$COMMAND_SCRIPT_DIR/../utils/config-context-bridge.sh" ]] && source "$COMMAND_SCRIPT_DIR/../utils/config-context-bridge.sh"
+
 # ready命令主函数
 cmd_ready() {
     local target_branch="${1:-}"
