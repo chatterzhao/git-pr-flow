@@ -20,8 +20,9 @@ detect_epic_context() {
     local worktree_path=""
     
     # 方法1: 从目录路径推导
-    if [[ "$current_dir" =~ \.worktrees/epic--([^/]+)$ ]]; then
-        epic_name="${BASH_REMATCH[1]}"
+    if [[ "$current_dir" == */.worktrees/epic--* && "$current_dir" != *--*--* ]]; then
+        # Epic worktree 格式: epic--xxx (不包含第二个 --)
+        epic_name=$(echo "$current_dir" | sed 's|.*/epic--||')
         epic_branch="epic/$epic_name"
         worktree_path=".worktrees/epic--$epic_name"
         
@@ -232,7 +233,7 @@ detect_base_branch() {
 # 从上下文信息中提取特定字段
 get_context_field() {
     local field="$1"
-    local context_info="$2"
+    local context_info="${2:-}"
     
     if [[ -z "$context_info" ]]; then
         context_info=$(detect_current_context 2>/dev/null) || return 1

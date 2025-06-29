@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
-# Git PR Flow - start命令实现
+# Git PR Flow - start命令实现  
 # 开始子功能开发，含自动分支切换和依赖关系检测
+
+# 引入配置重构后的系统
+[[ -f "$(dirname "${BASH_SOURCE[0]}")/../utils/config-context-bridge.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../utils/config-context-bridge.sh"
 
 # start命令主函数
 cmd_start() {

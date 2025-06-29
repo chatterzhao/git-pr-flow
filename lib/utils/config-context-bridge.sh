@@ -3,9 +3,10 @@
 # Git PR Flow - 配置系统桥接
 # 提供向后兼容的配置读取接口，使用上下文推导替代 YAML 读取
 
-# 引入新的系统
-[[ -f "$(dirname "${BASH_SOURCE[0]}")/context.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/context.sh"
-[[ -f "$(dirname "${BASH_SOURCE[0]}")/project-config.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/project-config.sh"
+# 引入新的系统  
+CONFIG_BRIDGE_DIR="$(dirname "${BASH_SOURCE[0]}")"
+[[ -f "$CONFIG_BRIDGE_DIR/context.sh" ]] && source "$CONFIG_BRIDGE_DIR/context.sh"
+[[ -f "$CONFIG_BRIDGE_DIR/project-config.sh" ]] && source "$CONFIG_BRIDGE_DIR/project-config.sh"
 
 # ============================================================================
 # 向后兼容的配置读取函数 (替代 config.sh 中的函数)
@@ -13,7 +14,7 @@
 
 # 替代 detect_current_epic 函数
 detect_current_epic() {
-    context_detect_current_epic
+    get_current_epic_name
 }
 
 # 替代 config_epic_exists 函数
