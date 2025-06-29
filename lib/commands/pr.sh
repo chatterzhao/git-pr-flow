@@ -54,18 +54,19 @@ cmd_pr() {
         esac
     done
     
-    # 检查Epic配置
-    if ! config_epic_exists; then
-        ui_error "未找到Epic配置文件"
-        ui_info "请先运行: gpf init <epic-name>"
-        return 1
-    fi
-    
     # 获取当前epic名称用于验证
     local epic_name
     epic_name=$(detect_current_epic)
     if [[ -z "$epic_name" ]]; then
         ui_error "无法检测当前Epic名称"
+        ui_info "请确保在Epic工作环境中运行此命令"
+        return 1
+    fi
+    
+    # 检查Epic配置
+    if ! config_epic_exists "$epic_name"; then
+        ui_error "未找到Epic配置: $epic_name"
+        ui_info "请先运行: gpf init <epic-name>"
         return 1
     fi
 
