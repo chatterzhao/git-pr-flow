@@ -388,7 +388,7 @@ check_branch_readiness() {
         local original_dir
         original_dir=$(pwd)
         
-        cd "$worktree_path" || return 1
+        cd "$worktree_absolute_path" || return 1
         
         if git_is_clean; then
             ui_info "  ✅ 工作目录干净"
