@@ -3,6 +3,10 @@
 # Git PR Flow - ready命令实现
 # Epic级策略性发布检查，验证所有功能分支的就绪状态
 
+# 引入环境检测工具
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$SCRIPT_DIR/../utils/environment.sh"
+
 # ready命令主函数
 cmd_ready() {
     local target_branch="${1:-}"

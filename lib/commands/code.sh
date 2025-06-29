@@ -3,6 +3,10 @@
 # Git PR Flow - code命令实现
 # VS Code集成，智能打开功能分支工作环境
 
+# 引入环境检测工具
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$SCRIPT_DIR/../utils/environment.sh"
+
 # code命令主函数
 cmd_code() {
     local feature_name="${1:-}"

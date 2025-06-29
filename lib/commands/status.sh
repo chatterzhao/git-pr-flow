@@ -3,6 +3,10 @@
 # Git PR Flow - status命令实现
 # Epic进度仪表盘，显示整体状态、分支关系、工作树状态等
 
+# 引入环境检测工具
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$SCRIPT_DIR/../utils/environment.sh"
+
 # 引入路径管理工具
 source "$(dirname "${BASH_SOURCE[0]}")/../utils/paths.sh"
 

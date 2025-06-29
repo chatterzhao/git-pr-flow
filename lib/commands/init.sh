@@ -3,6 +3,10 @@
 # Git PR Flow - init命令实现
 # 初始化Epic开发环境，支持基分支智能检测和配置文件生成
 
+# 引入环境检测工具
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$SCRIPT_DIR/../utils/environment.sh"
+
 # init命令主函数
 cmd_init() {
     local input_epic_name=""

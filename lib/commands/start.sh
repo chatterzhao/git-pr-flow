@@ -3,6 +3,10 @@
 # Git PR Flow - start命令实现  
 # 开始子功能开发，含自动分支切换和依赖关系检测
 
+# 引入环境检测工具
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$SCRIPT_DIR/../utils/environment.sh"
+
 # 引入配置重构后的系统
 [[ -f "$(dirname "${BASH_SOURCE[0]}")/../utils/config-context-bridge.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../utils/config-context-bridge.sh"
 

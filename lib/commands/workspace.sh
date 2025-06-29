@@ -3,6 +3,10 @@
 # Git PR Flow - workspace命令实现
 # VS Code多Epic工作区生成和管理
 
+# 引入环境检测工具
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$SCRIPT_DIR/../utils/environment.sh"
+
 # workspace命令主函数
 cmd_workspace() {
     local action="${1:-generate}"
