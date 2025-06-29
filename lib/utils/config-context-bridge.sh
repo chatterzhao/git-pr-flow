@@ -22,6 +22,34 @@ config_epic_exists() {
     context_epic_exists "$epic_name"
 }
 
+# 替代 config_epic_validate 函数
+config_epic_validate() {
+    local epic_name="$1"
+    
+    # 新的验证逻辑：检查Epic分支和基本上下文信息
+    if [[ -z "$epic_name" ]]; then
+        epic_name=$(detect_current_epic)
+    fi
+    
+    if [[ -z "$epic_name" ]]; then
+        return 1
+    fi
+    
+    # 检查Epic分支是否存在
+    if ! git show-ref --verify --quiet "refs/heads/epic/$epic_name" 2>/dev/null; then
+        return 1
+    fi
+    
+    # 检查上下文是否可以正确推导
+    local context_info
+    context_info=$(detect_current_context 2>/dev/null)
+    if [[ -z "$context_info" ]]; then
+        return 1
+    fi
+    
+    return 0
+}
+
 # 替代 config_epic_get 函数
 config_epic_get() {
     local key="$1"

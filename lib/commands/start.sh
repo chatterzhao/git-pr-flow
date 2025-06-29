@@ -30,17 +30,12 @@ cmd_start() {
     
     # 如果没有提供功能名称，显示交互式选择
     if [[ -z "$input_feature_name" ]]; then
-        # 检查Epic配置
+        # 检查Epic环境
         local current_epic
         current_epic=$(detect_current_epic)
         if [[ -z "$current_epic" ]] || ! config_epic_exists "$current_epic"; then
-            ui_error "未找到Epic配置文件"
-            ui_info "请先运行: gpf init <epic-name>"
-            return 1
-        fi
-        
-        if ! config_epic_validate "$current_epic"; then
-            ui_error "Epic配置文件无效"
+            ui_error "未检测到有效的Epic环境"
+            ui_info "请确认当前目录为Epic工作树，或先运行: gpf init <epic-name>"
             return 1
         fi
         
@@ -70,17 +65,12 @@ cmd_start() {
         return 1
     fi
     
-    # 重新检查Epic配置（切换后）
+    # 重新检查Epic环境（切换后）
     local current_epic
     current_epic=$(detect_current_epic)
     if [[ -z "$current_epic" ]] || ! config_epic_exists "$current_epic"; then
-        ui_error "未找到Epic配置文件"
-        ui_info "请先运行: gpf init <epic-name>"
-        return 1
-    fi
-    
-    if ! config_epic_validate "$current_epic"; then
-        ui_error "Epic配置文件无效"
+        ui_error "未检测到有效的Epic环境"
+        ui_info "请确认当前目录为Epic工作树，或先运行: gpf init <epic-name>"
         return 1
     fi
     
