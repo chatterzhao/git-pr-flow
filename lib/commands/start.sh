@@ -269,9 +269,14 @@ execute_feature_start() {
     local worktree_path="$2"
     local dependencies="$3"
     
+    # 引入上下文推导系统
+    source "$(dirname "${BASH_SOURCE[0]}")/../utils/context.sh"
+    
     local current_epic base_branch
-    current_epic=$(detect_current_epic)
-    base_branch=$(config_epic_get "base_branch" "$current_epic")
+    current_epic=$(context_detect_current_epic)
+    
+    # 功能分支应该基于Epic分支创建，而不是Epic的base_branch
+    base_branch="epic/$current_epic"
     
     # 确定基础分支
     local base_for_branch="$base_branch"
@@ -319,8 +324,9 @@ execute_feature_start() {
     epic_name=$(config_epic_get "epic_name" "$current_epic")
     feature_description="实现${feature_name#*/}功能"
     
-    ui_loading "创建功能分支配置文件"
-    config_feature_create "$feature_name" "$epic_name" "$feature_description" "$worktree_path"
+    # 功能分支不再创建YAML配置文件
+    # 所有配置信息通过上下文推导获取
+    ui_info "功能分支配置通过上下文推导管理，无需创建配置文件"
     
     ui_success "工作树创建成功: $worktree_path"
     return 0

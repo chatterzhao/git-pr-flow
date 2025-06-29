@@ -306,8 +306,17 @@ init_new_epic() {
         return 1
     fi
     
-    # 7. 创建Epic配置文件（在工作树内）
-    config_epic_create "$base_epic_name" "$description" "$base_branch" "$worktree_base_path" "$epic_branch_name"
+    # 7. 注册Epic到项目配置（替代创建YAML文件）
+    # 引入项目配置系统
+    source "$(dirname "${BASH_SOURCE[0]}")/../utils/project-config.sh"
+    
+    # 确保项目配置已初始化
+    if ! gpf_project_config_exists; then
+        init_project_config "$base_branch"
+    fi
+    
+    # 添加Epic到索引而不是创建YAML文件
+    add_epic_to_index "$base_epic_name" "$description" "$base_branch"
     
     ui_success "Epic工作树创建成功: $worktree_base_path"
     
