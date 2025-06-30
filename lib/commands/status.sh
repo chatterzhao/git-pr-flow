@@ -12,30 +12,118 @@ source "$(dirname "${BASH_SOURCE[0]}")/../utils/paths.sh"
 
 # status命令主函数
 cmd_status() {
-    local target_epic_or_scope="${1:-}"
+    local json_output=false
+    local show_help=false
+    local target_epic_or_scope=""
+    
+    # 解析参数
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --json)
+                json_output=true
+                shift
+                ;;
+            --help|-h)
+                show_help=true
+                shift
+                ;;
+            -*)
+                ui_error "未知选项: $1"
+                show_status_usage_help
+                return 1
+                ;;
+            *)
+                if [[ -z "$target_epic_or_scope" ]]; then
+                    target_epic_or_scope="$1"
+                else
+                    ui_error "过多参数: $1"
+                    show_status_usage_help
+                    return 1
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # 显示帮助
+    if [[ "$show_help" == "true" ]]; then
+        show_status_usage_help
+        return 0
+    fi
     
     # 如果没有参数，显示全局概览
     if [[ -z "$target_epic_or_scope" ]]; then
-        show_all_epics_overview
+        if [[ "$json_output" == "true" ]]; then
+            show_all_epics_overview_json
+        else
+            show_all_epics_overview
+        fi
         return 0
     fi
     
     # 检查是否是内置作用域
     case "$target_epic_or_scope" in
         "global")
-            show_global_status_dashboard
+            if [[ "$json_output" == "true" ]]; then
+                show_global_status_dashboard_json
+            else
+                show_global_status_dashboard
+            fi
             ;;
         "worktrees")
-            show_worktrees_status
+            if [[ "$json_output" == "true" ]]; then
+                show_worktrees_status_json
+            else
+                show_worktrees_status
+            fi
             ;;
         "branches")
-            show_branches_status
+            if [[ "$json_output" == "true" ]]; then
+                show_branches_status_json
+            else
+                show_branches_status
+            fi
             ;;
         *)
             # 尝试作为epic名称处理
-            show_specific_epic_status "$target_epic_or_scope"
+            if [[ "$json_output" == "true" ]]; then
+                show_specific_epic_status_json "$target_epic_or_scope"
+            else
+                show_specific_epic_status "$target_epic_or_scope"
+            fi
             ;;
     esac
+}
+
+# 显示status命令用法帮助
+show_status_usage_help() {
+    ui_header "📊 GPF 状态查看"
+    echo
+    echo "用法: gpf status [选项] [目标]"
+    echo
+    echo "选项:"
+    echo "  --json          输出JSON格式的结构化数据"
+    echo "  --help, -h      显示此帮助信息"
+    echo
+    echo "目标："
+    echo "  无参数          显示所有Epic概览"
+    echo "  <epic-name>     显示特定Epic的详细状态"
+    echo "  global          显示全局详细状态"
+    echo "  worktrees       显示所有工作树状态"
+    echo "  branches        显示所有分支状态"
+    echo
+    echo "示例:"
+    echo "  gpf status                    # 显示所有Epic概览"
+    echo "  gpf status auth               # 显示auth Epic详细状态"
+    echo "  gpf status --json             # 输出JSON格式的概览"
+    echo "  gpf status auth --json        # 输出auth Epic的JSON数据"
+    echo "  gpf status global             # 显示全局详细状态"
+    echo
+    echo "💡 说明:"
+    echo "  - status命令用于查看Epic和功能分支的开发状态"
+    echo "  - JSON格式便于程序化处理和AI工具集成"
+    echo "  - Epic名称会自动匹配对应的epic/前缀分支"
+    echo
 }
 
 # Epic状态仪表盘
