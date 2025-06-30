@@ -12,7 +12,7 @@ source "$COMMAND_SCRIPT_DIR/../utils/environment.sh"
 
 # start命令主函数
 cmd_start() {
-    local input_feature_name="$1"
+    local input_feature_name="${1:-}"
     
     # 智能目录切换：如果输入包含epic名称，自动切换到对应epic目录
     if [[ -n "$input_feature_name" && "$input_feature_name" == *"/"* ]]; then
@@ -35,8 +35,16 @@ cmd_start() {
         fi
     fi
     
-    # 如果没有提供功能名称，显示交互式选择
+    # 如果没有提供功能名称，显示交互式选择或用法帮助
     if [[ -z "$input_feature_name" ]]; then
+        # 检查是否为非交互式环境
+        if is_non_interactive; then
+            # 非交互式环境，显示用法说明并退出
+            ui_info "未提供功能名称，且处于非交互式环境"
+            show_start_usage_help
+            return 1
+        fi
+        
         # 检查Epic环境
         local current_epic
         current_epic=$(detect_current_epic)
@@ -86,6 +94,37 @@ cmd_start() {
 }
 
 # 交互式启动处理
+# 显示start命令用法帮助
+show_start_usage_help() {
+    ui_header "🚀 GPF 功能开发启动"
+    echo
+    echo "用法: gpf start <epic-name>/<feature-name>"
+    echo
+    echo "参数说明:"
+    echo "  <epic-name>      Epic名称，如: auth, user-profile, payment"
+    echo "  <feature-name>   功能名称，如: login, register, validation"
+    echo
+    echo "示例:"
+    echo "  gpf start auth/login          # 在auth Epic下创建login功能"
+    echo "  gpf start user-profile/avatar # 在user-profile Epic下创建avatar功能"
+    echo "  gpf start payment/validation  # 在payment Epic下创建validation功能"
+    echo
+    echo "💡 说明:"
+    echo "  - start命令用于在现有Epic下创建和启动功能分支开发"
+    echo "  - 功能分支会自动基于对应的Epic分支创建"
+    echo "  - 每个功能都会创建独立的工作树目录"
+    echo
+    echo "🔍 查看现有Epic:"
+    echo "  gpf status                    # 查看所有Epic和功能状态"
+    echo "  gpf status <epic-name>        # 查看特定Epic的功能列表"
+    echo
+    echo "📋 相关命令:"
+    echo "  gpf init <epic-name>          # 创建新Epic"
+    echo "  gpf ready <epic-name>/<feature-name>  # 检查功能就绪状态"
+    echo "  gpf pr <epic-name>/<feature-name>     # 创建功能PR"
+    echo
+}
+
 handle_start_interactive() {
     local current_epic epic_name
     current_epic=$(detect_current_epic)
