@@ -15,33 +15,90 @@
 
 ### 1. `gpf init` - Epic初始化命令
 
-#### 当前参数支持：
+#### 正确的命令逻辑：
 ```bash
-gpf init <epic-name> [base-branch] [-yaml]
-gpf init  # 无参数交互式模式
+gpf init <epic-name> [base-branch]
 ```
+
+**参数说明**：
+- `<epic-name>` (必需): Epic名称，总功能名，如 `auth`、`user-management`
+- `[base-branch]` (可选): 基础分支，不指定时读取 `~/.gpf/config.yaml` 中的 `epic_base_branch`
 
 #### 发现的问题：
 ❌ **死循环问题**: 无参数调用时在非交互式环境中陷入死循环
-- 现象：重复输出`请输入有效的Epic名称 (小写字母、数字、连字符)`
-- 原因：输入验证失败但没有退出机制
-- AI影响：AI无法使用无参数模式
+❌ **引导信息不友好**: 错误提示缺乏具体解决方案和示例
 
-#### 引导信息质量分析：
-- ✅ 错误信息明确：说明了命名规则
-- ❌ 缺乏非交互式指引：没有告诉AI如何正确调用
-- ❌ 缺乏退出机制：非交互式环境下无法退出
+#### AI友好的引导信息设计：
 
-#### 建议改进：
-1. **非交互式环境检测**：无参数时应显示用法并退出
-2. **改进引导信息**：
-   ```
-   ❌ 当前: 请输入有效的Epic名称 (小写字母、数字、连字符)
-   ✅ 建议: 
-   请输入Epic名称 (小写字母、数字、连字符，如: user-auth)
-   或直接使用: gpf init <epic-name> [base-branch]
-   示例: gpf init user-auth develop
-   ```
+**场景1：无参数调用**
+```bash
+gpf init
+```
+✅ **应该显示**：
+```
+🎯 GPF Epic 初始化
+
+用法: gpf init <epic-name> [base-branch]
+
+参数说明:
+  <epic-name>   Epic名称，小写字母+数字+连字符，描述总功能
+  [base-branch] 基础分支 (可选)
+
+示例:
+  gpf init auth develop          # 创建认证Epic，基于develop分支
+  gpf init user-management       # 创建用户管理Epic，使用默认分支
+  gpf init payment-system main   # 创建支付系统Epic，基于main分支
+
+💡 提示:
+  - 如果不指定base-branch，将使用 ~/.gpf/config.yaml 中的 epic_base_branch 设置
+  - 首次使用请指定分支，或先配置默认分支设置
+```
+
+**场景2：缺少base-branch且无配置**
+```bash
+gpf init auth
+```
+✅ **应该显示**：
+```
+❌ 未指定基础分支，且缺少默认配置
+
+解决方案 (选择其一):
+
+1️⃣ 临时指定分支:
+   gpf init auth develop
+
+2️⃣ 设置默认分支 (推荐):
+   在 ~/.gpf/config.yaml 中添加:
+   epic_base_branch: "develop"
+   
+   这样以后创建Epic都会自动基于 develop 分支
+
+💡 建议: 大多数项目使用 develop 或 main 作为基础分支
+```
+
+**场景3：Epic名称格式错误**
+```bash
+gpf init AuthUser
+```
+✅ **应该显示**：
+```
+❌ Epic名称格式错误: "AuthUser"
+
+要求: 小写字母、数字、连字符组合
+
+✅ 正确示例:
+  auth-user      # 认证用户功能
+  payment        # 支付功能  
+  user-profile   # 用户档案功能
+
+请重新输入: gpf init <正确的epic名称> [base-branch]
+```
+
+#### 改进要点：
+1. **非交互式友好**: 在非交互式环境直接显示完整帮助并退出
+2. **信息充分**: 包含用法、示例、配置说明
+3. **AI学习友好**: 提供具体的命令示例，AI可直接学习使用
+4. **问题导向**: 针对不同错误情况提供具体解决方案
 
 ---
 
