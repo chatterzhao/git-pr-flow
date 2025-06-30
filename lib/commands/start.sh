@@ -66,8 +66,7 @@ cmd_start() {
     
     # 验证功能名称格式
     if ! is_valid_feature_name "$normalized_feature_name"; then
-        ui_error "无效的功能名称: $normalized_feature_name"
-        ui_info "功能名称格式: epic-name/feature-name，如: auth/login, user-profile/avatar"
+        show_start_format_error "$input_feature_name"
         return 1
     fi
     
@@ -91,6 +90,39 @@ cmd_start() {
     
     # 执行功能开发启动
     start_feature_development "$normalized_feature_name"
+}
+
+# 显示友好的格式错误信息
+show_start_format_error() {
+    local user_input="$1"
+    
+    # 分析用户输入，提供针对性建议
+    if [[ "$user_input" == *"/"* ]]; then
+        # 包含斜杠，可能是格式问题
+        ui_error "功能名称格式错误: \"$user_input\""
+        echo
+        echo "💡 检查要点:"
+        echo "  - Epic名称是否存在？"
+        echo "  - 功能名称是否符合规范？"
+    else
+        # 不包含斜杠，缺少Epic前缀
+        ui_error "功能名称不完整: \"$user_input\""
+        echo
+        echo "💡 start 命令用于在某个Epic上创建功能分支"
+        echo "   需要指定是基于哪个Epic开发"
+    fi
+    
+    echo
+    echo "正确格式: gpf start <epic-name>/<feature-name>"
+    echo
+    echo "✅ 示例:"
+    echo "  基于auth Epic:     gpf start auth/$user_input"
+    echo "  基于user Epic:     gpf start user/$user_input"  
+    echo "  基于payment Epic:  gpf start payment/$user_input"
+    echo
+    echo "🔍 查看现有Epic:"
+    echo "  gpf status                    # 查看所有Epic和功能状态"
+    echo
 }
 
 # 交互式启动处理
