@@ -15,6 +15,7 @@ cmd_pr() {
     local feature_name=""
     local target_branch=""
     local push_remote=""
+    local force_mode=false
     
     # 解析参数
     while [[ $# -gt 0 ]]; do
@@ -40,6 +41,10 @@ cmd_pr() {
                     ui_error "--target 选项需要指定目标分支名称"
                     return 1
                 fi
+                ;;
+            --force)
+                force_mode=true
+                shift
                 ;;
             --help|-h)
                 show_pr_help
@@ -89,10 +94,10 @@ cmd_pr() {
         
         if [[ -n "$context_result" ]]; then
             # 自动检测到上下文，直接处理
-            handle_context_pr "$context_result" "$target_branch" "$push_remote"
+            handle_context_pr "$context_result" "$target_branch" "$push_remote" "$force_mode"
         else
             # 无法自动检测，显示交互式选择
-            if ! handle_pr_interactive; then
+            if ! handle_pr_interactive "$force_mode"; then
                 return 1
             fi
         fi
@@ -109,7 +114,7 @@ cmd_pr() {
     fi
     
     # 执行PR创建
-    create_feature_pr "$full_feature_name" "$target_branch" "$push_remote"
+    create_feature_pr "$full_feature_name" "$target_branch" "$push_remote" "$force_mode"
 }
 
 # 检测当前PR上下文
@@ -149,6 +154,7 @@ handle_context_pr() {
     local context="$1"
     local target_branch="$2"
     local push_remote="$3"
+    local force_mode="${4:-false}"
     
     local context_type="${context%%:*}"
     local branch_name="${context#*:}"
@@ -166,7 +172,7 @@ handle_context_pr() {
             fi
             
             ui_info "📋 准备创建PR: $branch_name → $target_branch"
-            create_feature_pr "$branch_name" "$target_branch" "$push_remote"
+            create_feature_pr "$branch_name" "$target_branch" "$push_remote" "$force_mode"
             ;;
             
         "epic")
@@ -179,7 +185,7 @@ handle_context_pr() {
             fi
             
             ui_info "📋 准备创建PR: $branch_name → $target_branch"
-            create_feature_pr "$branch_name" "$target_branch" "$push_remote"
+            create_feature_pr "$branch_name" "$target_branch" "$push_remote" "$force_mode"
             ;;
             
         *)
@@ -191,6 +197,7 @@ handle_context_pr() {
 
 # 交互式PR创建处理
 handle_pr_interactive() {
+    local force_mode="${1:-false}"
     local epic_name
     epic_name=$(config_epic_get "epic_name")
     
@@ -241,7 +248,7 @@ handle_pr_interactive() {
     else
         # 选择了具体功能
         local selected_feature="${features_array[$choice]}"
-        create_feature_pr "$selected_feature"
+        create_feature_pr "$selected_feature" "" "" "$force_mode"
     fi
 }
 
@@ -315,6 +322,7 @@ create_feature_pr() {
     local feature_name="$1"
     local target_branch="${2:-}"
     local push_remote="${3:-}"
+    local force_mode="${4:-false}"
     
     ui_loading "准备创建PR: $feature_name"
     
@@ -341,10 +349,15 @@ create_feature_pr() {
     # 显示PR预览
     show_pr_preview "$feature_name" "$pr_context"
     
-    # 确认创建
-    if ! ui_confirm "确认创建PR？"; then
-        ui_info "取消PR创建"
-        return 1
+    # 智能确认逻辑
+    if ! should_auto_create_pr "$feature_name" "$pr_context" "$force_mode"; then
+        # 需要确认时才显示确认对话框
+        if ! ui_confirm "确认创建PR？"; then
+            ui_info "取消PR创建"
+            return 1
+        fi
+    else
+        ui_info "✅ 自动创建PR (条件满足，无需确认)"
     fi
     
     # 执行PR创建流程
@@ -788,6 +801,7 @@ GPF PR命令 - 智能PR创建工具
   --push-remote <remote>    指定推送的远程仓库
   --multi-platform          推送到所有配置的平台（github, gitee等）
   --target <branch>         指定目标分支
+  --force                   强制跳过所有确认（适用于自动化脚本）
   --help, -h                显示此帮助信息
 
 参数:
@@ -813,4 +827,120 @@ GPF PR命令 - 智能PR创建工具
   3. 原生Git推送: git push <remote> <branch>
 
 EOF
+}
+
+# 智能确认逻辑 - 决定是否需要用户确认
+should_auto_create_pr() {
+    local feature_name="$1"
+    local pr_context="$2"
+    local force_mode="${3:-false}"
+    
+    # 强制模式：直接跳过所有确认
+    if [[ "$force_mode" == "true" ]]; then
+        ui_info "🚀 强制模式：跳过所有确认"
+        return 0
+    fi
+    
+    # 获取工作树路径检查风险条件
+    local worktree_path
+    worktree_path=$(get_branch_worktree_absolute_path "$feature_name")
+    
+    local risk_issues=()
+    local safety_checks_passed=true
+    
+    # 安全检查1: 检查工作目录是否干净
+    if [[ -d "$worktree_path" ]]; then
+        local original_dir
+        original_dir=$(pwd)
+        cd "$worktree_path" || return 1
+        
+        if ! git_is_clean; then
+            risk_issues+=("工作目录有未提交的变更")
+            safety_checks_passed=false
+        fi
+        
+        cd "$original_dir" || true
+    fi
+    
+    # 安全检查2: 检查是否有足够的提交
+    local commit_count
+    commit_count=$(echo "$pr_context" | grep '"commit_count"' | cut -d':' -f2 | cut -d',' -f1 | tr -d ' ')
+    
+    if [[ "$commit_count" -eq 0 ]]; then
+        risk_issues+=("分支没有提交")
+        safety_checks_passed=false
+    fi
+    
+    # 安全检查3: 检查是否在正确的上下文环境中
+    local current_context
+    current_context=$(detect_pr_context)
+    
+    if [[ -z "$current_context" ]]; then
+        risk_issues+=("无法检测当前环境上下文")
+        safety_checks_passed=false
+    fi
+    
+    # 安全检查4: 检查是否有明显的分支冲突风险
+    local base_branch
+    base_branch=$(echo "$pr_context" | grep '"base_branch"' | cut -d'"' -f4)
+    
+    if [[ -n "$base_branch" ]]; then
+        # 检查是否存在分支分歧 (这是一个简化的检查)
+        local diverged_commits
+        diverged_commits=$(git rev-list --count "$base_branch..$feature_name" 2>/dev/null || echo "0")
+        
+        # 如果分支有很多新提交，可能需要用户确认
+        if [[ "$diverged_commits" -gt 20 ]]; then
+            risk_issues+=("分支有较多新提交($diverged_commits个)，可能需要rebase")
+        fi
+    fi
+    
+    # 条件判断：是否应该自动创建PR
+    local auto_create_conditions=()
+    
+    # 条件1: 在功能分支目录中
+    local current_dir=$(pwd)
+    if [[ "$current_dir" == *"/.worktrees/epic--"*"--"* ]]; then
+        auto_create_conditions+=("在功能分支工作目录中")
+    fi
+    
+    # 条件2: 参数完整 (feature_name存在且有效)
+    if [[ -n "$feature_name" && -d "$worktree_path" ]]; then
+        auto_create_conditions+=("参数完整且分支有效")
+    fi
+    
+    # 条件3: 上下文清晰 (能够自动检测到正确的上下文)
+    if [[ -n "$current_context" ]]; then
+        auto_create_conditions+=("上下文检测清晰")
+    fi
+    
+    # 最终决策逻辑
+    if [[ "$safety_checks_passed" == "true" && ${#auto_create_conditions[@]} -ge 2 ]]; then
+        # 安全检查通过且满足至少2个自动创建条件
+        ui_info "🔍 自动创建条件检查："
+        for condition in "${auto_create_conditions[@]}"; do
+            ui_info "  ✅ $condition"
+        done
+        return 0  # 可以自动创建
+    else
+        # 存在风险或条件不足，需要用户确认
+        if [[ ${#risk_issues[@]} -gt 0 ]]; then
+            ui_warning "⚠️ 检测到以下风险，需要用户确认："
+            for issue in "${risk_issues[@]}"; do
+                ui_warning "  ❌ $issue"
+            done
+        fi
+        
+        if [[ ${#auto_create_conditions[@]} -lt 2 ]]; then
+            ui_info "💡 自动创建条件不足 (${#auto_create_conditions[@]}/2)："
+            if [[ ${#auto_create_conditions[@]} -gt 0 ]]; then
+                for condition in "${auto_create_conditions[@]}"; do
+                    ui_info "  ✅ $condition"
+                done
+            fi
+            ui_info "  💡 提示：在功能分支目录中运行命令可减少确认步骤"
+        fi
+        
+        return 1  # 需要用户确认
+    fi
 }
