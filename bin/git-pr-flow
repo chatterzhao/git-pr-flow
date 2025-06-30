@@ -16,6 +16,7 @@ source "$PROJECT_ROOT/lib/utils/common.sh"
 source "$PROJECT_ROOT/lib/utils/ui.sh"
 source "$PROJECT_ROOT/lib/utils/git.sh"
 source "$PROJECT_ROOT/lib/utils/config.sh"
+source "$PROJECT_ROOT/lib/utils/environment.sh"
 
 # 版本信息
 readonly VERSION="0.1.0-mvp"
