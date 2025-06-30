@@ -328,7 +328,7 @@ ensure_project_root_directory() {
         local from_relative="${current_dir##*/}"  # 只显示worktree目录名
         local to_relative="."  # 根目录显示为.
         
-        ui_info "检测到在worktree目录中，自动切换到项目根目录"
+        ui_info "检测到在worktree目录中，init 命令应该在根目录，将自动切换："
         ui_info "从: $from_relative"
         ui_info "到: $to_relative"
         
