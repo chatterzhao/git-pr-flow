@@ -10,6 +10,7 @@ source "$COMMAND_SCRIPT_DIR/../utils/environment.sh"
 # 引入路径管理工具
 source "$(dirname "${BASH_SOURCE[0]}")/../utils/paths.sh"
 
+
 # status命令主函数
 cmd_status() {
     local json_output=false
@@ -51,13 +52,59 @@ cmd_status() {
         return 0
     fi
     
-    # 如果没有参数，显示全局概览
+    # 如果没有参数，根据当前路径智能判断显示内容
     if [[ -z "$target_epic_or_scope" ]]; then
-        if [[ "$json_output" == "true" ]]; then
-            show_all_epics_overview_json
-        else
-            show_all_epics_overview
-        fi
+        # 获取当前路径信息，判断上下文
+        local current_context
+        current_context=$(detect_current_context)
+        
+        case "$current_context" in
+            "root")
+                # 在根目录，提示用户使用 gpf init 或 gpf start
+                ui_error "当前不在Epic工作环境中"
+                echo
+                echo "💡 请使用以下命令进入Epic工作环境："
+                echo "  gpf init <epic-name>                    # 创建新Epic或进入已存在的Epic"
+                echo "  gpf start <epic-name>                   # 进入已存在的Epic"
+                echo "  gpf start <epic-name>/<feature-name>    # 进入已存在的Epic feature"
+                echo
+                echo "💡 或者指定要查看的Epic："
+                echo "  gpf status <epic-name>   # 查看特定Epic的状态"
+                return 1
+                ;;
+            "epic:"*)
+                # 在Epic目录中，显示该Epic状态
+                local epic_name="${current_context#epic:}"
+                echo "📍 当前位置：Epic '$epic_name' 工作目录"
+                echo
+                if [[ "$json_output" == "true" ]]; then
+                    show_specific_epic_status_json "$epic_name"
+                else
+                    show_specific_epic_status "$epic_name"
+                fi
+                ;;
+            "feature:"*)
+                # 在功能目录中，显示该功能状态
+                local feature_path="${current_context#feature:}"
+                local epic_name="${feature_path%%/*}"
+                local feature_name="${feature_path#*/}"
+                echo "📍 当前位置：功能 '$feature_path' 工作目录"
+                echo
+                if [[ "$json_output" == "true" ]]; then
+                    show_specific_feature_status_json "$epic_name" "$feature_name"
+                else
+                    show_specific_feature_status "$epic_name" "$feature_name"
+                fi
+                ;;
+            *)
+                # 默认情况，显示全局概览
+                if [[ "$json_output" == "true" ]]; then
+                    show_all_epics_overview_json
+                else
+                    show_all_epics_overview
+                fi
+                ;;
+        esac
         return 0
     fi
     
@@ -106,18 +153,20 @@ show_status_usage_help() {
     echo "  --help, -h      显示此帮助信息"
     echo
     echo "目标："
-    echo "  无参数          显示所有Epic概览"
-    echo "  <epic-name>     显示特定Epic的详细状态"
-    echo "  global          显示全局详细状态"
-    echo "  worktrees       显示所有工作树状态"
-    echo "  branches        显示所有分支状态"
+    echo "  无参数                        显示所有Epic概览"
+    echo "  <epic-name>                   显示特定Epic及其子功能的详细状态"
+    echo "  <epic-name>/<feature-name>    显示特定功能分支的状态"
+    echo "  global                        显示全局详细状态"
+    echo "  worktrees                     显示所有工作树状态"
+    echo "  branches                      显示所有分支状态"
     echo
     echo "示例:"
-    echo "  gpf status                    # 显示所有Epic概览"
-    echo "  gpf status auth               # 显示auth Epic详细状态"
-    echo "  gpf status --json             # 输出JSON格式的概览"
-    echo "  gpf status auth --json        # 输出auth Epic的JSON数据"
-    echo "  gpf status global             # 显示全局详细状态"
+    echo "  gpf status                                # 显示所有Epic概览"
+    echo "  gpf status auth                           # 显示auth Epic及其子功能的状态"
+    echo "  gpf status auth/login                     # 显示auth/login功能分支的状态"
+    echo "  gpf status --json                         # 输出JSON格式的概览"
+    echo "  gpf status auth --json                    # 输出auth Epic的JSON数据"
+    echo "  gpf status global                         # 显示全局详细状态"
     echo
     echo "💡 说明:"
     echo "  - status命令用于查看Epic和功能分支的开发状态"
@@ -751,19 +800,194 @@ show_specific_epic_status_json() {
 
 # 显示特定Epic状态
 show_specific_epic_status() {
-    local epic_name="$1"
+    local user_input="$1"
+    local epic_name=""
     
-    # 检查Epic是否存在
-    if ! config_epic_exists "$epic_name"; then
-        ui_error "Epic '$epic_name' 不存在"
-        ui_info "可用的Epic:"
-        show_all_epics_list
+    # 智能Epic名称匹配 - 简化版本
+    # 方式1: 直接匹配 epic/ 前缀
+    if [[ "$user_input" == epic/* ]]; then
+        epic_name="${user_input#epic/}"
+    else
+        epic_name="$user_input"
+    fi
+    
+    # 检查Epic分支是否存在
+    if git branch | grep -q "epic/$epic_name"; then
+        # 检查Epic是否存在配置
+        if ! config_epic_exists "$epic_name"; then
+            ui_error "Epic '$epic_name' 不存在"
+            echo "📋 Epic管理命令:"
+            echo "  gpf init <epic_name>          # 创建新Epic"
+            echo "  gpf status                    # 查看所有Epic概览"
+            return 1
+        fi
+        show_epic_status_dashboard "$epic_name"
+    else
+        # Epic不存在，显示友好错误信息
+        ui_error "Epic '$user_input' 不存在"
+        echo
+        echo "💡 可用的 Epic 列表（可不输入\"epic/\"）:"
+        # 简单列出所有Epic分支
+        git branch | grep "epic/" | sed 's/^[* +] */  • /'
+        echo
+        echo "📋 Epic管理命令:"
+        echo "  gpf init <epic-name>                           # 创建新Epic"
+        echo "  gpf status                                     # 查看所有Epic概览"
+        echo "  gpf status <epic-name>                         # 查看<epic-name> 及它子功能的状态"
+        echo "  gpf status <epic-name>/<feature-name>          # 查看<epic-name>/<feature-name> 的状态"
+        return 1
+    fi
+}
+
+# 检测当前路径上下文
+detect_current_context() {
+    local current_dir=$(pwd)
+    local project_root
+    
+    # 获取项目根目录
+    if ! project_root=$(get_project_root_path 2>/dev/null); then
+        echo "unknown"
         return 1
     fi
     
-    # 显示Epic详细状态
-    show_epic_status_dashboard "$epic_name"
+    # 检查是否在项目根目录
+    if [[ "$current_dir" == "$project_root" ]]; then
+        echo "root"
+        return 0
+    fi
+    
+    # 检查是否在 .worktrees 目录中
+    if [[ "$current_dir" == *"/.worktrees/"* ]]; then
+        # 提取工作树路径部分
+        local worktree_path="${current_dir#*/.worktrees/}"
+        local worktree_name="${worktree_path%%/*}"
+        
+        # 首先检查是否是功能工作树 (格式: epic--epic-name--feature-name)
+        # 注意：需要先检查功能工作树，因为它包含更多的--分隔符
+        if [[ "$worktree_name" =~ ^epic--(.+)--(.+)$ ]]; then
+            local epic_name="${BASH_REMATCH[1]}"
+            local feature_name="${BASH_REMATCH[2]}"
+            echo "feature:$epic_name/$feature_name"
+            return 0
+        fi
+        
+        # 然后检查是否是Epic工作树 (格式: epic--epic-name)
+        if [[ "$worktree_name" =~ ^epic--(.+)$ ]]; then
+            local epic_name="${BASH_REMATCH[1]}"
+            # 检查是否在Epic根目录还是功能子目录
+            local relative_path="${worktree_path#*/}"
+            if [[ "$relative_path" == "$worktree_name" ]] || [[ -z "$relative_path" ]]; then
+                # 在Epic根目录
+                echo "epic:$epic_name"
+            else
+                # 可能在功能子目录，但目前简化为Epic
+                echo "epic:$epic_name"
+            fi
+            return 0
+        fi
+    fi
+    
+    # 默认情况
+    echo "unknown"
+    return 1
 }
+
+# 显示特定功能状态
+show_specific_feature_status() {
+    local epic_name="$1"
+    local feature_name="$2"
+    local full_feature_name="$epic_name/$feature_name"
+    
+    ui_header "功能分支状态: $full_feature_name"
+    
+    # 检查分支是否存在
+    if ! git branch | grep -q "$full_feature_name"; then
+        ui_error "功能分支 '$full_feature_name' 不存在"
+        return 1
+    fi
+    
+    # 显示功能基本信息
+    ui_subheader "功能信息"
+    echo "  🚀 Epic: $epic_name"
+    echo "  🔧 功能: $feature_name"
+    echo "  🌿 完整分支名: $full_feature_name"
+    
+    # 显示工作树状态
+    local worktree_path=".worktrees/epic--${epic_name}--${feature_name}"
+    if [[ -d "$worktree_path" ]]; then
+        echo "  🏠 工作树: $worktree_path"
+        
+        # 获取工作目录状态
+        local status_summary
+        if git_is_clean; then
+            status_summary="✅ 干净"
+        else
+            status_summary="⚠️ $(git_status_summary)"
+        fi
+        echo "  📊 工作目录状态: $status_summary"
+    else
+        echo "  📋 仅分支状态（无工作树）"
+    fi
+    
+    # 显示提交信息
+    local commits_count
+    commits_count=$(git rev-list --count "$full_feature_name" 2>/dev/null || echo "0")
+    echo "  📝 提交数: $commits_count"
+    
+    echo
+    
+    # 显示快速操作
+    ui_subheader "快速操作"
+    echo "  🔄 切换到此功能: gpf start $full_feature_name"
+    echo "  📋 创建PR: gpf pr $full_feature_name" 
+    echo "  🧹 清理工作树: gpf clean"
+    echo
+}
+
+# 显示特定功能状态的JSON格式
+show_specific_feature_status_json() {
+    local epic_name="$1"
+    local feature_name="$2"
+    local full_feature_name="$epic_name/$feature_name"
+    
+    # 构建JSON
+    local json_output='{'
+    json_output+='\"feature\":{'
+    json_output+='\"epic_name\":\"'$epic_name'\",'
+    json_output+='\"feature_name\":\"'$feature_name'\",'
+    json_output+='\"full_name\":\"'$full_feature_name'\",'
+    
+    # 检查分支是否存在
+    if ! git branch | grep -q "$full_feature_name"; then
+        json_output+='\"exists\":false,'
+        json_output+='\"error\":\"Feature branch not found\"'
+        json_output+='}}'
+        echo "$json_output"
+        return 1
+    fi
+    
+    json_output+='\"exists\":true,'
+    
+    # 工作树状态
+    local worktree_path=".worktrees/epic--${epic_name}--${feature_name}"
+    local worktree_exists="false"
+    if [[ -d "$worktree_path" ]]; then
+        worktree_exists="true"
+    fi
+    
+    json_output+='\"worktree_exists\":'$worktree_exists','
+    json_output+='\"worktree_path\":\"'$worktree_path'\",'
+    
+    # 提交数量
+    local commits_count
+    commits_count=$(git rev-list --count "$full_feature_name" 2>/dev/null || echo "0")
+    json_output+='\"commits_count\":'$commits_count
+    
+    json_output+='}}'
+    
+    echo "$json_output"
+}
+
 
 # 工作树概览
 show_worktrees_summary() {
@@ -805,15 +1029,16 @@ show_all_epics_list() {
                 local epic_name="${branch#epic/}"
                 local status_icon config_status worktree_status
                 
-                # 检查配置文件状态（使用新的路径API）
-                if epic_config_exists "$epic_name"; then
+                # 检查配置文件状态（使用配置工具）
+                if config_epic_exists "$epic_name"; then
                     config_status="✅"
                 else
                     config_status="❌"
                 fi
                 
-                # 检查工作树状态（使用新的路径API）
-                if epic_worktree_exists "$epic_name"; then
+                # 检查工作树状态（简单路径检查）
+                local epic_worktree_path=".worktrees/epic--$epic_name"
+                if [[ -d "$epic_worktree_path" ]]; then
                     worktree_status="🏠"
                 else
                     worktree_status="📋"
