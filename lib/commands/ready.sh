@@ -12,7 +12,30 @@ source "$COMMAND_SCRIPT_DIR/../utils/environment.sh"
 
 # ready命令主函数
 cmd_ready() {
-    local target_branch="${1:-}"
+    local input_param="${1:-}"
+    local enable_report=false
+    
+    # 解析参数
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --report)
+                enable_report=true
+                shift
+                ;;
+            -*)
+                ui_error "❌ 未知参数: $1"
+                ui_info "💡 支持的参数:"
+                ui_info "   --report    生成详细的markdown报告"
+                return 1
+                ;;
+            *)
+                if [[ -z "$input_param" ]]; then
+                    input_param="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
     
     # 加载path工具函数
     if [[ -f "$PROJECT_ROOT/lib/utils/paths.sh" ]]; then
@@ -20,23 +43,72 @@ cmd_ready() {
     fi
     
     # 如果没有参数，启动智能分支选择模式
-    if [[ -z "$target_branch" ]]; then
+    if [[ -z "$input_param" ]]; then
+        local target_branch
         target_branch=$(smart_branch_selection)
         if [[ -z "$target_branch" ]]; then
             ui_info "已取消操作"
             return 0
         fi
+        
+        
+        # 执行完整的ready检查流程
+        execute_full_ready_pipeline "$target_branch" "$enable_report"
+        return $?
     fi
     
-    # 验证目标分支格式 (应该是 xx/yy 格式)
-    if ! validate_feature_branch_format "$target_branch"; then
-        ui_error "无效的分支格式: $target_branch"
-        ui_info "分支格式应为: epic-name/feature-name，如: auth/login"
-        return 1
+    # 智能参数解析：判断是Epic名称还是功能分支名称
+    if [[ "$input_param" != */* ]]; then
+        # 不包含 '/' 的输入被识别为Epic名称，执行Epic级别检查
+        execute_epic_ready_check "$input_param"
+        return $?
+    else
+        # 包含 '/' 的输入被识别为功能分支名称
+        local target_branch="$input_param"
+        
+        # 验证目标分支格式和存在性
+        if ! validate_feature_branch_format "$target_branch"; then
+            ui_error "❌ 无效的功能分支格式: $target_branch"
+            echo
+            ui_info "📝 正确的命令格式:"
+            ui_info "   • 功能分支检查: gpf ready epic-name/feature-name"
+            ui_info "   • Epic级别检查: gpf ready epic-name"
+            return 1
+        fi
+        
+        # 检查功能分支的Epic和功能名称是否存在
+        local epic_part="${target_branch%%/*}"
+        local feature_part="${target_branch#*/}"
+        
+        # 检查Epic是否存在
+        if ! git rev-parse --verify "epic/$epic_part" >/dev/null 2>&1; then
+            ui_error "❌ 您输入的按规则判断属于Epic功能级，但是没有找到功能级所属的Epic '$epic_part'，请检查输入"
+            echo
+            show_available_epics
+            return 1
+        fi
+        
+        # 检查功能分支是否存在
+        if ! git rev-parse --verify "$target_branch" >/dev/null 2>&1; then
+            ui_error "❌ 您输入的按规则判断属于Epic功能级，但是没有在 '$epic_part' 下面找到 '$feature_part'，请检查 '$feature_part' 是否输入正确"
+            echo
+            ui_info "📋 Epic '$epic_part' 下的可用功能分支:"
+            local epic_features
+            epic_features=$(git_list_branches | grep "^$epic_part/" | sort)
+            if [[ -n "$epic_features" ]]; then
+                echo "$epic_features" | sed 's/^/     • /'
+            else
+                ui_info "     (暂无功能分支)"
+                ui_info "💡 使用: gpf start $epic_part/feature-name 创建新功能分支"
+            fi
+            return 1
+        fi
+        
+        
+        # 执行完整的ready检查流程
+        execute_full_ready_pipeline "$target_branch" "$enable_report"
+        return $?
     fi
-    
-    # 执行完整的ready检查流程
-    execute_full_ready_pipeline "$target_branch"
 }
 
 # 验证功能分支格式
@@ -232,9 +304,51 @@ get_branch_status_info() {
     fi
 }
 
+# 获取分支未就绪的详细原因
+get_branch_readiness_details() {
+    local branch="$1"
+    local issues=()
+    
+    # 检查工作树状态
+    local worktree_absolute_path
+    worktree_absolute_path=$(get_branch_worktree_absolute_path "$branch")
+    
+    if [[ ! -d "$worktree_absolute_path" ]]; then
+        issues+=("工作树不存在")
+    else
+        # 检查工作目录是否干净
+        local original_dir
+        original_dir=$(pwd)
+        
+        cd "$worktree_absolute_path" || return 1
+        
+        if ! git_is_clean; then
+            issues+=("有未提交的变更")
+        fi
+        
+        cd "$original_dir" || true
+    fi
+    
+    # 检查提交历史
+    local commit_count
+    commit_count=$(git rev-list --count "$branch" 2>/dev/null || echo "0")
+    
+    if [[ "$commit_count" -eq 0 ]]; then
+        issues+=("没有提交")
+    fi
+    
+    # 返回问题列表
+    if [[ ${#issues[@]} -gt 0 ]]; then
+        printf "%s" "$(IFS=', '; echo "${issues[*]}")"
+    else
+        echo "未知问题"
+    fi
+}
+
 # 执行完整的ready检查流程
 execute_full_ready_pipeline() {
     local target_branch="$1"
+    local enable_report="${2:-false}"
     
     ui_header "🚀 Ready 检查流程: $target_branch"
     
@@ -246,7 +360,12 @@ execute_full_ready_pipeline() {
     
     local overall_success=true
     local step=1
-    local total_steps=4
+    local total_steps=3
+    
+    # 如果启用报告生成，增加步骤数
+    if [[ "$enable_report" == "true" ]]; then
+        total_steps=4
+    fi
     
     # 步骤1: 验证依赖关系完整性
     ui_subheader "[$step/$total_steps] 🔍 验证依赖关系完整性"
@@ -270,17 +389,19 @@ execute_full_ready_pipeline() {
     ((step++))
     echo
     
-    # 步骤3: 生成详细报告
-    ui_subheader "[$step/$total_steps] 📄 生成详细报告"
-    if generate_branch_readiness_report "$target_branch"; then
-        ui_success "✅ 详细报告已生成"
-    else
-        ui_warning "⚠️ 报告生成有问题"
+    # 步骤3: 生成详细报告（可选）
+    if [[ "$enable_report" == "true" ]]; then
+        ui_subheader "[$step/$total_steps] 📄 生成详细报告"
+        if generate_branch_readiness_report "$target_branch"; then
+            ui_success "✅ 详细报告已生成"
+        else
+            ui_warning "⚠️ 报告生成有问题"
+        fi
+        ((step++))
+        echo
     fi
-    ((step++))
-    echo
     
-    # 步骤4: 准备发布（仅在前面都通过时）
+    # 最后步骤: 准备发布（仅在前面都通过时）
     ui_subheader "[$step/$total_steps] 🚀 准备发布"
     if [[ "$overall_success" == "true" ]]; then
         if prepare_branch_release "$target_branch"; then
@@ -294,7 +415,7 @@ execute_full_ready_pipeline() {
     fi
     
     # 显示最终结果
-    show_pipeline_summary "$target_branch" "$overall_success"
+    show_pipeline_summary "$target_branch" "$overall_success" "$enable_report"
     
     return $([ "$overall_success" == "true" ])
 }
@@ -303,28 +424,55 @@ execute_full_ready_pipeline() {
 show_pipeline_summary() {
     local branch="$1"
     local success="$2"
+    local enable_report="${3:-false}"
     
     echo
     ui_subheader "📊 Ready 检查总结"
     
     if [[ "$success" == "true" ]]; then
-        ui_success_box "🎉 分支已准备就绪！" \
-            "分支: $branch" \
-            "所有检查项目均已通过" \
-            "" \
-            "建议下一步操作:" \
-            "1. gpf pr $branch    # 创建PR" \
-            "2. 通知团队成员进行代码审查" \
-            "3. 合并后使用 gpf clean $branch"
+        if [[ "$enable_report" == "true" ]]; then
+            ui_success_box "🎉 分支已准备就绪！" \
+                "分支: $branch" \
+                "所有检查项目均已通过" \
+                "详细报告已生成到 docs/ready-report/" \
+                "" \
+                "建议下一步操作:" \
+                "1. gpf pr $branch    # 创建PR" \
+                "2. 通知团队成员进行代码审查" \
+                "3. 合并后使用 gpf clean $branch"
+        else
+            ui_success_box "🎉 分支已准备就绪！" \
+                "分支: $branch" \
+                "所有检查项目均已通过" \
+                "" \
+                "建议下一步操作:" \
+                "1. gpf pr $branch    # 创建PR" \
+                "2. 通知团队成员进行代码审查" \
+                "3. 合并后使用 gpf clean $branch" \
+                "" \
+                "💡 生成详细报告: gpf ready $branch --report"
+        fi
     else
-        ui_warning_box "⚠️ 分支尚未完全就绪" \
-            "分支: $branch" \
-            "存在需要关注的问题" \
-            "" \
-            "建议操作:" \
-            "1. 查看详细报告了解具体问题" \
-            "2. 解决标记的问题" \
-            "3. 重新运行: gpf ready $branch"
+        if [[ "$enable_report" == "true" ]]; then
+            ui_warning_box "⚠️ 分支尚未完全就绪" \
+                "分支: $branch" \
+                "存在需要关注的问题" \
+                "详细报告已生成到 docs/ready-report/" \
+                "" \
+                "建议操作:" \
+                "1. 查看详细报告了解具体问题" \
+                "2. 解决标记的问题" \
+                "3. 重新运行: gpf ready $branch"
+        else
+            ui_warning_box "⚠️ 分支尚未完全就绪" \
+                "分支: $branch" \
+                "存在需要关注的问题" \
+                "" \
+                "建议操作:" \
+                "1. 解决标记的问题" \
+                "2. 重新运行: gpf ready $branch" \
+                "3. 生成详细报告: gpf ready $branch --report"
+        fi
     fi
 }
 
@@ -1338,4 +1486,306 @@ check_version_compatibility() {
     
     echo "    ✅ 版本兼容性检查完成"
     echo
+}
+
+# Epic级别就绪检查主函数
+execute_epic_ready_check() {
+    local input_epic_name="$1"
+    
+    # 加载通用工具函数
+    if [[ -f "$PROJECT_ROOT/lib/utils/common.sh" ]]; then
+        source "$PROJECT_ROOT/lib/utils/common.sh"
+    fi
+    
+    # 解析Epic名称（支持简化输入）
+    local resolved_epic_name
+    resolved_epic_name=$(resolve_epic_name "$input_epic_name")
+    if [[ $? -ne 0 ]]; then
+        return 1
+    fi
+    
+    ui_info "📋 您输入的按规则判断属于Epic级，将检查它下面所有子功能"
+    ui_header "Epic级别就绪检查: $resolved_epic_name"
+    
+    # 检查Epic是否存在
+    local epic_branch_name="epic/$resolved_epic_name"
+    if ! git rev-parse --verify "$epic_branch_name" >/dev/null 2>&1; then
+        ui_error "Epic分支 '$epic_branch_name' 不存在"
+        show_available_epics
+        return 1
+    fi
+    
+    # 获取Epic下的所有功能分支
+    local feature_branches
+    feature_branches=$(git_list_branches | grep "^$resolved_epic_name/" | sort)
+    
+    if [[ -z "$feature_branches" ]]; then
+        ui_warning "📋 您输入的按规则判断属于Epic级，Epic '$resolved_epic_name' 存在但下面暂无功能分支"
+        echo
+        ui_info "🚀 创建功能分支:"
+        ui_info "   gpf start $resolved_epic_name/feature-name"
+        echo
+        ui_info "📖 示例:"
+        ui_info "   gpf start $resolved_epic_name/user-login"
+        ui_info "   gpf start $resolved_epic_name/password-reset"
+        return 1
+    fi
+    
+    
+    # 执行Epic级别的综合检查
+    execute_epic_comprehensive_check "$resolved_epic_name" "$feature_branches" "$enable_report"
+}
+
+# 解析Epic名称（支持简化输入和智能匹配）
+resolve_epic_name() {
+    local user_input="$1"
+    local epic_name=""
+    
+    # 方法1: 移除epic/前缀（如果存在）
+    if [[ "$user_input" == epic/* ]]; then
+        epic_name="${user_input#epic/}"
+    else
+        epic_name="$user_input"
+    fi
+    
+    # 方法2: 检查Epic分支是否存在
+    if git rev-parse --verify "epic/$epic_name" >/dev/null 2>&1; then
+        echo "$epic_name"
+        return 0
+    fi
+    
+    # 方法3: 尝试部分匹配
+    local matches
+    matches=$(git branch -a | grep "epic/" | sed 's|^[* +] *||' | sed 's|^.*/epic/||' | sed 's|^epic/||' | grep "$epic_name" | sort -u)
+    
+    local match_count
+    match_count=$(echo "$matches" | grep -c '^' 2>/dev/null || echo "0")
+    
+    if [[ $match_count -eq 1 && -n "$matches" ]]; then
+        echo "$matches"
+        return 0
+    elif [[ $match_count -gt 1 ]]; then
+        ui_error "❌ 您输入的按规则判断属于Epic级，但是Epic名称 '$user_input' 不够具体，找到多个匹配项："
+        echo "$matches" | sed 's/^/     • /'
+        echo
+        ui_info "💡 请使用更完整的Epic名称，例如:"
+        echo "$matches" | head -3 | sed 's/^/     gpf ready /'
+        return 1
+    fi
+    
+    # 没有找到匹配项
+    ui_error "❌ 您输入的按规则判断属于Epic级，但是没有找到同名的Epic '$user_input'，请检查您的输入"
+    echo
+    show_available_epics
+    return 1
+}
+
+# 显示可用的Epic列表
+show_available_epics() {
+    local available_epics
+    available_epics=$(git branch -a | grep "epic/" | sed 's|^[* +] *||' | sed 's|^.*/epic/||' | sed 's|^epic/||' | sort -u)
+    
+    if [[ -n "$available_epics" ]]; then
+        ui_info "📋 当前可用的Epic列表:"
+        echo "$available_epics" | sed 's/^/     • /'
+        echo
+        ui_info "💡 使用方法:"
+        ui_info "   gpf ready <epic-name>     # Epic级别就绪检查"
+        ui_info "   gpf ready <epic-name>/<feature>  # 功能分支检查"
+    else
+        ui_warning "📋 当前没有可用的Epic"
+        echo
+        ui_info "🚀 创建新Epic:"
+        ui_info "   gpf init <epic-name>"
+        echo
+        ui_info "📖 更多帮助: gpf help"
+    fi
+}
+
+# Epic级别综合检查
+execute_epic_comprehensive_check() {
+    local epic_name="$1"
+    local feature_branches="$2"
+    local enable_report="${3:-false}"
+    
+    ui_subheader "Epic: $epic_name - 综合就绪状态"
+    
+    local overall_ready=true
+    local total_features=0
+    local ready_features=0
+    local feature_status_details=()
+    
+    # 检查每个功能分支的就绪状态
+    while IFS= read -r feature_branch; do
+        if [[ -n "$feature_branch" ]]; then
+            total_features=$((total_features + 1))
+            ui_info "检查功能分支: $feature_branch"
+            
+            # 检查单个功能分支的就绪状态
+            local feature_ready=true
+            local status_details=""
+            
+            # 检查分支是否存在
+            if git rev-parse --verify "$feature_branch" >/dev/null 2>&1; then
+                # 检查工作区状态并获取详细原因
+                local readiness_details
+                readiness_details=$(get_branch_readiness_details "$feature_branch")
+                
+                if check_branch_readiness "$feature_branch"; then
+                    ready_features=$((ready_features + 1))
+                    status_details="✅ 就绪"
+                    ui_success "  ✅ $feature_branch 已就绪"
+                else
+                    feature_ready=false
+                    overall_ready=false
+                    status_details="❌ 未就绪: $readiness_details"
+                    ui_error "  ❌ $feature_branch 未就绪: $readiness_details"
+                fi
+            else
+                feature_ready=false
+                overall_ready=false
+                status_details="❌ 分支不存在"
+                ui_error "  ❌ $feature_branch 分支不存在"
+            fi
+            
+            feature_status_details+=("$feature_branch|$status_details")
+        fi
+    done <<< "$feature_branches"
+    
+    # 显示Epic级别汇总
+    echo
+    ui_subheader "Epic级别就绪汇总"
+    echo "  📊 Epic名称: $epic_name"
+    echo "  📈 总功能数: $total_features"
+    echo "  ✅ 就绪功能: $ready_features"
+    echo "  📉 待完成功能: $((total_features - ready_features))"
+    
+    if [[ $total_features -gt 0 ]]; then
+        local readiness_percentage
+        readiness_percentage=$(( (ready_features * 100) / total_features ))
+        echo "  📊 就绪度: ${readiness_percentage}%"
+    fi
+    
+    echo
+    ui_subheader "功能分支状态详情"
+    for detail in "${feature_status_details[@]}"; do
+        local branch_name="${detail%%|*}"
+        local status="${detail##*|}"
+        echo "  $status $branch_name"
+    done
+    
+    # 生成Epic级别就绪报告（可选）
+    if [[ "$enable_report" == "true" ]]; then
+        generate_epic_readiness_report "$epic_name" "$overall_ready" "$total_features" "$ready_features" "${feature_status_details[@]}"
+    fi
+    
+    # 显示最终结果
+    echo
+    if [[ "$overall_ready" == "true" ]]; then
+        ui_success "🎉 Epic '$epic_name' 已完全就绪！"
+        ui_info "所有功能分支都已准备好进行发布"
+        if [[ "$enable_report" == "false" ]]; then
+            ui_info "💡 生成详细报告: gpf ready $epic_name --report"
+        fi
+        return 0
+    else
+        ui_warning "⚠️ Epic '$epic_name' 尚未完全就绪"
+        ui_info "还有 $((total_features - ready_features)) 个功能分支需要完成"
+        ui_info "使用 'gpf ready <feature-branch>' 检查具体功能分支"
+        if [[ "$enable_report" == "false" ]]; then
+            ui_info "💡 生成详细报告: gpf ready $epic_name --report"
+        fi
+        return 1
+    fi
+}
+
+# 生成Epic级别就绪报告
+generate_epic_readiness_report() {
+    local epic_name="$1"
+    local overall_ready="$2"
+    local total_features="$3"
+    local ready_features="$4"
+    shift 4
+    local feature_details=("$@")
+    
+    # 确保报告目录存在
+    local report_dir="$PROJECT_ROOT/docs/ready-report"
+    mkdir -p "$report_dir"
+    
+    # 生成报告文件名
+    local timestamp
+    timestamp=$(date +"%Y%m%d-%H%M%S")
+    local report_file="$report_dir/epic-ready-report-${epic_name}-${timestamp}.md"
+    
+    # 生成报告内容
+    cat > "$report_file" << EOF
+# Epic就绪报告: $epic_name
+
+**生成时间:** $(date "+%Y-%m-%d %H:%M:%S")  
+**Epic名称:** $epic_name  
+**总体状态:** $(if [[ "$overall_ready" == "true" ]]; then echo "✅ 已就绪"; else echo "❌ 未就绪"; fi)
+
+## 📊 就绪度统计
+
+- **总功能数:** $total_features
+- **就绪功能数:** $ready_features  
+- **待完成功能数:** $((total_features - ready_features))
+- **就绪度:** $(( total_features > 0 ? (ready_features * 100) / total_features : 0 ))%
+
+## 📋 功能分支状态详情
+
+EOF
+
+    # 添加功能分支详情
+    for detail in "${feature_details[@]}"; do
+        local branch_name="${detail%%|*}"
+        local status="${detail##*|}"
+        echo "- $status **$branch_name**" >> "$report_file"
+    done
+    
+    cat >> "$report_file" << EOF
+
+## 🎯 下一步行动
+
+EOF
+
+    if [[ "$overall_ready" == "true" ]]; then
+        cat >> "$report_file" << EOF
+✅ **Epic已完全就绪！**
+
+所有功能分支都已准备好，可以进行以下操作：
+- 执行最终的集成测试
+- 准备发布版本
+- 创建发布PR
+
+EOF
+    else
+        cat >> "$report_file" << EOF
+⚠️ **Epic尚未完全就绪**
+
+还需要完成以下工作：
+
+EOF
+        for detail in "${feature_details[@]}"; do
+            local branch_name="${detail%%|*}"
+            local status="${detail##*|}"
+            if [[ "$status" == *"❌"* ]]; then
+                echo "- [ ] 完成功能分支: **$branch_name**" >> "$report_file"
+            fi
+        done
+        
+        cat >> "$report_file" << EOF
+
+建议操作：
+- 使用 \`gpf ready <feature-branch>\` 检查具体功能分支
+- 完成未就绪的功能开发和测试
+- 重新运行Epic级别检查
+
+EOF
+    fi
+    
+    echo "---" >> "$report_file"
+    echo "*由 gpf ready 自动生成*" >> "$report_file"
+    
+    ui_info "📄 Epic就绪报告已生成: $report_file"
 }
