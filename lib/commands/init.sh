@@ -45,6 +45,9 @@ cmd_init() {
     # 检查并确保在项目根目录执行
     ensure_project_root_directory
     
+    # 更新Git hooks到最新版本
+    update_git_hooks
+    
     # 如果没有提供Epic名称，显示现有配置或提示输入
     if [[ -z "$input_epic_name" ]]; then
         if ! handle_init_interactive; then
@@ -563,4 +566,168 @@ is_valid_epic_name() {
     fi
     
     return 0
+}
+
+# 更新Git hooks到最新版本
+update_git_hooks() {
+    ui_loading "更新Git hooks到最新版本..."
+    
+    # 确保hooks目录存在
+    local hooks_dir="$HOME/.gpf/hooks"
+    mkdir -p "$hooks_dir"
+    
+    # 创建优化后的pre-commit hook
+    cat > "$hooks_dir/pre-commit" << 'EOF'
+#!/usr/bin/env bash
+# GPF Pre-commit Hook - 全局Git PR Flow工作流保护
+# 支持通过环境变量或提交消息强制提交
+
+# 检查强制提交标志
+check_force_commit() {
+    # 方法1: 检查环境变量
+    if [[ "${GPF_FORCE_COMMIT:-}" == "1" ]]; then
+        return 0
+    fi
+    
+    # 方法2: 检查提交消息中的强制标志
+    if [[ -n "${1:-}" ]] && grep -q "GPF_FORCE_COMMIT" "$1" 2>/dev/null; then
+        return 0
+    fi
+    
+    return 1
+}
+
+# 检查是否只提交允许的文件
+check_epic_allowlist() {
+    local current_branch="$1"
+    
+    # 获取此次提交涉及的文件
+    local staged_files
+    staged_files=$(git diff --cached --name-only)
+    
+    # 检查是否所有文件都在允许列表中
+    local disallowed_files=""
+    while IFS= read -r file; do
+        if [[ -n "$file" ]]; then
+            # 允许的文件类型：docs/epic/目录下的.md文件
+            if [[ "$file" == docs/epic/*.md ]]; then
+                continue  # 允许
+            fi
+            # 其他文件不允许
+            disallowed_files="$disallowed_files $file"
+        fi
+    done <<< "$staged_files"
+    
+    if [[ -n "$disallowed_files" ]]; then
+        echo ""
+        echo "🚫 GPF工作流保护: Epic分支只允许提交roadmap文档"
+        echo ""
+        echo "💡 Epic分支 ($current_branch) 允许提交的文件："
+        echo "  ✅ docs/epic/*.md (Epic路线图文档)"
+        echo ""
+        echo "❌ 不允许提交的文件："
+        for file in $disallowed_files; do
+            echo "  - $file"
+        done
+        echo ""
+        echo "建议操作:"
+        local epic_name="${current_branch#epic/}"
+        echo "  1. 撤销当前提交: git reset HEAD"
+        echo "  2. 只提交roadmap文档: git add docs/epic/*.md && git commit"
+        echo "  3. 或创建功能分支开发: gpf start $epic_name/implementation"
+        return 1
+    fi
+    
+    # 所有文件都在允许列表中
+    return 0
+}
+
+# 显示强制提交选项
+show_force_options() {
+    local context="$1"
+    echo ""
+    echo "🔧 如果你需要强制提交(不推荐)，可以使用:"
+    echo "  方法1: GPF_FORCE_COMMIT=1 git commit -m \"your message\""
+    echo "  方法2: git commit -m \"your message GPF_FORCE_COMMIT\""
+    echo ""
+    echo "⚠️  强制提交会跳过GPF工作流保护，请谨慎使用！"
+    echo ""
+}
+
+# 检查是否在GPF项目中
+if [[ -f "bin/git-pr-flow" ]] || [[ -f ".git-pr-flow.yaml" ]] || git rev-parse --show-toplevel 2>/dev/null | xargs -I {} test -f "{}/bin/git-pr-flow"; then
+    # 在GPF项目中，应用严格工作流检查
+    current_branch=$(git branch --show-current 2>/dev/null)
+    
+    # 获取提交消息文件路径（如果有的话）
+    commit_msg_file="$1"
+    
+    # 检查是否强制提交
+    if check_force_commit "$commit_msg_file"; then
+        echo "⚠️  GPF工作流保护已被强制跳过 (GPF_FORCE_COMMIT)"
+        echo "📝 提交分支: $current_branch"
+        exit 0
+    fi
+    
+    # 检查Epic分支直接开发
+    if [[ "$current_branch" == epic/* ]]; then
+        # 检查是否只提交允许的文件
+        if check_epic_allowlist "$current_branch"; then
+            echo "✅ Epic分支roadmap文档提交已允许"
+            exit 0
+        fi
+        
+        # 如果有不允许的文件，显示传统的引导信息
+        echo "建议操作:"
+        local epic_name="${current_branch#epic/}"
+        echo "  1. 创建功能分支进行开发:"
+        echo "     gpf start $epic_name/implementation"
+        echo ""
+        echo "  2. 在功能分支上完成开发后:"
+        echo "     gpf ready    # 检查就绪状态"
+        echo "     gpf pr       # 创建PR到Epic分支"
+        echo ""
+        
+        # 交互式环境提供用户选择
+        if [[ -t 0 && -t 1 ]]; then
+            echo "🔄 要创建功能分支吗? (y/n)"
+            read -r response
+            if [[ "$response" =~ ^[Yy]$ ]]; then
+                echo "请输入功能名称 (例如: implementation, fix-bug, add-feature):"
+                read -r feature_name
+                if [[ -n "$feature_name" ]]; then
+                    echo "💡 请运行: gpf start $epic_name/$feature_name"
+                fi
+            fi
+        fi
+        
+        show_force_options "epic"
+        exit 1
+    fi
+    
+    # 检查主分支直接开发
+    if [[ "$current_branch" == "develop" || "$current_branch" == "main" || "$current_branch" == "master" ]]; then
+        echo ""
+        echo "🚫 GPF工作流保护: 禁止在主分支上直接提交"
+        echo ""
+        echo "建议操作:"
+        echo "  1. 创建Epic: gpf init <epic-name>"
+        echo "  2. 创建功能分支: gpf start <epic-name>/<feature-name>"
+        
+        show_force_options "main"
+        exit 1
+    fi
+fi
+
+# 非GPF项目或在允许的分支上，正常通过
+exit 0
+EOF
+    
+    # 设置hooks为可执行
+    chmod +x "$hooks_dir/pre-commit"
+    
+    # 配置Git使用全局hooks目录
+    git config --global core.hookspath "$hooks_dir"
+    
+    ui_success "Git hooks已更新到最新版本"
 }
