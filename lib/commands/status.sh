@@ -562,6 +562,193 @@ show_all_epics_overview() {
     ui_info "💡 使用 'gpf status global' 查看全局详细状态"
 }
 
+# 显示所有Epic概览的JSON格式
+show_all_epics_overview_json() {
+    local json_output=""
+    
+    # 获取仓库基本信息
+    local repo_path=$(pwd)
+    local current_branch=$(git branch --show-current 2>/dev/null || echo "unknown")
+    local repo_status="clean"
+    if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+        repo_status="modified"
+    fi
+    
+    # 构建JSON开始
+    json_output='{'
+    json_output+='"repository":{'
+    json_output+='"path":"'$repo_path'",'
+    json_output+='"current_branch":"'$current_branch'",'
+    json_output+='"status":"'$repo_status'"'
+    json_output+='},'
+    
+    # 获取Epic列表
+    json_output+='"epics":['
+    local epic_branches
+    epic_branches=$(git branch 2>/dev/null | grep "epic/" | sed 's/^[* +] *//' | sort -u || echo "")
+    
+    local first_epic=true
+    if [[ -n "$epic_branches" ]]; then
+        while IFS= read -r epic_branch; do
+            if [[ -n "$epic_branch" ]]; then
+                [[ "$first_epic" == "false" ]] && json_output+=','
+                first_epic=false
+                
+                local epic_name="${epic_branch#epic/}"
+                local epic_worktree_path=".worktrees/epic--$epic_name"
+                local config_exists="false"
+                local worktree_exists="false"
+                
+                # 检查配置和工作树
+                if config_epic_exists "$epic_name" 2>/dev/null; then
+                    config_exists="true"
+                fi
+                if [[ -d "$epic_worktree_path" ]]; then
+                    worktree_exists="true"
+                fi
+                
+                # 获取功能分支
+                local features='[]'
+                local feature_branches
+                feature_branches=$(git_list_branches 2>/dev/null | grep "^$epic_name/" || echo "")
+                if [[ -n "$feature_branches" ]]; then
+                    features='['
+                    local first_feature=true
+                    while IFS= read -r feature_branch; do
+                        if [[ -n "$feature_branch" ]]; then
+                            [[ "$first_feature" == "false" ]] && features+=','
+                            first_feature=false
+                            
+                            local feature_worktree_path=".worktrees/epic--${feature_branch//\//-}"
+                            local feature_status="active"
+                            if [[ ! -d "$feature_worktree_path" ]]; then
+                                feature_status="branch_only"
+                            fi
+                            
+                            features+='{'
+                            features+='"name":"'${feature_branch#$epic_name/}'",'
+                            features+='"branch":"'$feature_branch'",'
+                            features+='"status":"'$feature_status'",'
+                            features+='"worktree_path":"'$feature_worktree_path'"'
+                            features+='}'
+                        fi
+                    done <<< "$feature_branches"
+                    features+=']'
+                fi
+                
+                json_output+='{'
+                json_output+='"name":"'$epic_name'",'
+                json_output+='"branch":"'$epic_branch'",'
+                json_output+='"config_exists":'$config_exists','
+                json_output+='"worktree_exists":'$worktree_exists','
+                json_output+='"features":'$features
+                json_output+='}'
+            fi
+        done <<< "$epic_branches"
+    fi
+    json_output+='],'
+    
+    # 获取工作树概览
+    json_output+='"worktrees":{'
+    local total_worktrees=0
+    if [[ -d ".worktrees" ]]; then
+        total_worktrees=$(find .worktrees -maxdepth 1 -type d 2>/dev/null | wc -l)
+        total_worktrees=$((total_worktrees - 1))  # 减去.worktrees本身
+        if [[ $total_worktrees -lt 0 ]]; then
+            total_worktrees=0
+        fi
+    fi
+    json_output+='"total":'$total_worktrees
+    json_output+='}'
+    
+    json_output+='}'
+    
+    echo "$json_output"
+}
+
+# 显示特定Epic状态的JSON格式
+show_specific_epic_status_json() {
+    local epic_name="$1"
+    
+    # 标准化Epic名称
+    local normalized_epic_name
+    if [[ "$epic_name" == epic/* ]]; then
+        normalized_epic_name="$epic_name"
+        epic_name="${epic_name#epic/}"
+    else
+        normalized_epic_name="epic/$epic_name"
+    fi
+    
+    # 构建JSON
+    local json_output='{'
+    json_output+='"epic":{'
+    json_output+='"name":"'$epic_name'",'
+    json_output+='"branch":"'$normalized_epic_name'",'
+    
+    # 检查Epic是否存在
+    if ! git branch | grep -q "$normalized_epic_name"; then
+        json_output+='"exists":false,'
+        json_output+='"error":"Epic not found"'
+        json_output+='}'
+        json_output+='}'
+        echo "$json_output"
+        return 1
+    fi
+    
+    json_output+='"exists":true,'
+    
+    # 获取配置和工作树状态
+    local config_exists="false"
+    local worktree_exists="false"
+    local epic_worktree_path=".worktrees/epic--$epic_name"
+    
+    if config_epic_exists "$epic_name" 2>/dev/null; then
+        config_exists="true"
+    fi
+    if [[ -d "$epic_worktree_path" ]]; then
+        worktree_exists="true"
+    fi
+    
+    json_output+='"config_exists":'$config_exists','
+    json_output+='"worktree_exists":'$worktree_exists','
+    json_output+='"worktree_path":"'$epic_worktree_path'",'
+    
+    # 获取功能分支
+    json_output+='"features":['
+    local feature_branches
+    feature_branches=$(git branch 2>/dev/null | grep "^[* +] *$epic_name/" | sed 's/^[* +] *//' || echo "")
+    
+    local first_feature=true
+    if [[ -n "$feature_branches" ]]; then
+        while IFS= read -r feature_branch; do
+            if [[ -n "$feature_branch" ]]; then
+                [[ "$first_feature" == "false" ]] && json_output+=','
+                first_feature=false
+                
+                local feature_name="${feature_branch#$epic_name/}"
+                local feature_worktree_path=".worktrees/epic--${feature_branch//\//-}"
+                local feature_status="active"
+                if [[ ! -d "$feature_worktree_path" ]]; then
+                    feature_status="branch_only"
+                fi
+                
+                json_output+='{'
+                json_output+='"name":"'$feature_name'",'
+                json_output+='"branch":"'$feature_branch'",'
+                json_output+='"status":"'$feature_status'",'
+                json_output+='"worktree_path":"'$feature_worktree_path'"'
+                json_output+='}'
+            fi
+        done <<< "$feature_branches"
+    fi
+    json_output+=']'
+    
+    json_output+='}'
+    json_output+='}'
+    
+    echo "$json_output"
+}
+
 # 显示特定Epic状态
 show_specific_epic_status() {
     local epic_name="$1"
