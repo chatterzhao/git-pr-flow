@@ -79,6 +79,27 @@ cmd_init() {
     init_new_epic "$base_epic_name" "$epic_branch_name" "$input_base_branch"
 }
 
+# 显示init命令用法帮助
+show_init_usage_help() {
+    ui_header "🎯 GPF Epic 初始化"
+    echo
+    echo "用法: gpf init <epic-name> [base-branch]"
+    echo
+    echo "参数说明:"
+    echo "  <epic-name>   Epic名称，小写字母+数字+连字符，描述总功能"
+    echo "  [base-branch] 基础分支 (可选)"
+    echo
+    echo "示例:"
+    echo "  gpf init auth develop          # 创建认证Epic，基于develop分支"
+    echo "  gpf init user-management       # 创建用户管理Epic，使用默认分支"
+    echo "  gpf init payment-system main   # 创建支付系统Epic，基于main分支"
+    echo
+    echo "💡 提示:"
+    echo "  - 如果不指定base-branch，将使用 ~/.gpf/config.yaml 中的 epic_base_branch 设置"
+    echo "  - 首次使用请指定分支，或先配置默认分支设置"
+    echo
+}
+
 # 交互式初始化处理
 handle_init_interactive() {
     ui_header "Epic开发环境初始化"
@@ -126,16 +147,32 @@ handle_init_interactive() {
                 ;;
         esac
     else
-        # 没有现有配置，提示创建新Epic
+        # 没有现有配置，检查是否为非交互式环境
+        if ! is_interactive_environment; then
+            # 非交互式环境，显示用法说明并退出
+            ui_info "未发现Epic配置，且处于非交互式环境"
+            show_init_usage_help
+            return 1
+        fi
+        
+        # 交互式环境，提示创建新Epic
         ui_info "未发现Epic配置，开始新Epic创建流程"
         
         local epic_name
-        while true; do
+        local attempts=0
+        local max_attempts=3
+        
+        while [[ $attempts -lt $max_attempts ]]; do
             epic_name=$(ui_input "Epic名称" "")
             if [[ -n "$epic_name" ]] && is_valid_epic_name "$epic_name"; then
                 break
             else
                 ui_error "请输入有效的Epic名称 (小写字母、数字、连字符)"
+                ((attempts++))
+                if [[ $attempts -eq $max_attempts ]]; then
+                    ui_error "连续输入错误达到最大次数，退出初始化"
+                    return 1
+                fi
             fi
         done
         
