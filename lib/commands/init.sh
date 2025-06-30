@@ -333,7 +333,26 @@ init_new_epic() {
     }
     ui_success "已切换到Epic工作目录: $worktree_base_path"
     
-    # 9. 显示后续步骤
+    # 9. 自动生成Epic路线图
+    ui_loading "生成Epic路线图文档..."
+    
+    # 加载路线图生成工具
+    if [[ -f "$(dirname "${BASH_SOURCE[0]}")/../utils/auto-roadmap.sh" ]]; then
+        source "$(dirname "${BASH_SOURCE[0]}")/../utils/auto-roadmap.sh"
+        
+        local roadmap_file
+        roadmap_file=$(generate_epic_roadmap "$base_epic_name" "$description" "$base_branch")
+        
+        if [[ -f "$roadmap_file" ]]; then
+            ui_success "Epic路线图已创建: $roadmap_file"
+        else
+            ui_warning "路线图创建失败，请手动创建"
+        fi
+    else
+        ui_warning "路线图生成工具未找到，跳过路线图创建"
+    fi
+    
+    # 10. 显示后续步骤
     show_next_steps "$base_epic_name"
     
     ui_success "Epic '$base_epic_name' 初始化完成！"
@@ -501,17 +520,17 @@ show_detailed_config() {
 show_next_steps() {
     local epic_name="$1"
     
-    ui_success_box "Epic '$epic_name' 创建成功！" \
-        "接下来你可以：" \
+    ui_success_box "$epic_name 创建成功！" \
+        "Epic名称: $epic_name" \
+        "Worktree目录名: epic--$epic_name" \
+        "Git分支名: epic/$epic_name" \
+        "已在docs/epic/目录下创建了 $epic_name-roadmap.md" \
         "" \
-        "1. 开始第一个子功能开发：" \
-        "   gpf start $epic_name/your-feature" \
+        "请先完成这个文档，说明这个epic将要负责解决什么问题，" \
+        "分哪些子功能，每个子功能验收标准是什么，" \
+        "之后commit，然后执行：" \
         "" \
-        "2. 查看Epic状态：" \
-        "   git-pr-flow status" \
-        "" \
-        "3. 在VS Code中打开：" \
-        "   git-pr-flow code $epic_name/your-feature"
+        "gpf start $epic_name/功能名 创建你规划的第一个子功能，并开始开发"
 }
 
 # 验证Epic名称
