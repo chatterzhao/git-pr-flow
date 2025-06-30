@@ -314,9 +314,6 @@ ensure_project_root_directory() {
     
     # 检查是否在worktree目录中
     if [[ "$current_dir" =~ /.worktrees/ ]]; then
-        ui_info "检测到在worktree目录中，自动切换到项目根目录"
-        ui_info "从: $current_dir"
-        
         # 从worktree路径推断真实的项目根目录
         # 例如: /path/to/project/.worktrees/epic--xxx -> /path/to/project
         local real_root
@@ -327,7 +324,13 @@ ensure_project_root_directory() {
             exit 1
         fi
         
-        ui_info "到: $real_root"
+        # 获取相对路径显示
+        local from_relative="${current_dir##*/}"  # 只显示worktree目录名
+        local to_relative="."  # 根目录显示为.
+        
+        ui_info "检测到在worktree目录中，自动切换到项目根目录"
+        ui_info "从: $from_relative"
+        ui_info "到: $to_relative"
         
         # 验证推断的根目录是否为Git仓库
         if [[ ! -d "$real_root/.git" ]]; then

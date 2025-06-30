@@ -42,14 +42,14 @@ cmd_init() {
         esac
     done
     
-    # 检查并确保在项目根目录执行
-    ensure_project_root_directory
-    
-    # 更新Git hooks到最新版本
-    update_git_hooks
-    
     # 如果没有提供Epic名称，显示现有配置或提示输入
     if [[ -z "$input_epic_name" ]]; then
+        # 检查并确保在项目根目录执行
+        ensure_project_root_directory
+        
+        # 更新Git hooks到最新版本
+        update_git_hooks
+        
         if ! handle_init_interactive; then
             return 1
         fi
@@ -62,7 +62,7 @@ cmd_init() {
     local epic_branch_name
     epic_branch_name=$(to_epic_branch_name "$base_epic_name")
     
-    # 验证基础Epic名称
+    # 验证基础Epic名称 - 在执行任何操作之前先验证参数
     if ! is_valid_epic_name "$base_epic_name"; then
         ui_error "Epic名称格式错误: \"$base_epic_name\""
         echo
@@ -81,6 +81,13 @@ cmd_init() {
         echo "请重新输入: gpf init <正确格式的epic名称>"
         return 1
     fi
+    
+    # 参数验证通过后，执行环境准备操作
+    # 检查并确保在项目根目录执行
+    ensure_project_root_directory
+    
+    # 更新Git hooks到最新版本
+    update_git_hooks
     
     # 检查是否已存在Epic配置
     if config_epic_exists "$base_epic_name"; then
@@ -620,8 +627,6 @@ is_valid_epic_name() {
 
 # 更新Git hooks到最新版本
 update_git_hooks() {
-    ui_loading "更新Git hooks到最新版本..."
-    
     # 确保hooks目录存在
     local hooks_dir="$HOME/.gpf/hooks"
     mkdir -p "$hooks_dir"
@@ -777,7 +782,5 @@ EOF
     chmod +x "$hooks_dir/pre-commit"
     
     # 配置Git使用全局hooks目录
-    git config --global core.hookspath "$hooks_dir"
-    
-    ui_success "Git hooks已更新到最新版本"
+    git config --global core.hookspath "$hooks_dir" 2>/dev/null
 }
