@@ -64,8 +64,21 @@ cmd_init() {
     
     # 验证基础Epic名称
     if ! is_valid_epic_name "$base_epic_name"; then
-        ui_error "无效的Epic名称: $base_epic_name"
-        ui_info "Epic名称应该使用小写字母、数字和连字符，如: auth, user-profile, payment-system"
+        ui_error "Epic名称格式错误: \"$base_epic_name\""
+        echo
+        echo "要求: 小写字母、数字、连字符组合"
+        echo
+        echo "✅ 正确示例:"
+        echo "  auth              # 认证功能"
+        echo "  user-profile      # 用户档案功能"  
+        echo "  payment-system    # 支付系统功能"
+        echo
+        echo "❌ 错误示例:"
+        echo "  Auth              # 包含大写字母"
+        echo "  user_profile      # 使用下划线"
+        echo "  payment.system    # 使用点号"
+        echo
+        echo "请重新输入: gpf init <正确的epic名称> [base-branch]"
         return 1
     fi
     
