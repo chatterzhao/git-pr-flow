@@ -148,7 +148,7 @@ handle_init_interactive() {
         esac
     else
         # 没有现有配置，检查是否为非交互式环境
-        if ! is_interactive_environment; then
+        if is_non_interactive; then
             # 非交互式环境，显示用法说明并退出
             ui_info "未发现Epic配置，且处于非交互式环境"
             show_init_usage_help
