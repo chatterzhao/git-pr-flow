@@ -78,7 +78,7 @@ cmd_init() {
         echo "  user_profile      # 使用下划线"
         echo "  payment.system    # 使用点号"
         echo
-        echo "请重新输入: gpf init <正确的epic名称> [base-branch]"
+        echo "请重新输入: gpf init <正确格式的epic名称>"
         return 1
     fi
     
