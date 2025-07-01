@@ -123,6 +123,16 @@ ui_select_menu() {
     shift
     local options=("$@")
     
+    # 检查是否为非交互式环境
+    if [[ ! -t 0 ]] || [[ -n "${CI:-}" ]] || [[ -n "${BATCH_MODE:-}" ]]; then
+        ui_error "非交互式环境无法显示选择菜单"
+        ui_info "请使用具体的参数调用命令，例如："
+        ui_info "  gpf clean --dry-run    # 预检模式"
+        ui_info "  gpf clean --all        # 清理所有"
+        ui_info "  gpf clean --help       # 显示帮助"
+        return 1
+    fi
+    
     ui_subheader "$title"
     
     for i in "${!options[@]}"; do
@@ -130,8 +140,19 @@ ui_select_menu() {
     done
     echo
     
+    local attempt_count=0
+    local max_attempts=10
+    
     while true; do
+        # 防止无限循环，设置最大尝试次数
+        if [[ $attempt_count -ge $max_attempts ]]; then
+            ui_error "尝试次数过多，退出选择菜单"
+            ui_info "请检查输入环境或使用具体参数调用命令"
+            return 1
+        fi
+        
         read -p "请选择 (1-${#options[@]}): " -r choice
+        ((attempt_count++))
         
         if [[ "$choice" =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#options[@]})); then
             echo $((choice - 1))
