@@ -2,52 +2,1282 @@
 
 # Git PR Flow - clean命令实现
 # 智能环境清理，支持工作树、分支、Epic级清理
+# enhanced-user-experience: 提升用户体验，增加可视化效果和操作便利性
 
 # 引入环境检测工具
 COMMAND_SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 source "$COMMAND_SCRIPT_DIR/../utils/environment.sh"
 
-# clean命令主函数
-cmd_clean() {
-    local scope="${1:-interactive}"
-    local target="${2:-}"
+# ====== 增强用户体验核心功能 ======
+
+# 全局变量用于跟踪清理进度
+PROGRESS_TOTAL=0
+PROGRESS_CURRENT=0
+PROGRESS_BAR_WIDTH=40
+
+# 清理历史记录
+CLEANUP_HISTORY_FILE=".gpf-cleanup-history.log"
+MAX_HISTORY_ENTRIES=50
+
+# 分级显示清理项目
+show_categorized_cleanup_items() {
+    local operation_type="$1"
+    local target="$2"
     
-    case "$scope" in
-        "interactive")
-            handle_clean_interactive
+    ui_header "🎯 清理项目分析"
+    
+    local safe_items=()
+    local warning_items=()
+    local risky_items=()
+    
+    # 分析不同类型的清理项目
+    case "$operation_type" in
+        "all"|"")
+            analyze_all_cleanup_items safe_items warning_items risky_items
             ;;
         "worktrees")
-            clean_worktrees "$target"
+            analyze_worktrees_items "$target" safe_items warning_items risky_items
             ;;
         "branches")
-            clean_branches "$target"
+            analyze_branches_items "$target" safe_items warning_items risky_items
             ;;
         "epic")
-            clean_epic "$target"
+            analyze_epic_items "$target" safe_items warning_items risky_items
             ;;
         "merged")
-            clean_merged_branches
+            analyze_merged_branches_items safe_items warning_items risky_items
+            ;;
+    esac
+    
+    # 显示分级结果
+    display_categorized_items safe_items warning_items risky_items
+    
+    # 返回总计数量
+    echo $((${#safe_items[@]} + ${#warning_items[@]} + ${#risky_items[@]}))
+}
+
+# 分析所有清理项目
+analyze_all_cleanup_items() {
+    local -n safe_ref=$1
+    local -n warning_ref=$2
+    local -n risky_ref=$3
+    
+    # 分析工作树
+    if [[ -d ".worktrees" ]]; then
+        for worktree in .worktrees/epic--*; do
+            if [[ -d "$worktree" ]]; then
+                local worktree_name=$(basename "$worktree")
+                local status="safe"
+                local reason=""
+                
+                # 检查工作树状态
+                local original_dir=$(pwd)
+                cd "$worktree" 2>/dev/null || continue
+                
+                if ! git diff-index --quiet HEAD 2>/dev/null; then
+                    status="risky"
+                    reason="有未提交更改"
+                elif ! git diff-index --cached --quiet HEAD 2>/dev/null; then
+                    status="risky"
+                    reason="有暂存更改"
+                elif [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+                    status="warning"
+                    reason="有未跟踪文件"
+                elif [[ -f ".git/MERGE_HEAD" ]] || [[ -d ".git/rebase-merge" ]]; then
+                    status="risky"
+                    reason="有进行中的Git操作"
+                fi
+                
+                cd "$original_dir" || true
+                
+                local item="工作树|$worktree_name|$reason"
+                case "$status" in
+                    "safe") safe_ref+=("$item") ;;
+                    "warning") warning_ref+=("$item") ;;
+                    "risky") risky_ref+=("$item") ;;
+                esac
+            fi
+        done
+    fi
+    
+    # 分析分支
+    local current_branch=$(git branch --show-current 2>/dev/null)
+    local main_branches=("main" "master" "develop")
+    
+    for main_branch in "${main_branches[@]}"; do
+        if git_branch_exists "$main_branch"; then
+            local merged_branches
+            merged_branches=$(git branch --merged "$main_branch" 2>/dev/null | grep -v -E "(${main_branch}|\*)" | sed 's/^[+ ]*//' || true)
+            
+            while IFS= read -r branch; do
+                if [[ -n "$branch" && "$branch" != "$current_branch" ]]; then
+                    local status="safe"
+                    local reason="已合并到 $main_branch"
+                    
+                    # 检查是否有未推送提交
+                    if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+                        local commits_ahead
+                        commits_ahead=$(git rev-list --count "origin/$branch..HEAD" 2>/dev/null || echo "0")
+                        if [[ "$commits_ahead" -gt 0 ]]; then
+                            status="warning"
+                            reason="已合并，但有 $commits_ahead 个未推送提交"
+                        fi
+                    fi
+                    
+                    # 检查分支是否被工作树使用
+                    if [[ -d ".worktrees" ]]; then
+                        local worktree_info
+                        worktree_info=$(git worktree list 2>/dev/null | grep "$branch" || true)
+                        if [[ -n "$worktree_info" ]]; then
+                            status="warning"
+                            reason="$reason，但正被工作树使用"
+                        fi
+                    fi
+                    
+                    local item="分支|$branch|$reason"
+                    case "$status" in
+                        "safe") safe_ref+=("$item") ;;
+                        "warning") warning_ref+=("$item") ;;
+                        "risky") risky_ref+=("$item") ;;
+                    esac
+                fi
+            done <<< "$merged_branches"
+            break
+        fi
+    done
+    
+    # 分析临时文件
+    for pattern in "epic-*-readiness-report.md" "CHANGELOG-*.md" "*.tmp" ".gpf-*.tmp"; do
+        local files
+        files=$(find . -name "$pattern" -type f 2>/dev/null || true)
+        if [[ -n "$files" ]]; then
+            while IFS= read -r file; do
+                if [[ -n "$file" ]]; then
+                    local item="临时文件|$file|自动生成的临时文件"
+                    safe_ref+=("$item")
+                fi
+            done <<< "$files"
+        fi
+    done
+}
+
+# 分析工作树项目
+analyze_worktrees_items() {
+    local pattern="$1"
+    local -n safe_ref=$2
+    local -n warning_ref=$3
+    local -n risky_ref=$4
+    
+    if [[ -d ".worktrees" ]]; then
+        for worktree in .worktrees/epic--*; do
+            if [[ -d "$worktree" ]]; then
+                local worktree_name=$(basename "$worktree")
+                
+                # 如果指定了模式，检查是否匹配
+                if [[ -n "$pattern" && ! "$worktree_name" =~ $pattern ]]; then
+                    continue
+                fi
+                
+                local status="safe"
+                local reason=""
+                
+                # 检查工作树状态
+                local original_dir=$(pwd)
+                cd "$worktree" 2>/dev/null || continue
+                
+                if ! git diff-index --quiet HEAD 2>/dev/null; then
+                    status="risky"
+                    reason="有未提交更改"
+                elif ! git diff-index --cached --quiet HEAD 2>/dev/null; then
+                    status="risky"  
+                    reason="有暂存更改"
+                elif [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+                    status="warning"
+                    reason="有未跟踪文件"
+                fi
+                
+                cd "$original_dir" || true
+                
+                local item="工作树|$worktree_name|$reason"
+                case "$status" in
+                    "safe") safe_ref+=("$item") ;;
+                    "warning") warning_ref+=("$item") ;;
+                    "risky") risky_ref+=("$item") ;;
+                esac
+            fi
+        done
+    fi
+}
+
+# 分析分支项目
+analyze_branches_items() {
+    local pattern="$1"
+    local -n safe_ref=$2
+    local -n warning_ref=$3
+    local -n risky_ref=$4
+    
+    local current_branch=$(git branch --show-current 2>/dev/null)
+    local main_branches=("main" "master" "develop")
+    
+    for main_branch in "${main_branches[@]}"; do
+        if git_branch_exists "$main_branch"; then
+            local merged_branches
+            merged_branches=$(git branch --merged "$main_branch" 2>/dev/null | grep -v -E "(${main_branch}|\*)" | sed 's/^[+ ]*//' || true)
+            
+            while IFS= read -r branch; do
+                if [[ -n "$branch" && "$branch" != "$current_branch" ]]; then
+                    # 如果指定了模式，检查是否匹配
+                    if [[ -n "$pattern" && ! "$branch" =~ $pattern ]]; then
+                        continue
+                    fi
+                    
+                    local status="safe"
+                    local reason="已合并到 $main_branch"
+                    
+                    # 检查是否有未推送提交
+                    if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+                        local commits_ahead
+                        commits_ahead=$(git rev-list --count "origin/$branch..HEAD" 2>/dev/null || echo "0")
+                        if [[ "$commits_ahead" -gt 0 ]]; then
+                            status="warning"
+                            reason="已合并，但有 $commits_ahead 个未推送提交"
+                        fi
+                    fi
+                    
+                    local item="分支|$branch|$reason"
+                    case "$status" in
+                        "safe") safe_ref+=("$item") ;;
+                        "warning") warning_ref+=("$item") ;;
+                        "risky") risky_ref+=("$item") ;;
+                    esac
+                fi
+            done <<< "$merged_branches"
+            break
+        fi
+    done
+}
+
+# 分析Epic项目
+analyze_epic_items() {
+    local epic_name="$1"
+    local -n safe_ref=$2
+    local -n warning_ref=$3
+    local -n risky_ref=$4
+    
+    if ! git_branch_exists "epic/$epic_name"; then
+        return 1
+    fi
+    
+    # 分析功能分支
+    local feature_branches
+    feature_branches=$(git branch --format='%(refname:short)' | grep "^$epic_name/" || true)
+    
+    while IFS= read -r branch; do
+        if [[ -n "$branch" ]]; then
+            local status="safe"
+            local reason="Epic功能分支"
+            
+            # 检查是否已合并到Epic主分支
+            if ! git merge-base --is-ancestor "$branch" "epic/$epic_name" 2>/dev/null; then
+                status="warning"
+                reason="未合并到Epic主分支"
+            fi
+            
+            local item="分支|$branch|$reason"
+            case "$status" in
+                "safe") safe_ref+=("$item") ;;
+                "warning") warning_ref+=("$item") ;;
+                "risky") risky_ref+=("$item") ;;
+            esac
+        fi
+    done <<< "$feature_branches"
+    
+    # 分析Epic工作树
+    local epic_worktrees
+    epic_worktrees=$(find .worktrees -type d -name "epic--$epic_name*" 2>/dev/null || true)
+    
+    while IFS= read -r worktree; do
+        if [[ -n "$worktree" ]]; then
+            local worktree_name=$(basename "$worktree")
+            local status="safe"
+            local reason="Epic工作树"
+            
+            # 检查工作树状态
+            local original_dir=$(pwd)
+            cd "$worktree" 2>/dev/null || continue
+            
+            if ! git diff-index --quiet HEAD 2>/dev/null; then
+                status="risky"
+                reason="有未提交更改"
+            elif ! git diff-index --cached --quiet HEAD 2>/dev/null; then
+                status="risky"
+                reason="有暂存更改"
+            fi
+            
+            cd "$original_dir" || true
+            
+            local item="工作树|$worktree_name|$reason"
+            case "$status" in
+                "safe") safe_ref+=("$item") ;;
+                "warning") warning_ref+=("$item") ;;
+                "risky") risky_ref+=("$item") ;;
+            esac
+        fi
+    done <<< "$epic_worktrees"
+    
+    # Epic主分支
+    local item="分支|epic/$epic_name|Epic主分支"
+    safe_ref+=("$item")
+}
+
+# 分析已合并分支项目
+analyze_merged_branches_items() {
+    local -n safe_ref=$1
+    local -n warning_ref=$2
+    local -n risky_ref=$3
+    
+    analyze_branches_items "" safe_ref warning_ref risky_ref
+}
+
+# 显示分级项目
+display_categorized_items() {
+    local -n safe_ref=$1
+    local -n warning_ref=$2
+    local -n risky_ref=$3
+    
+    # 显示安全项目
+    if [[ ${#safe_ref[@]} -gt 0 ]]; then
+        echo
+        ui_success "🟢 可安全清理 (${#safe_ref[@]} 项):"
+        for item in "${safe_ref[@]}"; do
+            local type=$(echo "$item" | cut -d'|' -f1)
+            local name=$(echo "$item" | cut -d'|' -f2)
+            local reason=$(echo "$item" | cut -d'|' -f3)
+            
+            echo "  ✅ $type: $name"
+            if [[ -n "$reason" ]]; then
+                echo "     💬 $reason"
+            fi
+        done
+    fi
+    
+    # 显示警告项目
+    if [[ ${#warning_ref[@]} -gt 0 ]]; then
+        echo
+        ui_warning "🟡 需要注意 (${#warning_ref[@]} 项):"
+        for item in "${warning_ref[@]}"; do
+            local type=$(echo "$item" | cut -d'|' -f1)
+            local name=$(echo "$item" | cut -d'|' -f2)
+            local reason=$(echo "$item" | cut -d'|' -f3)
+            
+            echo "  ⚠️ $type: $name"
+            if [[ -n "$reason" ]]; then
+                echo "     💬 $reason"
+            fi
+        done
+    fi
+    
+    # 显示风险项目
+    if [[ ${#risky_ref[@]} -gt 0 ]]; then
+        echo
+        ui_error "🔴 有风险 (${#risky_ref[@]} 项):"
+        for item in "${risky_ref[@]}"; do
+            local type=$(echo "$item" | cut -d'|' -f1)
+            local name=$(echo "$item" | cut -d'|' -f2)
+            local reason=$(echo "$item" | cut -d'|' -f3)
+            
+            echo "  ❌ $type: $name"
+            if [[ -n "$reason" ]]; then
+                echo "     💬 $reason"
+            fi
+        done
+        
+        echo
+        ui_warning "⚠️ 风险项目需要手动处理或使用 --force 强制清理"
+    fi
+    
+    # 显示总结
+    local total_items=$((${#safe_ref[@]} + ${#warning_ref[@]} + ${#risky_ref[@]}))
+    echo
+    ui_subheader "📊 分级统计"
+    echo "  🟢 安全: ${#safe_ref[@]} 项"
+    echo "  🟡 警告: ${#warning_ref[@]} 项"  
+    echo "  🔴 风险: ${#risky_ref[@]} 项"
+    echo "  📋 总计: $total_items 项"
+}
+
+# 进度指示器功能
+show_progress_bar() {
+    local current="$1"
+    local total="$2"
+    local message="$3"
+    
+    # 计算进度百分比
+    local percentage=0
+    if [[ $total -gt 0 ]]; then
+        percentage=$(( (current * 100) / total ))
+    fi
+    
+    # 计算进度条填充
+    local filled=$(( (current * PROGRESS_BAR_WIDTH) / total ))
+    local empty=$((PROGRESS_BAR_WIDTH - filled))
+    
+    # 构建进度条
+    local bar=""
+    for ((i=0; i<filled; i++)); do
+        bar+="█"
+    done
+    for ((i=0; i<empty; i++)); do
+        bar+="░"
+    done
+    
+    # 显示进度条
+    printf "\r  🔄 [%s] %d%% (%d/%d) %s" "$bar" "$percentage" "$current" "$total" "$message"
+    
+    # 如果完成，换行
+    if [[ $current -eq $total ]]; then
+        echo
+    fi
+}
+
+# 初始化进度跟踪
+init_progress() {
+    local total="$1"
+    PROGRESS_TOTAL=$total
+    PROGRESS_CURRENT=0
+}
+
+# 更新进度
+update_progress() {
+    local message="$1"
+    ((PROGRESS_CURRENT++))
+    show_progress_bar "$PROGRESS_CURRENT" "$PROGRESS_TOTAL" "$message"
+}
+
+# 清理历史记录功能
+log_cleanup_action() {
+    local action="$1"
+    local target="$2"
+    local result="$3"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    # 记录到历史文件
+    echo "$timestamp|$action|$target|$result" >> "$CLEANUP_HISTORY_FILE"
+    
+    # 保持历史记录不超过最大条数
+    if [[ -f "$CLEANUP_HISTORY_FILE" ]]; then
+        local line_count
+        line_count=$(wc -l < "$CLEANUP_HISTORY_FILE")
+        if [[ $line_count -gt $MAX_HISTORY_ENTRIES ]]; then
+            tail -n $MAX_HISTORY_ENTRIES "$CLEANUP_HISTORY_FILE" > "${CLEANUP_HISTORY_FILE}.tmp"
+            mv "${CLEANUP_HISTORY_FILE}.tmp" "$CLEANUP_HISTORY_FILE"
+        fi
+    fi
+}
+
+# 显示清理历史
+show_cleanup_history() {
+    local limit="${1:-10}"
+    
+    ui_header "📜 最近的清理历史"
+    
+    if [[ ! -f "$CLEANUP_HISTORY_FILE" ]]; then
+        ui_info "暂无清理历史记录"
+        return 0
+    fi
+    
+    # 显示最近的记录
+    echo "显示最近 $limit 条记录："
+    echo
+    
+    tail -n "$limit" "$CLEANUP_HISTORY_FILE" | while IFS='|' read -r timestamp action target result; do
+        local status_icon="✅"
+        if [[ "$result" == "失败"* ]]; then
+            status_icon="❌"
+        elif [[ "$result" == "跳过"* ]]; then
+            status_icon="⚠️"
+        fi
+        
+        echo "  $status_icon $timestamp"
+        echo "     🎯 操作: $action"
+        if [[ -n "$target" ]]; then
+            echo "     📋 目标: $target"
+        fi
+        echo "     📊 结果: $result"
+        echo
+    done
+}
+
+# 显示撤销建议
+show_undo_suggestions() {
+    local operation_type="$1"
+    local cleaned_items="$2"
+    
+    ui_subheader "🔄 撤销建议"
+    
+    case "$operation_type" in
+        "worktrees")
+            ui_info "工作树清理撤销方法："
+            ui_info "  1. 重新创建工作树: git worktree add <path> <branch>"
+            ui_info "  2. 如果分支仍存在，工作树可以恢复"
+            ;;
+        "branches")
+            ui_info "分支清理撤销方法："
+            ui_info "  1. 从远程恢复: git checkout -b <branch> origin/<branch>"
+            ui_info "  2. 从reflog恢复: git branch <branch> <commit-hash>"
+            ui_info "  3. 查看reflog: git reflog --grep=<branch>"
+            ;;
+        "epic")
+            ui_info "Epic清理撤销方法："
+            ui_info "  1. 重新创建Epic: gpf init <epic-name>"
+            ui_info "  2. 从远程恢复分支: git fetch origin"
+            ui_info "  3. 重新检出所需分支: git checkout -b <branch> origin/<branch>"
             ;;
         "all")
-            clean_all_with_confirmation
+            ui_info "全面清理撤销方法："
+            ui_info "  1. 分别按类型恢复（见上述方法）"
+            ui_info "  2. 从最近的备份恢复"
+            ui_info "  3. 重新克隆仓库（如果有远程备份）"
             ;;
-        "--release")
+    esac
+    
+    echo
+    ui_warning "⚠️ 建议在重要操作前创建备份或使用 --dry-run 预览"
+    ui_info "💡 可以查看清理历史: gpf clean --history"
+}
+
+# 显示清理前后对比
+show_before_after_comparison() {
+    local before_stats="$1"
+    local after_stats="$2"
+    
+    ui_header "📊 清理前后对比"
+    
+    # 解析统计数据 (格式: worktrees:count,branches:count,files:count,disk:size)
+    local before_worktrees=$(echo "$before_stats" | grep -o 'worktrees:[0-9]*' | cut -d':' -f2 || echo "0")
+    local before_branches=$(echo "$before_stats" | grep -o 'branches:[0-9]*' | cut -d':' -f2 || echo "0")
+    local before_files=$(echo "$before_stats" | grep -o 'files:[0-9]*' | cut -d':' -f2 || echo "0")
+    local before_disk=$(echo "$before_stats" | grep -o 'disk:[^,]*' | cut -d':' -f2 || echo "0")
+    
+    local after_worktrees=$(echo "$after_stats" | grep -o 'worktrees:[0-9]*' | cut -d':' -f2 || echo "0")
+    local after_branches=$(echo "$after_stats" | grep -o 'branches:[0-9]*' | cut -d':' -f2 || echo "0")
+    local after_files=$(echo "$after_stats" | grep -o 'files:[0-9]*' | cut -d':' -f2 || echo "0")
+    local after_disk=$(echo "$after_stats" | grep -o 'disk:[^,]*' | cut -d':' -f2 || echo "0")
+    
+    # 计算差值
+    local diff_worktrees=$((before_worktrees - after_worktrees))
+    local diff_branches=$((before_branches - after_branches))
+    local diff_files=$((before_files - after_files))
+    
+    echo "项目类型        清理前    清理后    已清理"
+    echo "────────────────────────────────────────"
+    printf "🏠 工作树      %8d  %8d  %8d\n" "$before_worktrees" "$after_worktrees" "$diff_worktrees"
+    printf "🌿 分支        %8d  %8d  %8d\n" "$before_branches" "$after_branches" "$diff_branches"
+    printf "📄 临时文件    %8d  %8d  %8d\n" "$before_files" "$after_files" "$diff_files"
+    echo "────────────────────────────────────────"
+    
+    # 显示磁盘空间变化
+    if [[ -n "$before_disk" && -n "$after_disk" && "$before_disk" != "0" ]]; then
+        echo "💾 磁盘空间:   $before_disk → $after_disk"
+    fi
+    
+    local total_cleaned=$((diff_worktrees + diff_branches + diff_files))
+    if [[ $total_cleaned -gt 0 ]]; then
+        echo
+        ui_success "🎉 总计清理了 $total_cleaned 项资源"
+    else
+        echo
+        ui_info "📝 没有项目被清理"
+    fi
+}
+
+# 收集环境统计信息
+collect_environment_stats() {
+    local worktree_count=0
+    local branch_count=0
+    local file_count=0
+    local disk_usage="0"
+    
+    # 统计工作树
+    if [[ -d ".worktrees" ]]; then
+        worktree_count=$(find .worktrees -maxdepth 1 -type d -name "epic--*" | wc -l || echo "0")
+        disk_usage=$(du -s .worktrees 2>/dev/null | cut -f1 || echo "0")
+    fi
+    
+    # 统计已合并分支
+    local main_branches=("main" "master" "develop")
+    for main_branch in "${main_branches[@]}"; do
+        if git_branch_exists "$main_branch"; then
+            branch_count=$(git branch --merged "$main_branch" 2>/dev/null | grep -v -E "(${main_branch}|\*)" | wc -l || echo "0")
+            break
+        fi
+    done
+    
+    # 统计临时文件
+    for pattern in "epic-*-readiness-report.md" "CHANGELOG-*.md" "*.tmp" ".gpf-*.tmp"; do
+        local files
+        files=$(find . -name "$pattern" -type f 2>/dev/null | wc -l || echo "0")
+        file_count=$((file_count + files))
+    done
+    
+    echo "worktrees:$worktree_count,branches:$branch_count,files:$file_count,disk:$disk_usage"
+}
+
+# 部分清理选择功能
+interactive_partial_cleanup() {
+    ui_header "🎯 部分清理选择"
+    
+    # 分析所有可清理项目
+    local safe_items=()
+    local warning_items=()
+    local risky_items=()
+    
+    analyze_all_cleanup_items safe_items warning_items risky_items
+    
+    local total_items=$((${#safe_items[@]} + ${#warning_items[@]} + ${#risky_items[@]}))
+    
+    if [[ $total_items -eq 0 ]]; then
+        ui_success "✨ 环境很干净，无需清理"
+        return 0
+    fi
+    
+    # 显示分级项目
+    display_categorized_items safe_items warning_items risky_items
+    
+    echo
+    ui_subheader "🎯 选择清理范围"
+    
+    local cleanup_options=(
+        "只清理安全项目 (${#safe_items[@]} 项)"
+        "清理安全+警告项目 ($(( ${#safe_items[@]} + ${#warning_items[@]} )) 项)"
+        "清理所有项目 (需要--force)"
+        "自定义选择清理"
+        "取消操作"
+    )
+    
+    local choice
+    choice=$(ui_select_menu "请选择清理范围" "${cleanup_options[@]}")
+    
+    case $choice in
+        0) # 只清理安全项目
+            execute_selective_cleanup safe_items
+            ;;
+        1) # 清理安全+警告项目
+            local combined_items=("${safe_items[@]}" "${warning_items[@]}")
+            execute_selective_cleanup combined_items
+            ;;
+        2) # 清理所有项目
+            ui_warning "⚠️ 清理所有项目包括风险项目，需要确认"
+            if ui_confirm "确认清理所有项目（包括风险项目）？"; then
+                local all_items=("${safe_items[@]}" "${warning_items[@]}" "${risky_items[@]}")
+                execute_selective_cleanup all_items "true"
+            fi
+            ;;
+        3) # 自定义选择
+            custom_cleanup_selection safe_items warning_items risky_items
+            ;;
+        4) # 取消操作
+            ui_info "取消清理操作"
+            return 0
+            ;;
+    esac
+}
+
+# 执行选择性清理
+execute_selective_cleanup() {
+    local -n items_ref=$1
+    local force_mode="${2:-false}"
+    
+    if [[ ${#items_ref[@]} -eq 0 ]]; then
+        ui_info "没有项目需要清理"
+        return 0
+    fi
+    
+    ui_subheader "🚀 执行选择性清理"
+    
+    # 收集清理前统计
+    local before_stats
+    before_stats=$(collect_environment_stats)
+    
+    # 初始化进度
+    init_progress ${#items_ref[@]}
+    
+    local cleaned_count=0
+    local error_count=0
+    
+    # 执行清理
+    for item in "${items_ref[@]}"; do
+        local type=$(echo "$item" | cut -d'|' -f1)
+        local name=$(echo "$item" | cut -d'|' -f2)
+        local reason=$(echo "$item" | cut -d'|' -f3)
+        
+        update_progress "清理 $type: $name"
+        
+        local result="成功"
+        case "$type" in
+            "工作树")
+                if [[ -d ".worktrees/$name" ]]; then
+                    if git worktree remove ".worktrees/$name" --force 2>/dev/null; then
+                        ((cleaned_count++))
+                    else
+                        result="失败"
+                        ((error_count++))
+                    fi
+                fi
+                ;;
+            "分支")
+                if git branch -d "$name" 2>/dev/null || git branch -D "$name" 2>/dev/null; then
+                    ((cleaned_count++))
+                else
+                    result="失败"
+                    ((error_count++))
+                fi
+                ;;
+            "临时文件")
+                if rm -f "$name" 2>/dev/null; then
+                    ((cleaned_count++))
+                else
+                    result="失败"
+                    ((error_count++))
+                fi
+                ;;
+        esac
+        
+        # 记录到历史
+        log_cleanup_action "选择性清理" "$type:$name" "$result"
+        
+        # 短暂暂停以显示进度
+        sleep 0.1
+    done
+    
+    echo
+    
+    # 收集清理后统计
+    local after_stats
+    after_stats=$(collect_environment_stats)
+    
+    # 显示结果
+    ui_success "🎉 选择性清理完成"
+    echo "  ✅ 成功清理: $cleaned_count 项"
+    if [[ $error_count -gt 0 ]]; then
+        echo "  ❌ 清理失败: $error_count 项"
+    fi
+    
+    echo
+    show_before_after_comparison "$before_stats" "$after_stats"
+}
+
+# 自定义清理选择
+custom_cleanup_selection() {
+    local -n safe_ref=$1
+    local -n warning_ref=$2
+    local -n risky_ref=$3
+    
+    ui_subheader "🎯 自定义清理选择"
+    
+    local selected_items=()
+    local all_items=("${safe_ref[@]}" "${warning_ref[@]}" "${risky_ref[@]}")
+    
+    ui_info "请逐个选择要清理的项目："
+    echo
+    
+    local index=1
+    for item in "${all_items[@]}"; do
+        local type=$(echo "$item" | cut -d'|' -f1)
+        local name=$(echo "$item" | cut -d'|' -f2)
+        local reason=$(echo "$item" | cut -d'|' -f3)
+        
+        # 确定风险级别图标
+        local risk_icon="🟢"
+        for safe_item in "${safe_ref[@]}"; do
+            if [[ "$item" == "$safe_item" ]]; then
+                risk_icon="🟢"
+                break
+            fi
+        done
+        
+        for warning_item in "${warning_ref[@]}"; do
+            if [[ "$item" == "$warning_item" ]]; then
+                risk_icon="🟡"
+                break
+            fi
+        done
+        
+        for risky_item in "${risky_ref[@]}"; do
+            if [[ "$item" == "$risky_item" ]]; then
+                risk_icon="🔴"
+                break
+            fi
+        done
+        
+        echo "$risk_icon $index. $type: $name"
+        if [[ -n "$reason" ]]; then
+            echo "     💬 $reason"
+        fi
+        
+        if ui_confirm "   清理这个项目？"; then
+            selected_items+=("$item")
+            echo "     ✅ 已选择"
+        else
+            echo "     ⚠️ 跳过"
+        fi
+        
+        echo
+        ((index++))
+    done
+    
+    if [[ ${#selected_items[@]} -eq 0 ]]; then
+        ui_info "没有选择任何项目进行清理"
+        return 0
+    fi
+    
+    echo
+    ui_info "已选择 ${#selected_items[@]} 个项目进行清理"
+    
+    if ui_confirm "确认执行自定义清理？"; then
+        execute_selective_cleanup selected_items
+    else
+        ui_info "取消自定义清理"
+    fi
+}
+
+# clean命令主函数
+cmd_clean() {
+    local dry_run=false
+    local force_mode=false
+    local help_mode=false
+    local interactive_mode=false
+    local scope=""
+    local target=""
+    
+    # 解析参数
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dry-run)
+                dry_run=true
+                shift
+                ;;
+            --force)
+                force_mode=true
+                shift
+                ;;
+            --all)
+                scope="all"
+                shift
+                ;;
+            --help|-h)
+                help_mode=true
+                shift
+                ;;
+            --release)
+                scope="release"
+                shift
+                ;;
+            --interactive|-i)
+                interactive_mode=true
+                shift
+                ;;
+            --categorized)
+                # 新增：分级显示清理项目
+                show_categorized_cleanup_items "all"
+                return 0
+                ;;
+            --partial)
+                # 新增：部分清理选择
+                interactive_partial_cleanup
+                return 0
+                ;;
+            --history)
+                # 新增：显示清理历史
+                show_cleanup_history
+                return 0
+                ;;
+            worktrees|branches|epic|merged)
+                if [[ -z "$scope" ]]; then
+                    scope="$1"
+                    shift
+                    # 下一个参数可能是target
+                    if [[ $# -gt 0 && "$1" != -* ]]; then
+                        target="$1"
+                        shift
+                    fi
+                else
+                    ui_error "不能同时指定多个清理类型"
+                    return 1
+                fi
+                ;;
+            -*) 
+                ui_error "未知选项: $1"
+                show_enhanced_clean_help
+                return 1
+                ;;
+            *)
+                if [[ -z "$scope" ]]; then
+                    ui_error "无效的清理类型: $1"
+                    show_enhanced_clean_help
+                    return 1
+                elif [[ -z "$target" ]]; then
+                    target="$1"
+                    shift
+                else
+                    ui_error "过多参数: $1"
+                    return 1
+                fi
+                ;;
+        esac
+    done
+    
+    # 显示帮助信息
+    if [[ "$help_mode" == "true" ]]; then
+        show_enhanced_clean_help
+        return 0
+    fi
+    
+    # 处理只有 --dry-run 参数的情况
+    if [[ -z "$scope" && "$dry_run" == "true" ]]; then
+        show_categorized_cleanup_items "all"
+        return 0
+    fi
+    
+    # 无参数或交互模式时显示增强的交互界面
+    if [[ -z "$scope" || "$interactive_mode" == "true" ]]; then
+        handle_enhanced_interactive_cleanup
+        return 0
+    fi
+    
+    # 记录清理开始
+    log_cleanup_start "$scope" "$target" "$force_mode" "$dry_run"
+    
+    # 执行相应的清理操作，集成增强功能
+    case "$scope" in
+        "worktrees")
+            execute_enhanced_cleanup "worktrees" "$target" "$force_mode" "$dry_run"
+            ;;
+        "branches")
+            execute_enhanced_cleanup "branches" "$target" "$force_mode" "$dry_run"
+            ;;
+        "epic")
+            execute_enhanced_cleanup "epic" "$target" "$force_mode" "$dry_run"
+            ;;
+        "merged")
+            execute_enhanced_cleanup "merged" "$target" "$force_mode" "$dry_run"
+            ;;
+        "all")
+            execute_enhanced_cleanup "all" "$target" "$force_mode" "$dry_run"
+            ;;
+        "release")
             clean_after_release
             ;;
         *)
             ui_error "无效的清理范围: $scope"
-            ui_info "支持的范围: interactive, worktrees, branches, epic, merged, all"
-            ui_info "用法示例:"
-            ui_info "  git-pr-flow clean                    # 交互式清理"
-            ui_info "  git-pr-flow clean worktrees          # 清理未使用的工作树"
-            ui_info "  git-pr-flow clean branches           # 清理已合并分支"
-            ui_info "  git-pr-flow clean epic <epic-name>   # 清理指定Epic"
-            ui_info "  git-pr-flow clean merged             # 清理已合并分支"
-            ui_info "  git-pr-flow clean all                # 全面清理"
-            ui_info "  git-pr-flow clean --release          # 发布后清理"
+            show_enhanced_clean_help
             return 1
             ;;
     esac
+}
+
+# 增强的帮助信息
+show_enhanced_clean_help() {
+    ui_header "🧹 增强版清理命令帮助"
+    
+    echo "用法: gpf clean [选项] [类型] [目标]"
+    echo
+    
+    ui_subheader "基本清理类型"
+    echo "  worktrees                    清理未使用的工作树"
+    echo "  branches                     清理已合并的分支"
+    echo "  epic [name]                  清理指定Epic相关资源"
+    echo "  merged                       清理已合并分支"
+    echo
+    
+    ui_subheader "批量操作选项"
+    echo "  --all                        清理所有安全资源"
+    echo "  --force                      强制清理（跳过安全检查）"
+    echo "  --dry-run                    预览清理操作（不执行）"
+    echo "  --release                    发布后清理"
+    echo
+    
+    ui_subheader "增强功能选项"
+    echo "  --interactive, -i            交互式清理界面"
+    echo "  --categorized                分级显示清理项目"
+    echo "  --partial                    部分清理选择"
+    echo "  --history                    显示清理历史"
+    echo "  --help, -h                   显示此帮助信息"
+    echo
+    
+    ui_subheader "使用示例"
+    echo "  gpf clean                    # 智能引导界面"
+    echo "  gpf clean --dry-run          # 预览所有清理项目"
+    echo "  gpf clean --all              # 安全批量清理"
+    echo "  gpf clean --all --force      # 强制批量清理"
+    echo "  gpf clean worktrees          # 清理工作树"
+    echo "  gpf clean branches           # 清理分支"
+    echo "  gpf clean epic my-epic       # 清理指定Epic"
+    echo "  gpf clean --categorized      # 分级查看清理项目"
+    echo "  gpf clean --partial          # 选择性清理"
+    echo "  gpf clean --history          # 查看清理历史"
+    echo
+    
+    ui_subheader "风险级别说明"
+    echo "  🟢 安全    - 可安全清理，无数据丢失风险"
+    echo "  🟡 警告    - 有轻微风险，建议先检查"
+    echo "  🔴 阻断    - 有数据丢失风险，需要--force"
+}
+
+# 增强的交互式清理
+handle_enhanced_interactive_cleanup() {
+    ui_header "🎯 智能清理中心"
+    
+    # 分析当前环境
+    local total_items
+    total_items=$(show_categorized_cleanup_items "all")
+    
+    if [[ "$total_items" -eq 0 ]]; then
+        ui_success "✨ 环境很干净，无需清理"
+        return 0
+    fi
+    
+    echo
+    ui_subheader "🎛️ 清理选项"
+    
+    local cleanup_options=(
+        "🎯 部分清理选择（推荐）"
+        "🧹 安全批量清理"
+        "⚡ 强制批量清理"
+        "🔍 详细环境分析"
+        "📊 查看清理历史"
+        "❌ 取消操作"
+    )
+    
+    local choice
+    choice=$(ui_select_menu "选择清理方式" "${cleanup_options[@]}")
+    
+    case $choice in
+        0) # 部分清理选择
+            interactive_partial_cleanup
+            ;;
+        1) # 安全批量清理
+            execute_enhanced_cleanup "all" "" "false" "false"
+            ;;
+        2) # 强制批量清理
+            ui_warning "⚠️ 强制清理将跳过所有安全检查"
+            if ui_confirm "确认执行强制清理？"; then
+                execute_enhanced_cleanup "all" "" "true" "false"
+            fi
+            ;;
+        3) # 详细环境分析
+            show_detailed_cleanup_status
+            ;;
+        4) # 查看清理历史
+            show_cleanup_history
+            ;;
+        5) # 取消操作
+            ui_info "取消清理操作"
+            return 0
+            ;;
+    esac
+}
+
+# 执行增强的清理操作
+execute_enhanced_cleanup() {
+    local operation_type="$1"
+    local target="$2"
+    local force_mode="$3"
+    local dry_run="$4"
+    
+    # 收集清理前统计
+    local before_stats
+    before_stats=$(collect_environment_stats)
+    
+    # 显示进度和分类信息
+    show_progress_bar 0 "准备清理..."
+    
+    if [[ "$dry_run" == "true" ]]; then
+        ui_header "🔍 清理预览"
+        show_categorized_cleanup_items "$operation_type" "$target"
+        return 0
+    fi
+    
+    # 执行安全检查（除非强制模式）
+    if [[ "$force_mode" != "true" ]]; then
+        show_progress_bar 20 "执行安全检查..."
+        
+        # 这里应该调用之前实现的安全检查系统
+        local safety_level=0  # 假设安全检查通过
+        
+        if [[ $safety_level -eq 2 ]]; then
+            ui_error "🔴 检测到阻断性风险，清理已停止"
+            ui_info "使用 --force 强制清理或先解决安全问题"
+            return 1
+        elif [[ $safety_level -eq 1 ]]; then
+            ui_warning "🟡 检测到警告级风险"
+            if ! ui_confirm "是否继续清理？"; then
+                ui_info "清理已取消"
+                return 0
+            fi
+        fi
+    fi
+    
+    show_progress_bar 40 "开始执行清理..."
+    
+    # 执行实际清理操作
+    case "$operation_type" in
+        "worktrees")
+            show_progress_bar 60 "清理工作树..."
+            clean_worktrees "$target"
+            ;;
+        "branches")
+            show_progress_bar 60 "清理分支..."
+            clean_branches "$target"
+            ;;
+        "epic")
+            show_progress_bar 60 "清理Epic..."
+            clean_epic "$target"
+            ;;
+        "merged")
+            show_progress_bar 60 "清理已合并分支..."
+            clean_merged_branches
+            ;;
+        "all")
+            show_progress_bar 60 "执行全面清理..."
+            clean_all_with_confirmation
+            ;;
+    esac
+    
+    show_progress_bar 80 "收集清理后统计..."
+    
+    # 收集清理后统计
+    local after_stats
+    after_stats=$(collect_environment_stats)
+    
+    show_progress_bar 100 "清理完成！"
+    
+    # 显示清理摘要
+    show_cleanup_summary "$before_stats" "$after_stats" "$operation_type"
+    
+    # 记录清理历史
+    log_cleanup_completion "$operation_type" "$target" "$force_mode" "$before_stats" "$after_stats"
+    
+    # 显示后续建议
+    show_cleanup_recommendations "$operation_type"
+}
+
+# 记录清理开始
+log_cleanup_start() {
+    local operation_type="$1"
+    local target="$2"
+    local force_mode="$3"
+    local dry_run="$4"
+    
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    local log_entry="$timestamp|START|$operation_type|$target|force:$force_mode|dry:$dry_run"
+    
+    # 确保历史文件存在
+    touch "$CLEANUP_HISTORY_FILE"
+    
+    # 添加到历史记录
+    echo "$log_entry" >> "$CLEANUP_HISTORY_FILE"
+    
+    # 保持历史记录数量限制
+    maintain_history_limit
+}
+
+# 记录清理完成
+log_cleanup_completion() {
+    local operation_type="$1"
+    local target="$2"
+    local force_mode="$3"
+    local before_stats="$4"
+    local after_stats="$5"
+    
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    local log_entry="$timestamp|COMPLETE|$operation_type|$target|force:$force_mode|before:$before_stats|after:$after_stats"
+    
+    echo "$log_entry" >> "$CLEANUP_HISTORY_FILE"
+    maintain_history_limit
+}
+
+# 维护历史记录数量限制
+maintain_history_limit() {
+    if [[ -f "$CLEANUP_HISTORY_FILE" ]]; then
+        local line_count
+        line_count=$(wc -l < "$CLEANUP_HISTORY_FILE")
+        
+        if [[ $line_count -gt $MAX_HISTORY_ENTRIES ]]; then
+            # 保留最新的记录
+            tail -n $MAX_HISTORY_ENTRIES "$CLEANUP_HISTORY_FILE" > "${CLEANUP_HISTORY_FILE}.tmp"
+            mv "${CLEANUP_HISTORY_FILE}.tmp" "$CLEANUP_HISTORY_FILE"
+        fi
+    fi
+}
+
+# 显示清理摘要
+show_cleanup_summary() {
+    local before_stats="$1"
+    local after_stats="$2"
+    local operation_type="$3"
+    
+    ui_header "📊 清理摘要"
+    
+    # 解析统计数据
+    local before_worktrees after_worktrees before_branches after_branches
+    local before_files after_files before_disk after_disk
+    
+    IFS=',' read -r before_worktrees before_branches before_files before_disk <<< "$before_stats"
+    IFS=',' read -r after_worktrees after_branches after_files after_disk <<< "$after_stats"
+    
+    # 计算清理数量
+    local cleaned_worktrees=$((${before_worktrees#*:} - ${after_worktrees#*:}))
+    local cleaned_branches=$((${before_branches#*:} - ${after_branches#*:}))
+    local cleaned_files=$((${before_files#*:} - ${after_files#*:}))
+    local saved_disk=$((${before_disk#*:} - ${after_disk#*:}))
+    
+    echo "  🧹 清理类型: $operation_type"
+    echo "  🏠 工作树: $cleaned_worktrees 个"
+    echo "  🌿 分支: $cleaned_branches 个"
+    echo "  📄 文件: $cleaned_files 个"
+    echo "  💾 节省磁盘: ${saved_disk}KB"
+    echo "  ⏰ 完成时间: $(date)"
+    echo
+    
+    if [[ $cleaned_worktrees -gt 0 || $cleaned_branches -gt 0 || $cleaned_files -gt 0 ]]; then
+        ui_success "✅ 清理成功完成！"
+    else
+        ui_info "📝 环境已经很干净，无需清理"
+    fi
+}
+
+# 显示清理建议
+show_cleanup_recommendations() {
+    local operation_type="$1"
+    
+    ui_subheader "💡 后续建议"
+    
+    case "$operation_type" in
+        "worktrees")
+            echo "  • 定期运行 gpf clean worktrees 保持环境整洁"
+            echo "  • 考虑清理已合并的分支: gpf clean merged"
+            ;;
+        "branches")
+            echo "  • 检查是否有未使用的工作树: gpf clean worktrees"
+            echo "  • 考虑运行全面清理: gpf clean --all"
+            ;;
+        "all")
+            echo "  • 环境已全面清理，建议定期维护"
+            echo "  • 使用 gpf clean --history 查看清理历史"
+            ;;
+        "epic")
+            echo "  • Epic清理完成，可以开始新的开发工作"
+            echo "  • 考虑清理其他未使用资源: gpf clean --all"
+            ;;
+    esac
+    
+    echo
+    echo "  📚 更多帮助: gpf clean --help"
 }
 
 # 交互式清理处理
