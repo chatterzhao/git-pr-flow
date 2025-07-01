@@ -113,6 +113,16 @@ cmd_pr() {
         return 1
     fi
     
+    # 检查是否为Epic级别PR
+    if [[ "$full_feature_name" == epic/* ]]; then
+        # Epic级别PR：epic/epic-name → develop
+        ui_info "🎯 检测到Epic级别PR: $full_feature_name"
+        if [[ -z "$target_branch" ]]; then
+            target_branch="develop"
+        fi
+        ui_info "📋 准备创建Epic PR: $full_feature_name → $target_branch"
+    fi
+    
     # 执行PR创建
     create_feature_pr "$full_feature_name" "$target_branch" "$push_remote" "$force_mode"
 }
@@ -292,29 +302,157 @@ get_feature_ahead_count() {
     git rev-list --count "$base_branch..$feature_branch" 2>/dev/null || echo "0"
 }
 
+# 验证Epic是否存在
+validate_epic_exists() {
+    local epic_name="$1"
+    
+    # 检查是否存在 epic/{epic-name} 分支
+    if git_branch_exists "epic/$epic_name"; then
+        return 0
+    fi
+    
+    return 1
+}
+
+# 智能参数解析：支持Epic名称和Epic功能分支
+parse_feature_parameter() {
+    local input="$1"
+    
+    # 如果包含 "/"，可能是Epic功能分支格式
+    if [[ "$input" == */* ]]; then
+        local epic_part="${input%/*}"
+        local feature_part="${input#*/}"
+        
+        # 验证Epic是否存在
+        if validate_epic_exists "$epic_part"; then
+            # 是有效的Epic功能分支格式
+            echo "epic-feature:$input"
+            return 0
+        else
+            # 不是有效的Epic功能分支，可能是普通功能分支
+            echo "feature:$input"
+            return 0
+        fi
+    else
+        # 不包含 "/"，检查是否为Epic名称
+        if validate_epic_exists "$input"; then
+            # 是Epic名称
+            echo "epic:$input"
+            return 0
+        else
+            # 是普通功能名称，需要添加当前Epic前缀
+            echo "feature:$input"
+            return 0
+        fi
+    fi
+}
+
 # 标准化功能名称
 normalize_feature_name() {
     local feature_name="$1"
     local epic_name
     epic_name=$(config_epic_get "epic_name")
     
-    # 如果已经包含Epic前缀，直接返回
-    if [[ "$feature_name" =~ ^$epic_name/ ]]; then
-        if git_branch_exists "$feature_name"; then
-            echo "$feature_name"
-        fi
-        return 0
-    fi
+    # 使用智能参数解析
+    local parse_result
+    parse_result=$(parse_feature_parameter "$feature_name")
+    local param_type="${parse_result%%:*}"
+    local param_value="${parse_result#*:}"
     
-    # 添加Epic前缀
-    local full_name="$epic_name/$feature_name"
-    if git_branch_exists "$full_name"; then
-        echo "$full_name"
-        return 0
-    fi
+    case "$param_type" in
+        "epic-feature")
+            # Epic功能分支格式：epic-name/feature-name
+            if git_branch_exists "$param_value"; then
+                echo "$param_value"
+                return 0
+            fi
+            ;;
+        "epic")
+            # Epic名称格式：epic-name → epic/epic-name
+            local epic_branch="epic/$param_value"
+            if git_branch_exists "$epic_branch"; then
+                echo "$epic_branch"
+                return 0
+            fi
+            ;;
+        "feature")
+            # 普通功能名称：feature-name → current-epic/feature-name
+            local full_name="$epic_name/$param_value"
+            if git_branch_exists "$full_name"; then
+                echo "$full_name"
+                return 0
+            fi
+            ;;
+    esac
     
     # 如果都不存在，返回空
     return 1
+}
+
+# 智能确认判断：决定是否需要用户确认
+should_auto_create_pr() {
+    local feature_name="$1"
+    local pr_context="$2" 
+    local force_mode="${3:-false}"
+    
+    # --force 参数强制跳过所有确认
+    if [[ "$force_mode" == "true" ]]; then
+        return 0
+    fi
+    
+    # 获取工作树路径
+    local worktree_path
+    worktree_path=$(get_branch_worktree_absolute_path "$feature_name")
+    
+    # 安全检查：检测风险情况
+    local risk_detected=false
+    
+    # 检查1: 工作目录是否存在且干净
+    if [[ ! -d "$worktree_path" ]]; then
+        ui_debug "风险检测：工作树不存在"
+        risk_detected=true
+    else
+        # 切换到工作树检查状态
+        local original_dir=$(pwd)
+        cd "$worktree_path" || return 1
+        
+        if ! git_is_clean; then
+            ui_debug "风险检测：工作目录不干净"
+            risk_detected=true
+        fi
+        
+        cd "$original_dir" || true
+    fi
+    
+    # 检查2: 分支是否有未推送的提交
+    local ahead_count
+    ahead_count=$(get_feature_ahead_count "$feature_name")
+    if [[ "$ahead_count" -eq 0 ]]; then
+        ui_debug "风险检测：没有新提交需要推送"
+        risk_detected=true
+    fi
+    
+    # 检查3: 是否在正确的工作环境中
+    local current_dir=$(pwd)
+    local in_feature_dir=false
+    if [[ "$current_dir" == "$worktree_path" ]]; then
+        in_feature_dir=true
+    fi
+    
+    # 检查4: 参数完整性
+    local has_complete_context=true
+    if [[ -z "$feature_name" ]]; then
+        has_complete_context=false
+    fi
+    
+    # 决策逻辑：满足自动创建条件
+    if [[ "$risk_detected" == "false" && "$in_feature_dir" == "true" && "$has_complete_context" == "true" ]]; then
+        # 所有条件满足，可以自动创建
+        return 0
+    else
+        # 存在风险或条件不满足，需要确认
+        return 1
+    fi
 }
 
 # 创建功能PR
@@ -349,9 +487,8 @@ create_feature_pr() {
     # 显示PR预览
     show_pr_preview "$feature_name" "$pr_context"
     
-    # 智能确认逻辑
+    # 智能确认：根据条件决定是否需要用户确认
     if ! should_auto_create_pr "$feature_name" "$pr_context" "$force_mode"; then
-        # 需要确认时才显示确认对话框
         if ! ui_confirm "确认创建PR？"; then
             ui_info "取消PR创建"
             return 1
@@ -801,12 +938,15 @@ GPF PR命令 - 智能PR创建工具
   --push-remote <remote>    指定推送的远程仓库
   --multi-platform          推送到所有配置的平台（github, gitee等）
   --target <branch>         指定目标分支
-  --force                   强制跳过所有确认（适用于自动化脚本）
+  --force                   强制跳过所有确认（AI友好模式）
   --help, -h                显示此帮助信息
 
 参数:
-  功能名称                  要创建PR的功能分支名称
-  目标分支                  PR的目标分支（默认为Epic基础分支）
+  功能名称                  Epic名称或功能分支名称
+                           • epic-name: 创建Epic→develop的PR  
+                           • epic-name/feature-name: 创建功能→Epic的PR
+                           • feature-name: 创建功能→当前Epic的PR
+  目标分支                  PR的目标分支（默认自动检测）
 
 功能:
   - 智能检测Git配置并适配不同的远程仓库设置
@@ -815,10 +955,12 @@ GPF PR命令 - 智能PR创建工具
   - 提供详细的推送错误诊断和解决建议
 
 示例:
-  gpf pr feature-name                        # 创建PR，自动检测推送目标（优先all远程）
+  gpf pr feature-name                        # 创建功能→当前Epic的PR
+  gpf pr epic-name                           # 创建Epic→develop的PR
+  gpf pr epic-name/feature-name              # 创建功能→Epic的PR
+  gpf pr feature-name --force                # 强制创建PR（跳过确认）
   gpf pr feature-name --push-remote github   # 指定推送到github远程
   gpf pr feature-name --multi-platform       # 推送到所有平台（github + gitee）
-  gpf pr feature-name --push-remote all      # 使用all远程同时推送多平台
   gpf pr feature-name develop                # 指定目标分支为develop
 
 推送失败时的解决方案:
