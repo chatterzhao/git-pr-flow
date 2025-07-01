@@ -240,7 +240,10 @@ handle_enhanced_interactive_cleanup() {
     )
     
     local choice
-    choice=$(ui_select_menu "选择清理方式" "${cleanup_options[@]}")
+    if ! choice=$(ui_select_menu "选择清理方式" "${cleanup_options[@]}"); then
+        ui_error "选择菜单失败，已退出清理操作"
+        return 1
+    fi
     
     case $choice in
         0) # 部分清理选择
@@ -977,7 +980,10 @@ interactive_partial_cleanup() {
     )
     
     local choice
-    choice=$(ui_select_menu "请选择清理范围" "${cleanup_options[@]}")
+    if ! choice=$(ui_select_menu "请选择清理范围" "${cleanup_options[@]}"); then
+        ui_error "选择菜单失败，已退出清理操作"
+        return 1
+    fi
     
     case $choice in
         0) # 只清理安全项目
@@ -1544,7 +1550,10 @@ clean_after_release_enhanced() {
     )
     
     local choice
-    choice=$(ui_select_menu "选择发布后清理策略" "${cleanup_options[@]}")
+    if ! choice=$(ui_select_menu "选择发布后清理策略" "${cleanup_options[@]}"); then
+        ui_error "选择菜单失败，已退出清理操作"
+        return 1
+    fi
     
     case $choice in
         0) # 保留所有
