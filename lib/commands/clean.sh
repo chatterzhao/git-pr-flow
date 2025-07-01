@@ -2,52 +2,954 @@
 
 # Git PR Flow - clean命令实现
 # 智能环境清理，支持工作树、分支、Epic级清理
+# safety-check-system: 全面的安全检查机制
 
 # 引入环境检测工具
 COMMAND_SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 source "$COMMAND_SCRIPT_DIR/../utils/environment.sh"
 
-# clean命令主函数
-cmd_clean() {
-    local scope="${1:-interactive}"
-    local target="${2:-}"
+# ====== 安全检查系统核心函数 ======
+
+# 执行全面安全检查
+perform_comprehensive_safety_check() {
+    local check_target="${1:-all}"  # all, worktrees, branches, epic
+    local target_name="${2:-}"      # 具体目标名称（如epic名称）
+    local force_mode="${3:-false}"  # 是否强制模式
     
+    ui_header "🔍 安全检查系统"
+    
+    local safety_result
+    safety_result=$(create_safety_check_result)
+    
+    # 执行各项检查
+    check_uncommitted_changes "$safety_result" "$check_target" "$target_name"
+    check_unmerged_branches "$safety_result" "$check_target" "$target_name"
+    check_unpushed_commits "$safety_result" "$check_target" "$target_name"
+    check_active_worktrees "$safety_result" "$check_target" "$target_name"
+    check_branch_dependencies "$safety_result" "$check_target" "$target_name"
+    
+    # 显示检查结果
+    display_safety_check_results "$safety_result" "$force_mode"
+    
+    # 返回检查结果（0=安全，1=警告，2=阻断）
+    get_safety_check_level "$safety_result"
+}
+
+# 创建安全检查结果结构
+create_safety_check_result() {
+    cat << 'EOF'
+{
+    "safe_items": [],
+    "warning_items": [],
+    "blocking_items": [],
+    "recommendations": []
+}
+EOF
+}
+
+# 检查未提交更改
+check_uncommitted_changes() {
+    local safety_result="$1"
+    local check_target="$2"
+    local target_name="$3"
+    
+    ui_loading "检查未提交更改..."
+    
+    local uncommitted_worktrees=()
+    local main_repo_status=""
+    
+    # 检查主仓库
+    if ! git diff-index --quiet HEAD 2>/dev/null || ! git diff-index --cached --quiet HEAD 2>/dev/null; then
+        main_repo_status="主仓库有未提交更改"
+        add_blocking_item "$safety_result" "main_repo_uncommitted" "$main_repo_status" \
+            "git add . && git commit -m \"保存更改\"" \
+            "或: git stash save \"临时保存\""
+    fi
+    
+    # 检查工作树
+    if [[ -d ".worktrees" ]]; then
+        for worktree in .worktrees/epic--*; do
+            if [[ -d "$worktree" ]]; then
+                local worktree_name=$(basename "$worktree")
+                local original_dir=$(pwd)
+                
+                cd "$worktree" 2>/dev/null || continue
+                
+                # 检查是否有未提交更改
+                local has_changes=false
+                if ! git diff-index --quiet HEAD 2>/dev/null; then
+                    has_changes=true
+                elif ! git diff-index --cached --quiet HEAD 2>/dev/null; then
+                    has_changes=true
+                elif [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+                    has_changes=true
+                fi
+                
+                if [[ "$has_changes" == "true" ]]; then
+                    local branch_name
+                    branch_name=$(git branch --show-current 2>/dev/null || echo "unknown")
+                    
+                    add_blocking_item "$safety_result" "worktree_uncommitted_$worktree_name" \
+                        "工作树 $worktree_name ($branch_name) 有未提交更改" \
+                        "cd \"$worktree\" && git add . && git commit -m \"保存更改\"" \
+                        "或: cd \"$worktree\" && git stash save \"临时保存\""
+                fi
+                
+                cd "$original_dir" || true
+            fi
+        done
+    fi
+    
+    echo "✅ 未提交更改检查完成"
+}
+
+# 检查未合并分支
+check_unmerged_branches() {
+    local safety_result="$1"
+    local check_target="$2"
+    local target_name="$3"
+    
+    ui_loading "检查未合并分支..."
+    
+    # 获取主要分支
+    local main_branches=("main" "master" "develop")
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    
+    # 检查未合并到主分支的分支
+    for main_branch in "${main_branches[@]}"; do
+        if git_branch_exists "$main_branch"; then
+            local unmerged_branches
+            unmerged_branches=$(git branch --no-merged "$main_branch" 2>/dev/null | grep -v "^\*" | sed 's/^[+ ]*//' || true)
+            
+            while IFS= read -r branch; do
+                if [[ -n "$branch" && "$branch" != "$current_branch" ]]; then
+                    # 排除主要分支
+                    local is_main=false
+                    for mb in "${main_branches[@]}"; do
+                        if [[ "$branch" == "$mb" ]]; then
+                            is_main=true
+                            break
+                        fi
+                    done
+                    
+                    if [[ "$is_main" == "false" ]]; then
+                        # 检查是否有未推送的提交
+                        local commits_ahead=0
+                        if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+                            commits_ahead=$(git rev-list --count "origin/$branch..HEAD" 2>/dev/null || echo "0")
+                        fi
+                        
+                        if [[ "$commits_ahead" -gt 0 ]]; then
+                            add_warning_item "$safety_result" "unmerged_branch_$branch" \
+                                "分支 $branch 未合并到 $main_branch，且有 $commits_ahead 个未推送提交" \
+                                "git checkout $main_branch && git merge $branch" \
+                                "或: git push origin $branch 然后通过PR合并"
+                        else
+                            add_warning_item "$safety_result" "unmerged_branch_$branch" \
+                                "分支 $branch 未合并到 $main_branch" \
+                                "git checkout $main_branch && git merge $branch" \
+                                "或: 通过PR将分支合并到主分支"
+                        fi
+                    fi
+                fi
+            done <<< "$unmerged_branches"
+            break  # 只需要检查一个存在的主分支
+        fi
+    done
+    
+    echo "✅ 未合并分支检查完成"
+}
+
+# 检查未推送提交
+check_unpushed_commits() {
+    local safety_result="$1"
+    local check_target="$2"
+    local target_name="$3"
+    
+    ui_loading "检查未推送提交..."
+    
+    # 检查当前分支的未推送提交
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    
+    if [[ -n "$current_branch" ]]; then
+        local remote_branch="origin/$current_branch"
+        if git show-ref --verify --quiet "refs/remotes/$remote_branch"; then
+            local commits_ahead
+            commits_ahead=$(git rev-list --count "$remote_branch..HEAD" 2>/dev/null || echo "0")
+            
+            if [[ "$commits_ahead" -gt 0 ]]; then
+                add_warning_item "$safety_result" "unpushed_commits_current" \
+                    "当前分支 $current_branch 有 $commits_ahead 个未推送提交" \
+                    "git push origin $current_branch" \
+                    "或: git push origin $current_branch --force-with-lease (如果需要强制推送)"
+            fi
+        else
+            # 远程分支不存在
+            local local_commits
+            local_commits=$(git rev-list --count HEAD 2>/dev/null || echo "0")
+            if [[ "$local_commits" -gt 0 ]]; then
+                add_warning_item "$safety_result" "unpushed_new_branch" \
+                    "新分支 $current_branch 尚未推送到远程 ($local_commits 个提交)" \
+                    "git push origin $current_branch" \
+                    "或: git push origin $current_branch --set-upstream"
+            fi
+        fi
+    fi
+    
+    # 检查工作树中的未推送提交
+    if [[ -d ".worktrees" ]]; then
+        for worktree in .worktrees/epic--*; do
+            if [[ -d "$worktree" ]]; then
+                local worktree_name=$(basename "$worktree")
+                local original_dir=$(pwd)
+                
+                cd "$worktree" 2>/dev/null || continue
+                
+                local branch_name
+                branch_name=$(git branch --show-current 2>/dev/null || echo "")
+                
+                if [[ -n "$branch_name" ]]; then
+                    local remote_branch="origin/$branch_name"
+                    if git show-ref --verify --quiet "refs/remotes/$remote_branch"; then
+                        local commits_ahead
+                        commits_ahead=$(git rev-list --count "$remote_branch..HEAD" 2>/dev/null || echo "0")
+                        
+                        if [[ "$commits_ahead" -gt 0 ]]; then
+                            add_warning_item "$safety_result" "unpushed_commits_$worktree_name" \
+                                "工作树 $worktree_name ($branch_name) 有 $commits_ahead 个未推送提交" \
+                                "cd \"$worktree\" && git push origin $branch_name" \
+                                "或: 切换到工作树后推送"
+                        fi
+                    fi
+                fi
+                
+                cd "$original_dir" || true
+            fi
+        done
+    fi
+    
+    echo "✅ 未推送提交检查完成"
+}
+
+# 检查活跃工作树
+check_active_worktrees() {
+    local safety_result="$1"
+    local check_target="$2"
+    local target_name="$3"
+    
+    ui_loading "检查活跃工作树..."
+    
+    if [[ -d ".worktrees" ]]; then
+        for worktree in .worktrees/epic--*; do
+            if [[ -d "$worktree" ]]; then
+                local worktree_name=$(basename "$worktree")
+                local original_dir=$(pwd)
+                
+                cd "$worktree" 2>/dev/null || continue
+                
+                local branch_name
+                branch_name=$(git branch --show-current 2>/dev/null || echo "")
+                
+                # 检查是否有进行中的操作
+                local is_active=false
+                local activity_reason=""
+                
+                # 检查是否在进行merge
+                if [[ -f ".git/MERGE_HEAD" ]]; then
+                    is_active=true
+                    activity_reason="正在进行合并操作"
+                # 检查是否在进行rebase
+                elif [[ -d ".git/rebase-merge" || -d ".git/rebase-apply" ]]; then
+                    is_active=true
+                    activity_reason="正在进行变基操作"
+                # 检查是否有未提交的更改
+                elif ! git diff-index --quiet HEAD 2>/dev/null || ! git diff-index --cached --quiet HEAD 2>/dev/null; then
+                    is_active=true
+                    activity_reason="有未提交的更改"
+                fi
+                
+                if [[ "$is_active" == "true" ]]; then
+                    add_blocking_item "$safety_result" "active_worktree_$worktree_name" \
+                        "工作树 $worktree_name ($branch_name) 正在活跃使用: $activity_reason" \
+                        "cd \"$worktree\" && 完成当前操作后再清理" \
+                        "或: 使用 --force 强制清理（可能丢失数据）"
+                else
+                    add_safe_item "$safety_result" "inactive_worktree_$worktree_name" \
+                        "工作树 $worktree_name ($branch_name) 可以安全清理"
+                fi
+                
+                cd "$original_dir" || true
+            fi
+        done
+    fi
+    
+    echo "✅ 活跃工作树检查完成"
+}
+
+# 检查分支依赖关系
+check_branch_dependencies() {
+    local safety_result="$1"
+    local check_target="$2"
+    local target_name="$3"
+    
+    ui_loading "检查分支依赖关系..."
+    
+    # 如果是清理特定Epic，检查该Epic的依赖
+    if [[ "$check_target" == "epic" && -n "$target_name" ]]; then
+        local epic_branches
+        epic_branches=$(git branch --format='%(refname:short)' | grep "^$target_name/" || true)
+        
+        while IFS= read -r branch; do
+            if [[ -n "$branch" ]]; then
+                # 检查是否有其他分支依赖这个分支
+                local dependent_branches
+                dependent_branches=$(git branch --format='%(refname:short)' | while read -r other_branch; do
+                    if [[ "$other_branch" != "$branch" && -n "$other_branch" ]]; then
+                        # 检查是否 other_branch 是基于 branch 创建的
+                        if git merge-base --is-ancestor "$branch" "$other_branch" 2>/dev/null; then
+                            echo "$other_branch"
+                        fi
+                    fi
+                done)
+                
+                if [[ -n "$dependent_branches" ]]; then
+                    add_warning_item "$safety_result" "branch_dependency_$branch" \
+                        "分支 $branch 被其他分支依赖: $(echo "$dependent_branches" | tr '\n' ' ')" \
+                        "先处理依赖分支，或确认清理不会影响其他开发" \
+                        "或: 使用 --force 忽略依赖关系"
+                fi
+            fi
+        done <<< "$epic_branches"
+    fi
+    
+    echo "✅ 分支依赖关系检查完成"
+}
+
+# 添加安全项目
+add_safe_item() {
+    local safety_result="$1"
+    local item_id="$2"
+    local description="$3"
+    
+    # 这里实际上应该修改safety_result，但为了简化，我们用全局变量
+    SAFE_ITEMS+=("$item_id|$description")
+}
+
+# 添加警告项目
+add_warning_item() {
+    local safety_result="$1"
+    local item_id="$2"
+    local description="$3"
+    local solution1="$4"
+    local solution2="${5:-}"
+    
+    WARNING_ITEMS+=("$item_id|$description|$solution1|$solution2")
+}
+
+# 添加阻断项目
+add_blocking_item() {
+    local safety_result="$1"
+    local item_id="$2"
+    local description="$3"
+    local solution1="$4"
+    local solution2="${5:-}"
+    
+    BLOCKING_ITEMS+=("$item_id|$description|$solution1|$solution2")
+}
+
+# 显示安全检查结果
+display_safety_check_results() {
+    local safety_result="$1"
+    local force_mode="$2"
+    
+    echo
+    ui_subheader "📊 安全检查结果"
+    
+    # 显示安全项目
+    if [[ ${#SAFE_ITEMS[@]} -gt 0 ]]; then
+        echo
+        ui_success "🟢 安全项目 (${#SAFE_ITEMS[@]} 项):"
+        for item in "${SAFE_ITEMS[@]}"; do
+            local description=$(echo "$item" | cut -d'|' -f2)
+            echo "  ✅ $description"
+        done
+    fi
+    
+    # 显示警告项目
+    if [[ ${#WARNING_ITEMS[@]} -gt 0 ]]; then
+        echo
+        ui_warning "🟡 警告项目 (${#WARNING_ITEMS[@]} 项):"
+        for item in "${WARNING_ITEMS[@]}"; do
+            local description=$(echo "$item" | cut -d'|' -f2)
+            local solution1=$(echo "$item" | cut -d'|' -f3)
+            local solution2=$(echo "$item" | cut -d'|' -f4)
+            
+            echo "  ⚠️ $description"
+            echo "    💡 解决方案:"
+            echo "       $solution1"
+            if [[ -n "$solution2" ]]; then
+                echo "       $solution2"
+            fi
+        done
+    fi
+    
+    # 显示阻断项目
+    if [[ ${#BLOCKING_ITEMS[@]} -gt 0 ]]; then
+        echo
+        ui_error "🔴 阻断项目 (${#BLOCKING_ITEMS[@]} 项):"
+        for item in "${BLOCKING_ITEMS[@]}"; do
+            local description=$(echo "$item" | cut -d'|' -f2)
+            local solution1=$(echo "$item" | cut -d'|' -f3)
+            local solution2=$(echo "$item" | cut -d'|' -f4)
+            
+            echo "  ❌ $description"
+            echo "    💡 解决方案:"
+            echo "       $solution1"
+            if [[ -n "$solution2" ]]; then
+                echo "       $solution2"
+            fi
+        done
+    fi
+    
+    # 显示总结和建议
+    echo
+    display_safety_summary "$force_mode"
+}
+
+# 显示安全检查总结
+display_safety_summary() {
+    local force_mode="$1"
+    
+    local safe_count=${#SAFE_ITEMS[@]}
+    local warning_count=${#WARNING_ITEMS[@]}
+    local blocking_count=${#BLOCKING_ITEMS[@]}
+    
+    ui_subheader "📋 检查总结"
+    
+    if [[ $blocking_count -gt 0 ]]; then
+        ui_error "❌ 存在 $blocking_count 个阻断条件，无法安全执行清理"
+        if [[ "$force_mode" == "true" ]]; then
+            ui_warning "⚠️ 强制模式已启用，将跳过所有检查"
+        else
+            ui_info "💡 建议："
+            ui_info "  1. 解决上述阻断问题后重试"
+            ui_info "  2. 使用 --force 强制清理（可能导致数据丢失）"
+        fi
+    elif [[ $warning_count -gt 0 ]]; then
+        ui_warning "⚠️ 存在 $warning_count 个警告项目，建议谨慎操作"
+        ui_info "💡 建议："
+        ui_info "  1. 解决警告问题后重试以获得最佳安全性"
+        ui_info "  2. 继续执行清理（会保留警告项目）"
+    else
+        ui_success "✅ 所有检查通过，可以安全执行清理"
+    fi
+    
+    if [[ $safe_count -gt 0 ]]; then
+        ui_success "🟢 可以安全清理 $safe_count 项资源"
+    fi
+}
+
+# 获取安全检查级别
+get_safety_check_level() {
+    local safety_result="$1"
+    
+    if [[ ${#BLOCKING_ITEMS[@]} -gt 0 ]]; then
+        return 2  # 阻断
+    elif [[ ${#WARNING_ITEMS[@]} -gt 0 ]]; then
+        return 1  # 警告
+    else
+        return 0  # 安全
+    fi
+}
+
+# 全局数组用于存储检查结果
+declare -a SAFE_ITEMS=()
+declare -a WARNING_ITEMS=()
+declare -a BLOCKING_ITEMS=()
+
+# clean命令主函数 - 集成安全检查系统
+cmd_clean() {
+    local dry_run=false
+    local force_mode=false
+    local safety_check=true
+    local help_mode=false
+    local scope=""
+    local target=""
+    
+    # 解析参数
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dry-run)
+                dry_run=true
+                shift
+                ;;
+            --force)
+                force_mode=true
+                shift
+                ;;
+            --no-safety-check)
+                safety_check=false
+                shift
+                ;;
+            --help|-h)
+                help_mode=true
+                shift
+                ;;
+            --all)
+                scope="all"
+                shift
+                ;;
+            --release)
+                scope="release"
+                shift
+                ;;
+            worktrees|branches|epic|merged)
+                if [[ -z "$scope" ]]; then
+                    scope="$1"
+                    shift
+                    # 下一个参数可能是target
+                    if [[ $# -gt 0 && "$1" != -* ]]; then
+                        target="$1"
+                        shift
+                    fi
+                else
+                    ui_error "不能同时指定多个清理类型"
+                    return 1
+                fi
+                ;;
+            -*)
+                ui_error "未知选项: $1"
+                show_safety_clean_help
+                return 1
+                ;;
+            *)
+                if [[ -z "$scope" ]]; then
+                    ui_error "无效的清理类型: $1"
+                    show_safety_clean_help
+                    return 1
+                elif [[ -z "$target" ]]; then
+                    target="$1"
+                    shift
+                else
+                    ui_error "过多参数: $1"
+                    return 1
+                fi
+                ;;
+        esac
+    done
+    
+    # 显示帮助信息
+    if [[ "$help_mode" == "true" ]]; then
+        show_safety_clean_help
+        return 0
+    fi
+    
+    # 处理只有 --dry-run 参数的情况
+    if [[ -z "$scope" && "$dry_run" == "true" ]]; then
+        perform_comprehensive_safety_check "all" "" "$force_mode"
+        return $?
+    fi
+    
+    # 无参数时显示安全检查报告
+    if [[ -z "$scope" ]]; then
+        perform_comprehensive_safety_check "all" "" "$force_mode"
+        show_safety_guided_options
+        return 0
+    fi
+    
+    # 执行安全检查（除非明确跳过）
+    local safety_level=0
+    if [[ "$safety_check" == "true" && "$force_mode" == "false" ]]; then
+        perform_comprehensive_safety_check "$scope" "$target" "$force_mode"
+        safety_level=$?
+        
+        # 如果有阻断条件，停止执行
+        if [[ $safety_level -eq 2 ]]; then
+            ui_error "❌ 安全检查发现阻断条件，停止执行"
+            ui_info "💡 使用 --force 强制执行或解决上述问题后重试"
+            return 1
+        elif [[ $safety_level -eq 1 ]]; then
+            ui_warning "⚠️ 安全检查发现警告项目"
+            if ! ui_confirm "继续执行清理？"; then
+                ui_info "取消清理操作"
+                return 0
+            fi
+        fi
+    fi
+    
+    # 执行相应的清理操作
     case "$scope" in
-        "interactive")
-            handle_clean_interactive
-            ;;
         "worktrees")
-            clean_worktrees "$target"
+            if [[ "$dry_run" == "true" ]]; then
+                preview_clean_worktrees "$target"
+            else
+                clean_worktrees_with_safety "$target" "$force_mode"
+            fi
             ;;
         "branches")
-            clean_branches "$target"
+            if [[ "$dry_run" == "true" ]]; then
+                preview_clean_branches "$target"
+            else
+                clean_branches_with_safety "$target" "$force_mode"
+            fi
             ;;
         "epic")
-            clean_epic "$target"
+            if [[ -z "$target" ]]; then
+                ui_error "清理Epic需要指定Epic名称"
+                ui_info "用法: gpf clean epic <epic-name>"
+                return 1
+            fi
+            if [[ "$dry_run" == "true" ]]; then
+                preview_clean_epic "$target"
+            else
+                clean_epic_with_safety "$target" "$force_mode"
+            fi
             ;;
         "merged")
-            clean_merged_branches
+            if [[ "$dry_run" == "true" ]]; then
+                preview_clean_merged_branches
+            else
+                clean_merged_branches_with_safety "$force_mode"
+            fi
             ;;
         "all")
-            clean_all_with_confirmation
+            if [[ "$dry_run" == "true" ]]; then
+                preview_clean_all
+            else
+                clean_all_with_safety "$force_mode"
+            fi
             ;;
-        "--release")
-            clean_after_release
+        "release")
+            clean_after_release_with_safety "$force_mode"
             ;;
         *)
-            ui_error "无效的清理范围: $scope"
-            ui_info "支持的范围: interactive, worktrees, branches, epic, merged, all"
-            ui_info "用法示例:"
-            ui_info "  git-pr-flow clean                    # 交互式清理"
-            ui_info "  git-pr-flow clean worktrees          # 清理未使用的工作树"
-            ui_info "  git-pr-flow clean branches           # 清理已合并分支"
-            ui_info "  git-pr-flow clean epic <epic-name>   # 清理指定Epic"
-            ui_info "  git-pr-flow clean merged             # 清理已合并分支"
-            ui_info "  git-pr-flow clean all                # 全面清理"
-            ui_info "  git-pr-flow clean --release          # 发布后清理"
-            return 1
+            # 这应该不会到达，因为参数解析已经处理了
+            handle_clean_interactive_with_safety
             ;;
     esac
+}
+
+# ====== 安全检查集成的新功能函数 ======
+
+# 显示安全检查帮助信息
+show_safety_clean_help() {
+    cat << EOF
+GPF Clean命令 - 智能环境清理工具（集成安全检查系统）
+
+用法:
+  gpf clean [选项] [类型] [目标]
+
+选项:
+  --dry-run             预览清理计划和安全检查，不执行实际操作
+  --all                 清理所有类型的资源
+  --force               强制清理，跳过安全检查
+  --no-safety-check     跳过安全检查（不推荐）
+  --help, -h            显示此帮助信息
+
+清理类型:
+  worktrees [pattern]   清理工作树（pattern可选，支持通配符）
+  branches [pattern]    清理分支（pattern可选，支持通配符）
+  epic <epic-name>      清理指定Epic（必须指定Epic名称）
+  merged                清理已合并分支
+
+特殊操作:
+  --release             发布后清理
+
+示例:
+  gpf clean                           # 显示全面安全检查和引导
+  gpf clean --dry-run                 # 预览所有清理计划和安全检查
+  gpf clean --all                     # 安全清理所有资源（含安全检查）
+  gpf clean --all --force             # 强制清理所有资源（跳过安全检查）
+  gpf clean worktrees                 # 清理工作树（含安全检查）
+  gpf clean branches feature/*        # 清理feature分支（含安全检查）
+  gpf clean epic test                 # 清理test Epic（含安全检查）
+
+安全检查级别:
+  🟢 安全操作：通过所有检查的清理操作
+  🟡 警告操作：有警告但可以继续的操作
+  🔴 阻断操作：存在风险，需要解决问题或使用 --force
+
+安全检查内容:
+  - 未提交更改检查（git status）
+  - 未合并分支检查（git branch --no-merged）
+  - 未推送提交检查（git log @{u}..HEAD）
+  - 活跃工作树检查（正在使用的分支）
+  - 分支依赖关系检查
+
+EOF
+}
+
+# 显示安全引导选项
+show_safety_guided_options() {
+    echo
+    ui_subheader "💡 根据安全检查结果的推荐操作"
+    
+    local safe_count=${#SAFE_ITEMS[@]}
+    local warning_count=${#WARNING_ITEMS[@]}
+    local blocking_count=${#BLOCKING_ITEMS[@]}
+    
+    if [[ $blocking_count -eq 0 && $warning_count -eq 0 && $safe_count -gt 0 ]]; then
+        echo
+        ui_success "✅ 环境安全，推荐执行："
+        ui_info "  gpf clean --all                     # 安全清理所有资源"
+        ui_info "  gpf clean worktrees                 # 只清理工作树"
+        ui_info "  gpf clean branches                  # 只清理已合并分支"
+        
+    elif [[ $blocking_count -eq 0 && $warning_count -gt 0 ]]; then
+        echo
+        ui_warning "⚠️ 存在警告项目，建议操作："
+        ui_info "  1. 先解决警告问题（推荐）："
+        for item in "${WARNING_ITEMS[@]}"; do
+            local solution1=$(echo "$item" | cut -d'|' -f3)
+            ui_info "     $solution1"
+        done
+        echo
+        ui_info "  2. 或谨慎执行清理："
+        ui_info "     gpf clean --all                  # 继续清理（会提示确认）"
+        
+    elif [[ $blocking_count -gt 0 ]]; then
+        echo
+        ui_error "🔴 存在阻断条件，需要先解决："
+        for item in "${BLOCKING_ITEMS[@]}"; do
+            local solution1=$(echo "$item" | cut -d'|' -f3)
+            ui_info "  $solution1"
+        done
+        echo
+        ui_info "解决后重试："
+        ui_info "  gpf clean --all                     # 重新检查并清理"
+        echo
+        ui_info "强制清理（可能丢失数据）："
+        ui_info "  gpf clean --all --force             # 跳过所有安全检查"
+        
+    else
+        echo
+        ui_info "🧹 常用清理操作："
+        ui_info "  gpf clean --dry-run                 # 预览清理计划"
+        ui_info "  gpf clean --all                     # 全面清理"
+        ui_info "  gpf clean worktrees                 # 清理工作树"
+        ui_info "  gpf clean branches                  # 清理分支"
+    fi
+    
+    echo
+    ui_info "📖 详细帮助：gpf clean --help"
+}
+
+# 带安全检查的工作树清理
+clean_worktrees_with_safety() {
+    local target_pattern="$1"
+    local force_mode="$2"
+    
+    ui_subheader "🧹 安全工作树清理"
+    
+    # 如果不是强制模式，进行额外的工作树特定检查
+    if [[ "$force_mode" != "true" ]]; then
+        ui_info "执行工作树特定安全检查..."
+        
+        # 重置检查结果数组
+        SAFE_ITEMS=()
+        WARNING_ITEMS=()
+        BLOCKING_ITEMS=()
+        
+        # 只检查工作树相关的安全项
+        check_uncommitted_changes "" "worktrees" "$target_pattern"
+        check_active_worktrees "" "worktrees" "$target_pattern"
+        
+        # 如果有阻断条件，停止
+        if [[ ${#BLOCKING_ITEMS[@]} -gt 0 ]]; then
+            display_safety_check_results "" "$force_mode"
+            return 1
+        fi
+    fi
+    
+    # 调用原始的清理函数
+    clean_worktrees "$target_pattern"
+}
+
+# 带安全检查的分支清理
+clean_branches_with_safety() {
+    local target_pattern="$1"
+    local force_mode="$2"
+    
+    ui_subheader "🌿 安全分支清理"
+    
+    # 如果不是强制模式，进行额外的分支特定检查
+    if [[ "$force_mode" != "true" ]]; then
+        ui_info "执行分支特定安全检查..."
+        
+        # 重置检查结果数组
+        SAFE_ITEMS=()
+        WARNING_ITEMS=()
+        BLOCKING_ITEMS=()
+        
+        # 只检查分支相关的安全项
+        check_unmerged_branches "" "branches" "$target_pattern"
+        check_unpushed_commits "" "branches" "$target_pattern"
+        
+        # 显示检查结果
+        if [[ ${#WARNING_ITEMS[@]} -gt 0 || ${#BLOCKING_ITEMS[@]} -gt 0 ]]; then
+            display_safety_check_results "" "$force_mode"
+            
+            if [[ ${#BLOCKING_ITEMS[@]} -gt 0 ]]; then
+                return 1
+            fi
+            
+            if [[ ${#WARNING_ITEMS[@]} -gt 0 ]]; then
+                if ! ui_confirm "存在警告项目，继续清理分支？"; then
+                    ui_info "取消分支清理"
+                    return 0
+                fi
+            fi
+        fi
+    fi
+    
+    # 调用原始的清理函数
+    clean_branches "$target_pattern"
+}
+
+# 带安全检查的Epic清理
+clean_epic_with_safety() {
+    local epic_name="$1"
+    local force_mode="$2"
+    
+    ui_subheader "🚀 安全Epic清理"
+    
+    # 如果不是强制模式，进行Epic特定检查
+    if [[ "$force_mode" != "true" ]]; then
+        ui_info "执行Epic特定安全检查..."
+        
+        # 重置检查结果数组
+        SAFE_ITEMS=()
+        WARNING_ITEMS=()
+        BLOCKING_ITEMS=()
+        
+        # 执行Epic相关的所有检查
+        check_uncommitted_changes "" "epic" "$epic_name"
+        check_unmerged_branches "" "epic" "$epic_name"
+        check_unpushed_commits "" "epic" "$epic_name"
+        check_active_worktrees "" "epic" "$epic_name"
+        check_branch_dependencies "" "epic" "$epic_name"
+        
+        # 显示检查结果并确认
+        if [[ ${#WARNING_ITEMS[@]} -gt 0 || ${#BLOCKING_ITEMS[@]} -gt 0 ]]; then
+            display_safety_check_results "" "$force_mode"
+            
+            if [[ ${#BLOCKING_ITEMS[@]} -gt 0 ]]; then
+                return 1
+            fi
+            
+            if [[ ${#WARNING_ITEMS[@]} -gt 0 ]]; then
+                ui_warning "⚠️ Epic清理是高风险操作"
+                if ! ui_confirm "确认清理整个Epic '$epic_name'？"; then
+                    ui_info "取消Epic清理"
+                    return 0
+                fi
+            fi
+        fi
+    fi
+    
+    # 调用原始的清理函数
+    clean_epic "$epic_name"
+}
+
+# 带安全检查的已合并分支清理
+clean_merged_branches_with_safety() {
+    local force_mode="$1"
+    
+    ui_subheader "🌿 安全已合并分支清理"
+    
+    # 已合并分支清理相对安全，只进行基本检查
+    if [[ "$force_mode" != "true" ]]; then
+        ui_info "执行已合并分支安全检查..."
+        
+        # 重置检查结果数组
+        SAFE_ITEMS=()
+        WARNING_ITEMS=()
+        BLOCKING_ITEMS=()
+        
+        # 检查未推送提交（已合并但可能有本地修改）
+        check_unpushed_commits "" "merged" ""
+        
+        if [[ ${#WARNING_ITEMS[@]} -gt 0 ]]; then
+            display_safety_check_results "" "$force_mode"
+            if ! ui_confirm "继续清理已合并分支？"; then
+                ui_info "取消已合并分支清理"
+                return 0
+            fi
+        fi
+    fi
+    
+    # 调用原始的清理函数
+    clean_merged_branches
+}
+
+# 带安全检查的全面清理
+clean_all_with_safety() {
+    local force_mode="$1"
+    
+    ui_subheader "🧹 安全全面清理"
+    
+    if [[ "$force_mode" != "true" ]]; then
+        ui_warning "⚠️ 全面清理是高风险操作，已执行完整安全检查"
+        ui_info "如果需要强制清理，请使用: gpf clean --all --force"
+        
+        # 安全检查已在主函数中执行，这里只需要最终确认
+        if ! ui_confirm "确认执行全面清理？"; then
+            ui_info "取消全面清理"
+            return 0
+        fi
+    else
+        ui_warning "⚠️ 强制模式：跳过所有安全检查"
+        if ! ui_confirm "确认强制执行全面清理？这可能导致数据丢失"; then
+            ui_info "取消强制清理"
+            return 0
+        fi
+    fi
+    
+    # 调用原始的全面清理函数
+    clean_all_with_confirmation
+}
+
+# 带安全检查的发布后清理
+clean_after_release_with_safety() {
+    local force_mode="$1"
+    
+    ui_subheader "🎉 安全发布后清理"
+    
+    # 发布后清理相对安全，但仍需要基本检查
+    if [[ "$force_mode" != "true" ]]; then
+        ui_info "执行发布后清理安全检查..."
+        
+        # 重置检查结果数组
+        SAFE_ITEMS=()
+        WARNING_ITEMS=()
+        BLOCKING_ITEMS=()
+        
+        # 基本的安全检查
+        check_uncommitted_changes "" "release" ""
+        check_active_worktrees "" "release" ""
+        
+        if [[ ${#BLOCKING_ITEMS[@]} -gt 0 ]]; then
+            display_safety_check_results "" "$force_mode"
+            return 1
+        fi
+    fi
+    
+    # 调用原始的发布后清理函数
+    clean_after_release
+}
+
+# 带安全检查的交互式清理
+handle_clean_interactive_with_safety() {
+    # 先执行全面安全检查
+    ui_header "🔍 智能环境清理（安全模式）"
+    
+    perform_comprehensive_safety_check "all" "" "false"
+    show_safety_guided_options
+    
+    # 然后显示交互式选项
+    handle_clean_interactive
 }
 
 # 交互式清理处理
