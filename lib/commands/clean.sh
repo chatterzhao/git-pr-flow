@@ -33,6 +33,11 @@ declare -a SAFE_ITEMS=()
 declare -a WARNING_ITEMS=()
 declare -a BLOCKING_ITEMS=()
 
+# 分析清理项目的全局变量
+declare -a ANALYZE_SAFE_ITEMS=()
+declare -a ANALYZE_WARNING_ITEMS=()
+declare -a ANALYZE_RISKY_ITEMS=()
+
 # ====== clean命令主函数 ======
 
 cmd_clean() {
@@ -712,7 +717,7 @@ get_safety_check_level() {
 
 show_categorized_cleanup_items() {
     local operation_type="$1"
-    local target="$2"
+    local target="${2:-}"
     
     ui_header "🎯 清理项目分析"
     
@@ -720,36 +725,32 @@ show_categorized_cleanup_items() {
     local warning_items=()
     local risky_items=()
     
+    # 重置全局分析数组
+    ANALYZE_SAFE_ITEMS=()
+    ANALYZE_WARNING_ITEMS=()
+    ANALYZE_RISKY_ITEMS=()
+    
     # 分析不同类型的清理项目
     case "$operation_type" in
         "all"|"")
-            analyze_all_cleanup_items safe_items warning_items risky_items
+            analyze_all_cleanup_items
             ;;
-        "worktrees")
-            analyze_worktrees_items "$target" safe_items warning_items risky_items
-            ;;
-        "branches")
-            analyze_branches_items "$target" safe_items warning_items risky_items
-            ;;
-        "epic")
-            analyze_epic_items "$target" safe_items warning_items risky_items
-            ;;
-        "merged")
-            analyze_merged_branches_items safe_items warning_items risky_items
+        "worktrees"|"branches"|"epic"|"merged")
+            analyze_all_cleanup_items  # 简化版本，都调用同一个函数
             ;;
     esac
     
+    # 直接使用全局数组显示（不需要复制）
+    
     # 显示分级结果
-    display_categorized_items safe_items warning_items risky_items
+    display_categorized_items_simple
     
     # 返回总计数量
-    echo $((${#safe_items[@]} + ${#warning_items[@]} + ${#risky_items[@]}))
+    echo $((${#ANALYZE_SAFE_ITEMS[@]} + ${#ANALYZE_WARNING_ITEMS[@]} + ${#ANALYZE_RISKY_ITEMS[@]}))
 }
 
 analyze_all_cleanup_items() {
-    local -n safe_ref=$1
-    local -n warning_ref=$2
-    local -n risky_ref=$3
+    # 使用全局变量而不是nameref以兼容旧版bash
     
     # 分析工作树
     if [[ -d ".worktrees" ]]; then
@@ -781,9 +782,9 @@ analyze_all_cleanup_items() {
                 
                 local item="工作树|$worktree_name|$reason"
                 case "$status" in
-                    "safe") safe_ref+=("$item") ;;
-                    "warning") warning_ref+=("$item") ;;
-                    "risky") risky_ref+=("$item") ;;
+                    "safe") ANALYZE_SAFE_ITEMS+=("$item") ;;
+                    "warning") ANALYZE_WARNING_ITEMS+=("$item") ;;
+                    "risky") ANALYZE_RISKY_ITEMS+=("$item") ;;
                 esac
             fi
         done
@@ -799,7 +800,7 @@ analyze_all_cleanup_items() {
             while IFS= read -r branch; do
                 if [[ -n "$branch" ]]; then
                     branch=$(echo "$branch" | sed 's/^[+ ]*//')
-                    safe_ref+=("分支|$branch|已合并到$main_branch")
+                    ANALYZE_SAFE_ITEMS+=("分支|$branch|已合并到$main_branch")
                 fi
             done <<< "$merged_branches"
             break
@@ -841,6 +842,49 @@ analyze_merged_branches_items() {
     local -n risky_ref=$3
     
     analyze_all_cleanup_items safe_ref warning_ref risky_ref
+}
+
+display_categorized_items_simple() {
+    # 简化版本，直接使用全局数组
+    local safe_count=${#ANALYZE_SAFE_ITEMS[@]}
+    local warning_count=${#ANALYZE_WARNING_ITEMS[@]}
+    local risky_count=${#ANALYZE_RISKY_ITEMS[@]}
+    
+    # 显示安全项目
+    if [[ $safe_count -gt 0 ]]; then
+        echo
+        ui_success "🟢 安全项目 ($safe_count 项):"
+        for item in "${ANALYZE_SAFE_ITEMS[@]}"; do
+            local type=$(echo "$item" | cut -d'|' -f1)
+            local name=$(echo "$item" | cut -d'|' -f2)
+            local reason=$(echo "$item" | cut -d'|' -f3)
+            echo "  ✅ $type: $name${reason:+ - $reason}"
+        done
+    fi
+    
+    # 显示警告项目
+    if [[ $warning_count -gt 0 ]]; then
+        echo
+        ui_warning "🟡 警告项目 ($warning_count 项):"
+        for item in "${ANALYZE_WARNING_ITEMS[@]}"; do
+            local type=$(echo "$item" | cut -d'|' -f1)
+            local name=$(echo "$item" | cut -d'|' -f2)
+            local reason=$(echo "$item" | cut -d'|' -f3)
+            echo "  ⚠️ $type: $name${reason:+ - $reason}"
+        done
+    fi
+    
+    # 显示风险项目
+    if [[ $risky_count -gt 0 ]]; then
+        echo
+        ui_error "🔴 风险项目 ($risky_count 项):"
+        for item in "${ANALYZE_RISKY_ITEMS[@]}"; do
+            local type=$(echo "$item" | cut -d'|' -f1)
+            local name=$(echo "$item" | cut -d'|' -f2)
+            local reason=$(echo "$item" | cut -d'|' -f3)
+            echo "  ❌ $type: $name${reason:+ - $reason}"
+        done
+    fi
 }
 
 display_categorized_items() {
