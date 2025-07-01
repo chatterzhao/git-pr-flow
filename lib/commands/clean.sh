@@ -79,6 +79,12 @@ cmd_clean() {
         return 0
     fi
     
+    # 处理只有 --dry-run 参数的情况
+    if [[ -z "$scope" && "$dry_run" == "true" ]]; then
+        preview_clean_all
+        return 0
+    fi
+    
     # 无参数时显示智能引导
     if [[ -z "$scope" ]]; then
         show_intelligent_guidance
@@ -1432,4 +1438,29 @@ show_disk_usage_analysis() {
     echo "  💾 磁盘使用情况:"
     echo "    ├─ Git目录: $git_dir_size"
     echo "    └─ 工作树: $worktrees_size"
+}
+
+# ====== 辅助工具函数 ======
+
+# 工作树路径转换为分支名称
+worktree_path_to_branch() {
+    local worktree_path="$1"
+    
+    # 从工作树路径提取分支名称
+    local branch_name
+    if [[ "$worktree_path" =~ epic--(.+) ]]; then
+        local epic_part="${BASH_REMATCH[1]}"
+        if [[ "$epic_part" =~ (.+)--(.+) ]]; then
+            # 格式: epic--epic-name--feature-name
+            branch_name="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+        else
+            # 格式: epic--epic-name
+            branch_name="epic/$epic_part"
+        fi
+    else
+        # 通过 git worktree 命令获取
+        branch_name=$(git worktree list | grep "$worktree_path" | awk '{print $3}' | tr -d '[]' || echo "unknown")
+    fi
+    
+    echo "$branch_name"
 }
