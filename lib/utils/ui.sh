@@ -133,12 +133,12 @@ ui_select_menu() {
         return 1
     fi
     
-    ui_subheader "$title"
+    ui_subheader "$title" >&2
     
     for i in "${!options[@]}"; do
-        echo "  $(($i + 1)). ${options[$i]}"
+        echo "  $(($i + 1)). ${options[$i]}" >&2
     done
-    echo
+    echo >&2
     
     local attempt_count=0
     local max_attempts=10
@@ -151,7 +151,8 @@ ui_select_menu() {
             return 1
         fi
         
-        read -p "请选择 (1-${#options[@]}): " -r choice
+        echo -n "请选择 (1-${#options[@]}): " >&2
+        read -r choice
         ((attempt_count++))
         
         if [[ "$choice" =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#options[@]})); then

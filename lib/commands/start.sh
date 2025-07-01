@@ -294,8 +294,9 @@ start_feature_development() {
     echo "  📂 工作目录: $worktree_path"
     
     # 检查依赖关系
+    # 对于start xx/yy命令，自动基于epic分支，无需用户交互
     local dependencies
-    if ! dependencies=$(detect_feature_dependencies "$feature_name"); then
+    if ! dependencies=$(GPF_AUTO_BASE_EPIC=true detect_feature_dependencies "$feature_name"); then
         ui_error "依赖关系检测失败"
         return 1
     fi
@@ -529,10 +530,17 @@ detect_feature_dependencies() {
         echo
     } >&2
     
-    # 依赖关系选择 (支持非交互式环境)
-    if [[ ! -t 0 ]]; then
-        # 非交互式环境：自动选择无依赖
+    # 依赖关系选择 (支持非交互式环境和AI友好模式)
+    if [[ ! -t 0 ]] || [[ -n "${AI_FRIENDLY_MODE:-}" ]]; then
+        # 非交互式环境或AI友好模式：自动选择无依赖
         ui_info "非交互式环境，自动选择: 无依赖 (基于基础分支)" >&2
+        return 0
+    fi
+    
+    # 对于start xx/yy这种明确指定epic的命令，自动选择基于epic分支，无需用户交互
+    # 检查是否是通过start命令且指定了epic名称的场景
+    if [[ "${GPF_AUTO_BASE_EPIC:-}" == "true" ]]; then
+        ui_info "自动选择: 无依赖 (基于Epic分支)" >&2
         return 0
     fi
     
