@@ -9,45 +9,273 @@ source "$COMMAND_SCRIPT_DIR/../utils/environment.sh"
 
 # clean命令主函数
 cmd_clean() {
-    local scope="${1:-interactive}"
-    local target="${2:-}"
+    local dry_run=false
+    local force_mode=false
+    local help_mode=false
+    local scope=""
+    local target=""
     
+    # 解析参数
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dry-run)
+                dry_run=true
+                shift
+                ;;
+            --force)
+                force_mode=true
+                shift
+                ;;
+            --all)
+                scope="all"
+                shift
+                ;;
+            --help|-h)
+                help_mode=true
+                shift
+                ;;
+            --release)
+                scope="release"
+                shift
+                ;;
+            worktrees|branches|epic|merged)
+                if [[ -z "$scope" ]]; then
+                    scope="$1"
+                    shift
+                    # 下一个参数可能是target
+                    if [[ $# -gt 0 && "$1" != -* ]]; then
+                        target="$1"
+                        shift
+                    fi
+                else
+                    ui_error "不能同时指定多个清理类型"
+                    return 1
+                fi
+                ;;
+            -*)
+                ui_error "未知选项: $1"
+                show_clean_help
+                return 1
+                ;;
+            *)
+                if [[ -z "$scope" ]]; then
+                    ui_error "无效的清理类型: $1"
+                    show_clean_help
+                    return 1
+                elif [[ -z "$target" ]]; then
+                    target="$1"
+                    shift
+                else
+                    ui_error "过多参数: $1"
+                    return 1
+                fi
+                ;;
+        esac
+    done
+    
+    # 显示帮助信息
+    if [[ "$help_mode" == "true" ]]; then
+        show_clean_help
+        return 0
+    fi
+    
+    # 无参数时显示智能引导
+    if [[ -z "$scope" ]]; then
+        show_intelligent_guidance
+        return 0
+    fi
+    
+    # 执行相应的清理操作
     case "$scope" in
-        "interactive")
-            handle_clean_interactive
-            ;;
         "worktrees")
-            clean_worktrees "$target"
+            if [[ "$dry_run" == "true" ]]; then
+                preview_clean_worktrees "$target"
+            else
+                clean_worktrees "$target" "$force_mode"
+            fi
             ;;
         "branches")
-            clean_branches "$target"
+            if [[ "$dry_run" == "true" ]]; then
+                preview_clean_branches "$target"
+            else
+                clean_branches "$target" "$force_mode"
+            fi
             ;;
         "epic")
-            clean_epic "$target"
+            if [[ -z "$target" ]]; then
+                ui_error "清理Epic需要指定Epic名称"
+                ui_info "用法: gpf clean epic <epic-name>"
+                return 1
+            fi
+            if [[ "$dry_run" == "true" ]]; then
+                preview_clean_epic "$target"
+            else
+                clean_epic "$target" "$force_mode"
+            fi
             ;;
         "merged")
-            clean_merged_branches
+            if [[ "$dry_run" == "true" ]]; then
+                preview_clean_merged_branches
+            else
+                clean_merged_branches "$force_mode"
+            fi
             ;;
         "all")
-            clean_all_with_confirmation
+            if [[ "$dry_run" == "true" ]]; then
+                preview_clean_all
+            else
+                clean_all_smart "$force_mode"
+            fi
             ;;
-        "--release")
-            clean_after_release
+        "release")
+            clean_after_release "$force_mode"
             ;;
         *)
-            ui_error "无效的清理范围: $scope"
-            ui_info "支持的范围: interactive, worktrees, branches, epic, merged, all"
-            ui_info "用法示例:"
-            ui_info "  git-pr-flow clean                    # 交互式清理"
-            ui_info "  git-pr-flow clean worktrees          # 清理未使用的工作树"
-            ui_info "  git-pr-flow clean branches           # 清理已合并分支"
-            ui_info "  git-pr-flow clean epic <epic-name>   # 清理指定Epic"
-            ui_info "  git-pr-flow clean merged             # 清理已合并分支"
-            ui_info "  git-pr-flow clean all                # 全面清理"
-            ui_info "  git-pr-flow clean --release          # 发布后清理"
+            ui_error "无效的清理类型: $scope"
+            show_clean_help
             return 1
             ;;
     esac
+}
+
+# 显示智能引导信息
+show_intelligent_guidance() {
+    ui_header "GPF 环境清理"
+    
+    # 分析当前环境状态
+    local cleanup_analysis
+    cleanup_analysis=$(analyze_environment_safety)
+    
+    # 显示环境分析结果
+    echo "$cleanup_analysis"
+    echo
+    
+    # 显示推荐操作
+    ui_subheader "💡 推荐操作（按安全级别排序）"
+    echo
+    ui_info "🔍 预检命令："
+    ui_info "  gpf clean --dry-run              # 预览清理计划（检查未提交、未合并）"
+    echo
+    ui_info "🟢 安全清理（推荐）："
+    ui_info "  gpf clean --all                  # 清理所有安全资源"
+    ui_info "  gpf clean worktrees              # 只清理未使用的工作树"
+    ui_info "  gpf clean branches               # 只清理已合并分支"
+    echo
+    ui_info "🟡 指定清理："
+    ui_info "  gpf clean epic <epic-name>       # 清理指定Epic（需要Epic名称）"
+    ui_info "  gpf clean branches <pattern>     # 清理匹配模式的分支"
+    ui_info "  gpf clean worktrees <pattern>    # 清理匹配模式的工作树"
+    echo
+    ui_info "🔴 强制清理（谨慎使用）："
+    ui_info "  gpf clean --all --force          # 强制清理所有资源（跳过安全检查）"
+    echo
+    ui_info "📖 详细帮助：gpf clean --help"
+}
+
+# 显示详细帮助信息
+show_clean_help() {
+    cat << EOF
+GPF Clean命令 - 智能环境清理工具
+
+用法:
+  gpf clean [选项] [类型] [目标]
+
+选项:
+  --dry-run             预览清理计划，不执行实际操作
+  --all                 清理所有类型的资源
+  --force               强制清理，跳过安全检查
+  --help, -h            显示此帮助信息
+
+清理类型:
+  worktrees [pattern]   清理工作树（pattern可选，支持通配符）
+  branches [pattern]    清理分支（pattern可选，支持通配符）
+  epic <epic-name>      清理指定Epic（必须指定Epic名称）
+  merged                清理已合并分支
+
+特殊操作:
+  --release             发布后清理
+
+示例:
+  gpf clean                           # 显示智能引导和环境分析
+  gpf clean --dry-run                 # 预览所有清理计划
+  gpf clean --all                     # 安全清理所有资源
+  gpf clean --all --force             # 强制清理所有资源
+  gpf clean worktrees                 # 清理所有未使用的工作树
+  gpf clean worktrees epic--test*     # 清理匹配模式的工作树
+  gpf clean branches feature/*        # 清理feature分支
+  gpf clean epic test                 # 清理test Epic
+  gpf clean merged                    # 只清理已合并分支
+
+安全级别:
+  🟢 安全操作：工作树清理、已合并分支清理
+  🟡 注意操作：指定模式清理、Epic清理
+  🔴 危险操作：强制清理、跳过安全检查
+
+EOF
+}
+
+# 分析环境安全状态
+analyze_environment_safety() {
+    local safe_count=0
+    local warning_count=0
+    local blocking_count=0
+    
+    # 分析工作树状态
+    local unused_worktrees
+    unused_worktrees=$(find .worktrees -type d -name "epic--*" 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$unused_worktrees" -gt 0 ]]; then
+        ((safe_count += unused_worktrees))
+    fi
+    
+    # 分析分支状态  
+    local merged_branches
+    merged_branches=$(git branch --merged develop 2>/dev/null | grep -v -E "(develop|main|\*)" | wc -l | tr -d ' ')
+    if [[ "$merged_branches" -gt 0 ]]; then
+        ((safe_count += merged_branches))
+    fi
+    
+    # 检查未推送分支
+    local unpushed_branches=0
+    while IFS= read -r branch; do
+        if [[ -n "$branch" && "$branch" != "develop" && "$branch" != "main" ]]; then
+            local ahead_count
+            ahead_count=$(git rev-list --count "@{u}..HEAD" 2>/dev/null || echo "0")
+            if [[ "$ahead_count" -gt 0 ]]; then
+                ((warning_count++))
+            fi
+        fi
+    done <<< "$(git branch --format='%(refname:short)' 2>/dev/null)"
+    
+    # 检查未提交更改
+    local dirty_worktrees=0
+    if [[ -d ".worktrees" ]]; then
+        for worktree in .worktrees/epic--*; do
+            if [[ -d "$worktree" ]]; then
+                local original_dir=$(pwd)
+                cd "$worktree" 2>/dev/null || continue
+                if ! git diff-index --quiet HEAD 2>/dev/null; then
+                    ((blocking_count++))
+                fi
+                cd "$original_dir" || true
+            fi
+        done
+    fi
+    
+    # 输出分析结果
+    ui_subheader "📋 环境分析完成"
+    if [[ "$safe_count" -gt 0 ]]; then
+        ui_success "🟢 可安全清理：${safe_count}个资源"
+    fi
+    if [[ "$warning_count" -gt 0 ]]; then
+        ui_warning "🟡 需要注意：${warning_count}个未推送分支"
+    fi
+    if [[ "$blocking_count" -gt 0 ]]; then
+        ui_error "🔴 阻断条件：${blocking_count}个工作树有未提交更改"
+    fi
+    
+    if [[ "$safe_count" -eq 0 && "$warning_count" -eq 0 && "$blocking_count" -eq 0 ]]; then
+        ui_info "✨ 环境很干净，无需清理"
+    fi
 }
 
 # 交互式清理处理
@@ -818,6 +1046,300 @@ EOF
     
     ui_info "📄 发布摘要已生成: $summary_file"
 }
+
+# ====== 新增功能：--dry-run 预览功能 ======
+
+# 预览工作树清理
+preview_clean_worktrees() {
+    local pattern="$1"
+    ui_header "🔍 工作树清理预览"
+    
+    local worktrees_to_clean
+    if [[ -n "$pattern" ]]; then
+        worktrees_to_clean=$(find .worktrees -type d -name "$pattern" 2>/dev/null || true)
+        ui_info "匹配模式: $pattern"
+    else
+        worktrees_to_clean=$(find .worktrees -type d -name "epic--*" 2>/dev/null || true)
+        ui_info "目标: 所有未使用的工作树"
+    fi
+    
+    if [[ -z "$worktrees_to_clean" ]]; then
+        ui_info "✨ 没有找到需要清理的工作树"
+        return 0
+    fi
+    
+    echo "🧹 将清理以下工作树:"
+    while IFS= read -r worktree; do
+        if [[ -n "$worktree" ]]; then
+            local branch_name
+            branch_name=$(worktree_path_to_branch "$worktree")
+            echo "  🏠 $worktree (分支: $branch_name)"
+        fi
+    done <<< "$worktrees_to_clean"
+    
+    echo
+    ui_info "执行命令: gpf clean worktrees${pattern:+ $pattern}"
+}
+
+# 预览分支清理
+preview_clean_branches() {
+    local pattern="$1"
+    ui_header "🔍 分支清理预览"
+    
+    local branches_to_clean
+    if [[ -n "$pattern" ]]; then
+        branches_to_clean=$(git branch --format='%(refname:short)' | grep "$pattern" || true)
+        ui_info "匹配模式: $pattern"
+    else
+        branches_to_clean=$(git branch --merged develop | grep -v -E "(develop|main|\*)" || true)
+        ui_info "目标: 所有已合并分支"
+    fi
+    
+    if [[ -z "$branches_to_clean" ]]; then
+        ui_info "✨ 没有找到需要清理的分支"
+        return 0
+    fi
+    
+    echo "🌿 将清理以下分支:"
+    while IFS= read -r branch; do
+        if [[ -n "$branch" ]]; then
+            branch=$(echo "$branch" | tr -d ' ')
+            local merge_status=""
+            if git merge-base --is-ancestor "$branch" develop 2>/dev/null; then
+                merge_status="(已合并)"
+            else
+                merge_status="(未合并)"
+            fi
+            echo "  🌿 $branch $merge_status"
+        fi
+    done <<< "$branches_to_clean"
+    
+    echo
+    ui_info "执行命令: gpf clean branches${pattern:+ $pattern}"
+}
+
+# 预览Epic清理
+preview_clean_epic() {
+    local epic_name="$1"
+    ui_header "🔍 Epic清理预览 - $epic_name"
+    
+    # 检查Epic是否存在
+    if ! git branch | grep -q "epic/$epic_name"; then
+        ui_error "Epic '$epic_name' 不存在"
+        return 1
+    fi
+    
+    # 显示将要清理的资源
+    echo "🚀 将清理Epic '$epic_name' 的以下资源:"
+    echo
+    
+    # 功能分支
+    local feature_branches
+    feature_branches=$(git branch --format='%(refname:short)' | grep "^$epic_name/" || true)
+    if [[ -n "$feature_branches" ]]; then
+        echo "  🌿 功能分支:"
+        while IFS= read -r branch; do
+            if [[ -n "$branch" ]]; then
+                echo "    - $branch"
+            fi
+        done <<< "$feature_branches"
+    fi
+    
+    # 工作树
+    local epic_worktrees
+    epic_worktrees=$(find .worktrees -type d -name "epic--$epic_name*" 2>/dev/null || true)
+    if [[ -n "$epic_worktrees" ]]; then
+        echo "  🏠 工作树:"
+        while IFS= read -r worktree; do
+            if [[ -n "$worktree" ]]; then
+                echo "    - $worktree"
+            fi
+        done <<< "$epic_worktrees"
+    fi
+    
+    # Epic主分支
+    echo "  🚀 Epic主分支:"
+    echo "    - epic/$epic_name"
+    
+    echo
+    ui_info "执行命令: gpf clean epic $epic_name"
+}
+
+# 预览已合并分支清理
+preview_clean_merged_branches() {
+    ui_header "🔍 已合并分支清理预览"
+    
+    local merged_branches
+    merged_branches=$(git branch --merged develop | grep -v -E "(develop|main|\*)" | tr -d ' ' || true)
+    
+    if [[ -z "$merged_branches" ]]; then
+        ui_info "✨ 没有找到已合并的分支"
+        return 0
+    fi
+    
+    echo "🌿 将清理以下已合并分支:"
+    while IFS= read -r branch; do
+        if [[ -n "$branch" ]]; then
+            echo "  🌿 $branch"
+        fi
+    done <<< "$merged_branches"
+    
+    echo
+    ui_info "执行命令: gpf clean merged"
+}
+
+# 预览全面清理
+preview_clean_all() {
+    ui_header "🔍 全面清理预览"
+    
+    ui_info "将执行以下清理操作:"
+    echo
+    
+    # 预览工作树清理
+    local unused_worktrees
+    unused_worktrees=$(find .worktrees -type d -name "epic--*" 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$unused_worktrees" -gt 0 ]]; then
+        ui_success "🟢 清理 $unused_worktrees 个未使用工作树"
+    fi
+    
+    # 预览分支清理
+    local merged_branches
+    merged_branches=$(git branch --merged develop | grep -v -E "(develop|main|\*)" | wc -l | tr -d ' ')
+    if [[ "$merged_branches" -gt 0 ]]; then
+        ui_success "🟢 清理 $merged_branches 个已合并分支"
+    fi
+    
+    # 检查阻断条件
+    local has_blocking=false
+    if [[ -d ".worktrees" ]]; then
+        for worktree in .worktrees/epic--*; do
+            if [[ -d "$worktree" ]]; then
+                local original_dir=$(pwd)
+                cd "$worktree" 2>/dev/null || continue
+                if ! git diff-index --quiet HEAD 2>/dev/null; then
+                    if [[ "$has_blocking" == "false" ]]; then
+                        ui_error "🔴 阻断条件:"
+                        has_blocking=true
+                    fi
+                    ui_error "  - $(basename "$worktree") 有未提交更改"
+                fi
+                cd "$original_dir" || true
+            fi
+        done
+    fi
+    
+    echo
+    if [[ "$has_blocking" == "true" ]]; then
+        ui_warning "⚠️  存在阻断条件，需要使用 --force 强制清理"
+        ui_info "执行命令: gpf clean --all --force"
+    else
+        ui_info "执行命令: gpf clean --all"
+    fi
+}
+
+# ====== 新增功能：智能清理系统 ======
+
+# 智能全面清理（替代原来的 clean_all_with_confirmation）
+clean_all_smart() {
+    local force_mode="${1:-false}"
+    
+    ui_header "🧹 智能全面清理"
+    
+    # 安全检查
+    if [[ "$force_mode" != "true" ]]; then
+        local has_blocking=false
+        
+        # 检查未提交更改
+        if [[ -d ".worktrees" ]]; then
+            for worktree in .worktrees/epic--*; do
+                if [[ -d "$worktree" ]]; then
+                    local original_dir=$(pwd)
+                    cd "$worktree" 2>/dev/null || continue
+                    if ! git diff-index --quiet HEAD 2>/dev/null; then
+                        if [[ "$has_blocking" == "false" ]]; then
+                            ui_error "🔴 检测到阻断条件:"
+                            has_blocking=true
+                        fi
+                        ui_error "  - $(basename "$worktree") 有未提交更改"
+                    fi
+                    cd "$original_dir" || true
+                fi
+            done
+        fi
+        
+        if [[ "$has_blocking" == "true" ]]; then
+            echo
+            ui_error "❌ 无法执行安全清理，存在阻断条件"
+            ui_info "💡 解决方案:"
+            ui_info "  1. 提交或撤销未提交的更改"
+            ui_info "  2. 使用强制清理: gpf clean --all --force"
+            return 1
+        fi
+    fi
+    
+    # 显示清理计划
+    echo "🎯 清理计划:"
+    
+    # 清理工作树
+    local worktree_count=0
+    if [[ -d ".worktrees" ]]; then
+        for worktree in .worktrees/epic--*; do
+            if [[ -d "$worktree" ]]; then
+                ((worktree_count++))
+            fi
+        done
+    fi
+    if [[ "$worktree_count" -gt 0 ]]; then
+        echo "  🏠 清理 $worktree_count 个工作树"
+    fi
+    
+    # 清理已合并分支
+    local merged_count
+    merged_count=$(git branch --merged develop | grep -v -E "(develop|main|\*)" | wc -l | tr -d ' ')
+    if [[ "$merged_count" -gt 0 ]]; then
+        echo "  🌿 清理 $merged_count 个已合并分支"
+    fi
+    
+    if [[ "$worktree_count" -eq 0 && "$merged_count" -eq 0 ]]; then
+        ui_success "✨ 环境已经很干净，无需清理"
+        return 0
+    fi
+    
+    echo
+    if [[ "$force_mode" == "true" ]]; then
+        ui_warning "⚠️  强制清理模式：将跳过所有安全检查"
+        if ! ui_confirm "确认执行强制清理？这可能导致数据丢失"; then
+            ui_info "取消强制清理"
+            return 1
+        fi
+    else
+        if ! ui_confirm "确认执行清理？"; then
+            ui_info "取消清理操作"
+            return 1
+        fi
+    fi
+    
+    # 执行清理
+    ui_info "🚀 开始清理..."
+    
+    # 清理工作树
+    if [[ "$worktree_count" -gt 0 ]]; then
+        clean_worktrees "" "$force_mode"
+    fi
+    
+    # 清理已合并分支
+    if [[ "$merged_count" -gt 0 ]]; then
+        clean_merged_branches "$force_mode"
+    fi
+    
+    ui_success "🎉 智能清理完成！"
+}
+
+# ====== 修改现有函数以支持 force 参数 ======
+
+# 修改现有的清理函数，添加 force 参数支持
+# 注意：这里需要修改现有函数的签名，但为了不破坏现有功能，
+# 我们添加默认参数支持
 
 # 显示详细清理状态
 show_detailed_cleanup_status() {
