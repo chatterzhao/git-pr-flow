@@ -136,9 +136,11 @@ cmd_clean() {
         return 0
     fi
     
-    # 处理只有 --dry-run 参数的情况
-    if [[ -z "$scope" && "$dry_run" == "true" ]]; then
-        show_categorized_cleanup_items "all"
+    # 处理干运行模式 - 可以与任何scope组合使用
+    if [[ "$dry_run" == "true" ]]; then
+        local effective_scope="${scope:-all}"
+        ui_header "🔍 清理预览模式"
+        show_categorized_cleanup_items "$effective_scope" "$target"
         return 0
     fi
     
@@ -242,6 +244,10 @@ handle_enhanced_interactive_cleanup() {
     local choice
     if ! choice=$(ui_select_menu "选择清理方式" "${cleanup_options[@]}"); then
         ui_error "选择菜单失败，已退出清理操作"
+        ui_info "💡 提示：在非交互式环境中，请使用具体参数："
+        ui_info "  gpf clean --dry-run     # 预览模式"
+        ui_info "  gpf clean --all         # 批量清理"
+        ui_info "  gpf clean --help        # 显示帮助"
         return 1
     fi
     
