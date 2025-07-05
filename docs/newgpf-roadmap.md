@@ -75,23 +75,23 @@ NewGPF 四层架构
 # NewGPF开发的Epic结构
 develop                           # 主开发分支
 ├── epic-core-foundation-e        # Epic1: 核心基础架构
-│   ├── epic-core-foundation-atomic-ef      # Feature1: 原子层实现
-│   ├── epic-core-foundation-composite-ef   # Feature2: 组合层实现
-│   └── epic-core-foundation-modules-ef     # Feature3: 模块层实现
+│   ├── epic-core-foundation-e-atomic-ef      # Feature1: 原子层实现
+│   ├── epic-core-foundation-e-composite-ef   # Feature2: 组合层实现
+│   └── epic-core-foundation-e-modules-ef     # Feature3: 模块层实现
 ├── epic-github-integration-e     # Epic2: GitHub集成功能
-│   ├── epic-github-integration-cli-ef      # Feature1: CLI检查集成
-│   ├── epic-github-integration-pr-ef       # Feature2: PR管理集成
-│   └── epic-github-integration-auth-ef     # Feature3: 认证和权限
+│   ├── epic-github-integration-e-cli-ef      # Feature1: CLI检查集成
+│   ├── epic-github-integration-e-pr-ef       # Feature2: PR管理集成
+│   └── epic-github-integration-e-auth-ef     # Feature3: 认证和权限
 ├── epic-commands-layer-e         # Epic3: 命令层实现
-│   ├── epic-commands-layer-status-ef       # Feature1: status命令
-│   ├── epic-commands-layer-start-ef        # Feature2: start命令
-│   ├── epic-commands-layer-pr-ef           # Feature3: pr命令
-│   ├── epic-commands-layer-clean-ef        # Feature4: clean命令
-│   └── epic-commands-layer-sync-ef         # Feature5: sync命令
+│   ├── epic-commands-layer-e-status-ef       # Feature1: status命令
+│   ├── epic-commands-layer-e-start-ef        # Feature2: start命令
+│   ├── epic-commands-layer-e-pr-ef           # Feature3: pr命令
+│   ├── epic-commands-layer-e-clean-ef        # Feature4: clean命令
+│   └── epic-commands-layer-e-sync-ef         # Feature5: sync命令
 └── epic-testing-quality-e        # Epic4: 测试和质量保证
-    ├── epic-testing-quality-unit-ef        # Feature1: 单元测试框架
-    ├── epic-testing-quality-integration-ef # Feature2: 集成测试
-    └── epic-testing-quality-e2e-ef         # Feature3: 端到端测试
+    ├── epic-testing-quality-e-unit-ef        # Feature1: 单元测试框架
+    ├── epic-testing-quality-e-integration-ef # Feature2: 集成测试
+    └── epic-testing-quality-e-e2e-ef         # Feature3: 端到端测试
 ```
 
 #### 🔄 Worktree开发流程
@@ -107,8 +107,8 @@ cd .worktrees/epic-core-foundation-e
 # 现在在Epic工作区，可以进行Epic层面的整体规划和集成
 
 # 2. 创建Feature worktree（在主项目根目录执行）
-git worktree add .worktrees/epic-core-foundation-atomic-ef -b epic-core-foundation-atomic-ef epic-core-foundation-e
-cd .worktrees/epic-core-foundation-atomic-ef
+git worktree add .worktrees/epic-core-foundation-e-atomic-ef -b epic-core-foundation-e-atomic-ef epic-core-foundation-e
+cd .worktrees/epic-core-foundation-e-atomic-ef
 # 现在在Feature工作区，专注开发原子层功能
 
 # 3. 并行开发模式示例
@@ -116,15 +116,15 @@ cd .worktrees/epic-core-foundation-atomic-ef
 # /Users/project/gpf/                                    # 主项目根目录 (develop分支)
 # ├── .worktrees/
 # │   ├── epic-core-foundation-e/                        # Epic工作区
-# │   ├── epic-core-foundation-atomic-ef/                # Feature1工作区 (原子层)
-# │   ├── epic-core-foundation-composite-ef/             # Feature2工作区 (组合层)
-# │   ├── epic-core-foundation-modules-ef/               # Feature3工作区 (模块层)
-# │   └── epic-github-integration-cli-ef/                # 其他Epic的Feature工作区
+# │   ├── epic-core-foundation-e-atomic-ef/                # Feature1工作区 (原子层)
+# │   ├── epic-core-foundation-e-composite-ef/             # Feature2工作区 (组合层)
+# │   ├── epic-core-foundation-e-modules-ef/               # Feature3工作区 (模块层)
+# │   └── epic-github-integration-e-cli-ef/                # 其他Epic的Feature工作区
 # 
 # 🔄 多终端并行开发：
-# 终端1: cd .worktrees/epic-core-foundation-atomic-ef    # 开发原子层
-# 终端2: cd .worktrees/epic-core-foundation-composite-ef # 开发组合层
-# 终端3: cd .worktrees/epic-github-integration-cli-ef    # 开发GitHub集成
+# 终端1: cd .worktrees/epic-core-foundation-e-atomic-ef    # 开发原子层
+# 终端2: cd .worktrees/epic-core-foundation-e-composite-ef # 开发组合层
+# 终端3: cd .worktrees/epic-github-integration-e-cli-ef    # 开发GitHub集成
 ```
 
 #### 📋 开发工作流实例
@@ -132,16 +132,16 @@ cd .worktrees/epic-core-foundation-atomic-ef
 ```bash
 # 开发者Alice的一天：
 # 09:00 - 开始开发原子层
-cd .worktrees/epic-core-foundation-atomic-ef
+cd .worktrees/epic-core-foundation-e-atomic-ef
 # 在这里编写 lib/core/atomic/environment-atomic.sh
 
 # 11:00 - 切换到组合层
-cd ../epic-core-foundation-composite-ef  
+cd ../epic-core-foundation-e-composite-ef  
 # 在这里编写 lib/core/composite/environment-composite.sh
 
 # 14:00 - Feature完成，准备PR
 git add . && git commit -m "实现环境检测原子方法"
-# 使用GitHub CLI创建 epic-core-foundation-atomic-ef → epic-core-foundation-e 的PR
+# 使用GitHub CLI创建 epic-core-foundation-e-atomic-ef → epic-core-foundation-e 的PR
 
 # 15:00 - 切换到Epic工作区进行集成测试
 cd ../epic-core-foundation-e
@@ -281,7 +281,7 @@ git_check_branch_pushed() {
 - 性能基准：单个原子方法执行时间<100ms
 
 **🔄 Epic实践验证**
-- [ ] `epic-core-foundation-atomic-ef` Feature完成并PR到 `epic-core-foundation-e`
+- [ ] `epic-core-foundation-e-atomic-ef` Feature完成并PR到 `epic-core-foundation-e`
 - [ ] 验证worktree并行开发的流畅性
 - [ ] 验证早期版本的环境检测功能在实际开发中的表现
 
@@ -318,7 +318,7 @@ transform_input_to_epic_branch() {
     # 参数：(user_input, target_type)  # target_type: e|ef
     # 功能：将用户输入转换为标准Git分支名
     # 示例：auth + e → epic-auth-e
-    # 示例：login + auth + ef → epic-auth-login-ef
+    # 示例：login + auth + ef → epic-auth-e-login-ef
 }
 ```
 
@@ -677,33 +677,33 @@ esac
 ### Week 1: Epic1核心基础架构
 - ✅ 设计文档完成
 - 🔄 **Epic开发环境搭建**：`epic-core-foundation-e`
-- 📋 原子层Feature开发：`epic-core-foundation-atomic-ef`
+- 📋 原子层Feature开发：`epic-core-foundation-e-atomic-ef`
 - 📋 原子层单元测试（覆盖率>95%）
 - 📋 验证worktree并行开发流程
 
 ### Week 2-3: Epic1完成 + Epic2启动
-- 📋 组合层Feature：`epic-core-foundation-composite-ef`
-- 📋 模块层Feature：`epic-core-foundation-modules-ef`
+- 📋 组合层Feature：`epic-core-foundation-e-composite-ef`
+- 📋 模块层Feature：`epic-core-foundation-e-modules-ef`
 - 📋 **Epic1完成**：`epic-core-foundation-e` → PR to develop
 - 🚀 **Epic2启动**：GitHub集成Epic (`epic-github-integration-e`)
 
 ### Week 4-5: Epic3命令层核心
 - 🚀 **Epic3启动**：命令层Epic (`epic-commands-layer-e`)
-- 📋 status命令Feature：`epic-commands-layer-status-ef`
-- 📋 start命令Feature：`epic-commands-layer-start-ef`
-- 📋 pr命令Feature：`epic-commands-layer-pr-ef`
+- 📋 status命令Feature：`epic-commands-layer-e-status-ef`
+- 📋 start命令Feature：`epic-commands-layer-e-start-ef`
+- 📋 pr命令Feature：`epic-commands-layer-e-pr-ef`
 - 📋 **实战验证**：使用开发的工具来管理自己的开发
 
 ### Week 6: Epic3完成 + Epic4启动
-- 📋 clean命令Feature：`epic-commands-layer-clean-ef`
-- 📋 sync命令Feature：`epic-commands-layer-sync-ef`
+- 📋 clean命令Feature：`epic-commands-layer-e-clean-ef`
+- 📋 sync命令Feature：`epic-commands-layer-e-sync-ef`
 - 📋 **Epic3完成**：`epic-commands-layer-e` → PR to develop
 - 🚀 **Epic4启动**：测试质量Epic (`epic-testing-quality-e`)
 
 ### Week 7-8: Epic4完成 + 项目发布
-- 📋 单元测试Feature：`epic-testing-quality-unit-ef`
-- 📋 集成测试Feature：`epic-testing-quality-integration-ef`
-- 📋 端到端测试Feature：`epic-testing-quality-e2e-ef`
+- 📋 单元测试Feature：`epic-testing-quality-e-unit-ef`
+- 📋 集成测试Feature：`epic-testing-quality-e-integration-ef`
+- 📋 端到端测试Feature：`epic-testing-quality-e-e2e-ef`
 - 📋 **Epic4完成**：`epic-testing-quality-e` → PR to develop
 - 🎉 **项目发布**：所有Epic合并，NewGPF v1.0发布
 

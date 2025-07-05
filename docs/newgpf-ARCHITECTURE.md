@@ -317,13 +317,13 @@ process_feature_name()   # 处理Epic子功能名称
 
 # 路径转换
 get_epic_worktree_path()    # auth -> .worktrees/epic-auth-e
-get_feature_worktree_path() # auth login -> .worktrees/epic-auth-login-ef
+get_feature_worktree_path() # auth login -> .worktrees/epic-auth-e-login-ef
 
 # Git分支转换（分支名与worktree目录名一致）
 epic_to_git_branch()    # auth -> epic-auth-e
-feature_to_git_branch() # auth login -> epic-auth-login-ef
+feature_to_git_branch() # auth login -> epic-auth-e-login-ef
 git_branch_to_epic()    # epic-auth-e -> auth
-git_branch_to_feature() # epic-auth-login-ef -> auth login
+git_branch_to_feature() # epic-auth-e-login-ef -> auth login
 ```
 
 ### 🆕 worktree组件 - 职责分离设计
@@ -548,9 +548,9 @@ worktree优先 → 根目录fallback → 错误处理
 | ✅ GPF管理 | ❌ GPF不管理 |
 |------------|--------------|
 | `.worktrees/epic-*-e` | 根目录分支操作 |
-| `.worktrees/epic-*-*-ef` | `develop → main` PR |
+| `.worktrees/epic-*-e-*-ef` | `develop → main` PR |
 | `epic-*-e` Git分支 | 根目录分支清理 |
-| `epic-*-*-ef` Git分支 | 传统Git工作流 |
+| `epic-*-e-*-ef` Git分支 | 传统Git工作流 |
 
 ### 架构优势
 - **🧩 模块化设计**：directory.sh统一管理所有目录切换逻辑

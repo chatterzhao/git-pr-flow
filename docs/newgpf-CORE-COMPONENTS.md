@@ -29,7 +29,7 @@ Environment = {
     current_path: "/current/working/directory" 
     epic_name: "auth" | null      # Epic 名称  
     feature_name: "login" | null  # Epic 的子 Feature 名称
-    git_branch: "epic-auth-e" | "epic-auth-login-ef" | "develop"  # 分支名
+    git_branch: "epic-auth-e" | "epic-auth-e-login-ef" | "develop"  # 分支名
     worktree_path: "/absolute/path/to/worktree" | null  # Worktree 路径
 }
 ```
@@ -331,10 +331,10 @@ transform_input_to_feature_branch() {
     # 3. 智能构建Feature名称
     if [[ "$clean_feature" == "$clean_epic-"* ]]; then
         # Feature已包含Epic前缀：auth-login
-        echo "epic-$clean_feature-ef"
+        echo "epic-$clean_epic-e-$clean_feature-ef"
     else
         # Feature不包含Epic前缀：login
-        echo "epic-$clean_epic-$clean_feature-ef"
+        echo "epic-$clean_epic-e-$clean_feature-ef"
     fi
 }
 
@@ -443,7 +443,7 @@ extract_epic_from_branch() {
             strip_suffix_from_input "$(strip_epic_prefix_from_input "$branch_name")"
             ;;
         "ef")
-            # Feature分支：epic-auth-login-ef -> auth
+            # Feature分支：epic-auth-e-login-ef -> auth
             local clean_name
             clean_name=$(strip_suffix_from_input "$(strip_epic_prefix_from_input "$branch_name")")
             echo "${clean_name%-*}"  # 移除最后一个-及之后的内容
@@ -702,7 +702,7 @@ extract_current_epic_name() {
             # 当前在Feature分支，提取Epic部分
             local clean_name
             clean_name=$(strip_suffix_from_input "$(strip_epic_prefix_from_input "$current_branch")")
-            # epic-auth-login-ef -> auth-login -> auth
+            # epic-auth-e-login-ef -> auth-login -> auth
             echo "${clean_name%-*}"
             ;;
         *)
@@ -1320,10 +1320,10 @@ build_standard_branch_name() {
             # 智能构建feature名称
             if [[ "$clean_name" == "$epic_environment-"* ]]; then
                 # 已包含epic前缀：auth-login
-                echo "epic-$clean_name-ef"
+                echo "epic-$epic_environment-e-$clean_name-ef"
             else
                 # 不包含epic前缀：login
-                echo "epic-$epic_environment-$clean_name-ef"
+                echo "epic-$epic_environment-e-$clean_name-ef"
             fi
             ;;
         *)
@@ -1463,7 +1463,7 @@ intelligent_navigate_to_target() {
 extract_feature_name_from_branch() {
     local branch_name="$1"
     
-    # epic-auth-login-ef -> login
+    # epic-auth-e-login-ef -> login
     local clean_name
     clean_name=$(strip_suffix_from_input "$(strip_epic_prefix_from_input "$branch_name")")
     
@@ -1965,7 +1965,7 @@ execute_cascade_sync() {
     epic_name=$(extract_epic_from_branch "$epic_branch") || return 1
     
     local feature_branches
-    feature_branches=$(list_all_worktrees | grep "^epic-$epic_name-.*-ef:")
+    feature_branches=$(list_all_worktrees | grep "^epic-$epic_name-e-.*-ef:")
     
     if [[ -z "$feature_branches" ]]; then
         echo "ℹ️ 没有发现相关的Feature分支"
@@ -2031,7 +2031,7 @@ ensure_epic_is_synced_before_feature_creation() {
 
 # pr命令专用：检查PR前的同步新鲜度
 check_pr_sync_requirements() {
-    local source_branch="$1"    # epic-auth-login-ef
+    local source_branch="$1"    # epic-auth-e-login-ef
     local target_branch="$2"    # epic-auth-e
     
     echo "🔍 检查分支同步新鲜度..."
@@ -3249,7 +3249,7 @@ handle_issue_association() {
 extract_issue_from_branch_name() {
     local branch="$1"
     
-    # 匹配格式: epic-auth-123-e 或 epic-auth-login-456-ef
+    # 匹配格式: epic-auth-123-e 或 epic-auth-e-login-456-ef
     if [[ "$branch" =~ -([0-9]+)-(e|ef)$ ]]; then
         echo "${BASH_REMATCH[1]}"
         return 0

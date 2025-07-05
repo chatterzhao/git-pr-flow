@@ -21,7 +21,7 @@
 gpf start -e auth develop     # 如果 epic-auth-e 已存在 → 自动切换
                               # 如果不存在 → 创建并切换
 
-gpf start -ef login auth      # 如果 epic-auth-login-ef 已存在 → 自动切换  
+gpf start -ef login auth      # 如果 epic-auth-e-login-ef 已存在 → 自动切换  
                               # 如果不存在 → 创建并切换
 
 gpf pr auth                   # 自动切换到Epic环境并创建PR到develop
@@ -32,7 +32,7 @@ gpf pr                        # 根据当前环境智能判断PR方向
 ```bash
 # 用户输入 → 系统处理 → 最终结果
 auth → epic-auth-e → Git分支: epic-auth-e, Worktree: .worktrees/epic-auth-e
-login + auth → auth-login → epic-auth-login-ef → Git分支: epic-auth-login-ef, Worktree: .worktrees/epic-auth-login-ef
+login + auth → auth-login → epic-auth-e-login-ef → Git分支: epic-auth-e-login-ef, Worktree: .worktrees/epic-auth-e-login-ef
 ```
 
 ## 1. `gpf start` - 开始开发
@@ -57,7 +57,7 @@ gpf start -ef <feature-name> <epic-name>
 | `-e` | 创建Epic分支 | `-e auth develop` | - |
 | `-ef` | 创建Epic 的子 Feature分支 | `-ef login auth` | - |
 | `<epic-name>` | Epic名称（可省略epic-前缀） | `auth`, `epic-auth-e` | ✅ |
-| `<feature-name>` | Epic 的子 Feature 名称（可省略Epic前缀） | `login`, `auth-login`, `epic-auth-login-ef` | ✅ |
+| `<feature-name>` | Epic 的子 Feature 名称（可省略Epic前缀） | `login`, `auth-login`, `epic-auth-e-login-ef` | ✅ |
 | `<base-branch>` | 基础分支名 | `develop`, `main` | ✅ |
 
 ### 🆕 智能切换逻辑
@@ -112,11 +112,11 @@ gpf start -ef <feature-name> <epic-name>
 1. **输入验证和补全**
    - 使用 `validate_start_input(feature_input, "ef")` 验证后缀
    - 使用 `validate_start_input(epic_input, "e")` 验证Epic后缀
-   - 智能补全：`login` + `auth` → `epic-auth-login-ef`
+   - 智能补全：`login` + `auth` → `epic-auth-e-login-ef`
 
 2. **Worktree检测和切换**
    - 使用 `smart_switch_to_worktree(feature_name, "start-ef", epic_name)` 检测
-   - 如果 `epic-auth-login-ef` 的worktree已存在 → 自动切换并提示
+   - 如果 `epic-auth-e-login-ef` 的worktree已存在 → 自动切换并提示
    - 如果不存在 → 继续创建流程
 
 3. **🛡️ Epic Roadmap验证（必须步骤）**
@@ -145,13 +145,13 @@ gpf start -ef <feature-name> <epic-name>
    ```bash
    # 场景1：Feature已存在
    $ gpf start -ef login auth
-   ✅ Epic子功能 login 已存在，已自动切换到Feature环境 (.worktrees/epic-auth-login-ef)
+   ✅ Epic子功能 login 已存在，已自动切换到Feature环境 (.worktrees/epic-auth-e-login-ef)
    
    # 场景2：Feature不存在，需要创建（包含自动同步）
    $ gpf start -ef register auth
    
    🔄 步骤1: 输入验证和补全
-   ✅ 补全为: epic-auth-register-ef
+   ✅ 补全为: epic-auth-e-register-ef
    
    🔄 步骤2: Worktree检测
    📍 Feature不存在，需要创建
@@ -170,7 +170,7 @@ gpf start -ef <feature-name> <epic-name>
    📍 切换到Epic环境 (.worktrees/epic-auth-e)
    
    🔄 步骤6: 创建Feature
-   ✅ 已创建并切换到Feature环境 epic-auth-register-ef (.worktrees/epic-auth-register-ef)
+   ✅ 已创建并切换到Feature环境 epic-auth-e-register-ef (.worktrees/epic-auth-e-register-ef)
    ```
 
 ### 交互式模式详细流程
@@ -216,7 +216,7 @@ GPF PR命令**必须在正确环境中执行**，不支持在项目根目录执�
 ```bash
 # ✅ 正确的执行环境
 cd .worktrees/epic-auth-e         # Epic环境
-cd .worktrees/epic-auth-login-ef  # Feature环境
+cd .worktrees/epic-auth-e-login-ef  # Feature环境
 
 # ❌ 错误的执行环境  
 cd /project/root                  # 项目根目录 - 直接报错
@@ -276,7 +276,7 @@ GPF PR命令完全依赖GitHub CLI工具，执行前会自动检查：
    ```bash
    # 目标解析示例
    gpf pr auth     → 切换到 .worktrees/epic-auth-e
-   gpf pr login    → 切换到Feature环境 (.worktrees/epic-auth-login-ef)
+   gpf pr login    → 切换到Feature环境 (.worktrees/epic-auth-e-login-ef)
    ```
 
 4. **状态完整检查**
@@ -308,11 +308,11 @@ GPF PR命令完全依赖GitHub CLI工具，执行前会自动检查：
 #### Feature分支创建PR示例
 
 ```bash
-$ cd .worktrees/epic-auth-login-ef
+$ cd .worktrees/epic-auth-e-login-ef
 $ gpf pr
 
-🔄 环境检测: Feature环境 (epic-auth-login-ef)
-🎯 PR方向: epic-auth-login-ef → epic-auth-e
+🔄 环境检测: Feature环境 (epic-auth-e-login-ef)
+🎯 PR方向: epic-auth-e-login-ef → epic-auth-e
 
 🔧 GitHub CLI检查: ✅ 工具已安装并认证
 
@@ -328,7 +328,7 @@ $ gpf pr
   ✅ 将关联issue #123
 
 🚀 创建GitHub PR:
-  gh pr create --base epic-auth-e --head epic-auth-login-ef --body "Closes #123"
+  gh pr create --base epic-auth-e --head epic-auth-e-login-ef --body "Closes #123"
   
 ✅ PR创建成功! #45
 
@@ -373,15 +373,15 @@ $ gpf pr
 
 💡 请切换到正确的环境：
    Epic目录: cd .worktrees/epic-xxx-e
-   Feature目录: cd .worktrees/epic-xxx-yyy-ef
+   Feature目录: cd .worktrees/epic-xxx-e-yyy-ef
 
 📋 可用的 worktree 目录：
    .worktrees/epic-auth-e
-   .worktrees/epic-auth-login-ef
-   .worktrees/epic-auth-register-ef
+   .worktrees/epic-auth-e-login-ef
+   .worktrees/epic-auth-e-register-ef
 
 # 状态检查失败
-$ cd .worktrees/epic-auth-login-ef
+$ cd .worktrees/epic-auth-e-login-ef
 $ gpf pr
 ❌ 状态检查失败
 
@@ -391,7 +391,7 @@ $ gpf pr
 
 💡 解决方案:
   1. 保存修改: git add . && git commit -m "fix: 准备创建PR"
-  2. 推送分支: git push origin epic-auth-login-ef
+  2. 推送分支: git push origin epic-auth-e-login-ef
   3. 重新创建PR: gpf pr
 ```
 
@@ -433,11 +433,11 @@ pr_command_implementation() {
 
 ```bash
 # Feature分支的PR辅助示例
-$ cd .worktrees/epic-auth-login-ef
+$ cd .worktrees/epic-auth-e-login-ef
 $ gpf pr
 
 🔄 步骤1: 环境检测
-📍 检测到Feature环境: epic-auth-login-ef → epic-auth-e
+📍 检测到Feature环境: epic-auth-e-login-ef → epic-auth-e
 
 🔄 步骤2: 智能级联同步检查
 🔍 检查Feature分支同步状态...
@@ -447,11 +447,11 @@ $ gpf pr
 
 🔍 检查Feature与Epic的同步状态...
 🟡 检测到Feature落后Epic 4个提交（包含develop更新）
-🚀 自动执行Feature同步: epic-auth-e → epic-auth-login-ef
+🚀 自动执行Feature同步: epic-auth-e → epic-auth-e-login-ef
 ✅ Feature同步完成，现在基于最新Epic+develop
 
 🔄 步骤3: PR就绪性状态验证
-🔍 PR就绪性检查: epic-auth-login-ef (ef分支)
+🔍 PR就绪性检查: epic-auth-e-login-ef (ef分支)
 📦 Feature分支检查标准:
   ✅ 工作区干净
   ✅ 暂存区为空
@@ -461,18 +461,18 @@ $ gpf pr
   ✅ 对应Epic分支可访问
 
 🔄 步骤4: PR准备和辅助
-🎯 PR目标识别: epic-auth-login-ef → epic-auth-e
+🎯 PR目标识别: epic-auth-e-login-ef → epic-auth-e
 📋 PR信息:
-  源分支: epic-auth-login-ef
+  源分支: epic-auth-e-login-ef
   目标分支: epic-auth-e  
   变更数量: 3个提交, 15个文件修改
 
 💡 下一步操作:
   方式1: 在GitHub网页创建PR
-    → https://github.com/your-repo/compare/epic-auth-e...epic-auth-login-ef
+    → https://github.com/your-repo/compare/epic-auth-e...epic-auth-e-login-ef
   
   方式2: 使用gh命令创建PR
-    → gh pr create --base epic-auth-e --head epic-auth-login-ef --title "Add login functionality"
+    → gh pr create --base epic-auth-e --head epic-auth-e-login-ef --title "Add login functionality"
   
   方式3: 使用GPF集成创建 (如果已安装gh)
     → gpf pr --create-gh
@@ -557,16 +557,16 @@ gpf clean --force <target>   # 强制清理指定目标
 | 目标参数 | 解析结果 | 清理范围 |
 |---------|---------|---------|
 | `auth` | Epic | `epic-auth-e` + 该Epic的所有子功能分支 |
-| `auth-login` | Feature | 仅 `epic-auth-login-ef` 分支 |
+| `auth-login` | Feature | 仅 `epic-auth-e-login-ef` 分支 |
 | 无参数 | 环境自动检测 | 根据当前执行位置智能确定范围 |
 
 ### 🛡️ 环境感知的清理范围
 
 | 执行环境 | 清理范围 | 示例 |
 |---------|---------|------|
-| **根目录** | 所有GPF管理的worktree | 清理所有 `epic-*-e` 和 `epic-*-*-ef` |
-| **Epic worktree** | 该Epic的所有子功能 | 在 `epic-auth-e` → 清理 `epic-auth-*-ef` |
-| **Feature worktree** | 仅当前Feature分支 | 在 `epic-auth-login-ef` → 仅清理该分支 |
+| **根目录** | 所有GPF管理的worktree | 清理所有 `epic-*-e` 和 `epic-*-e-*-ef` |
+| **Epic worktree** | 该Epic的所有子功能 | 在 `epic-auth-e` → 清理 `epic-auth-e-*-ef` |
+| **Feature worktree** | 仅当前Feature分支 | 在 `epic-auth-e-login-ef` → 仅清理该分支 |
 
 ### 🚨 统一安全检查接口
 
@@ -666,43 +666,43 @@ $ gpf clean --safe
 
 🔄 步骤1: 环境检测和分支发现
 🔍 环境检测：Epic环境 (epic-auth-e)
-📋 发现4个待检查分支: epic-auth-login-ef, epic-auth-register-ef, epic-auth-forgot-ef, epic-auth-profile-ef
+📋 发现4个待检查分支: epic-auth-e-login-ef, epic-auth-e-register-ef, epic-auth-e-forgot-ef, epic-auth-e-profile-ef
 
 🔄 步骤2: 逐个分支安全检查
 
-📦 检查: epic-auth-login-ef
+📦 检查: epic-auth-e-login-ef
   📊 状态检查: 🟢 安全 (已保存+已提交+已推送)
   🔍 GitHub PR+Review检查: ✅ 已完成review并merge到 epic-auth-e
   ✅ 标记为可清理
 
-📦 检查: epic-auth-register-ef  
+📦 检查: epic-auth-e-register-ef  
   📊 状态检查: 🟡 警告 (有未推送提交)
   🔍 GitHub PR+Review检查: ✅ 已完成review并merge到 epic-auth-e
   ⚠️ 跳过清理 (有未推送提交，可能丢失)
 
-📦 检查: epic-auth-forgot-ef
+📦 检查: epic-auth-e-forgot-ef
   📊 状态检查: 🟢 安全 (已保存+已提交+已推送)  
   🔍 GitHub PR+Review检查: ❌ PR尚未完成review或未merge到 epic-auth-e
   ❌ 跳过清理 (未完成GitHub review流程，会丢失代码)
 
-📦 检查: epic-auth-profile-ef
+📦 检查: epic-auth-e-profile-ef
   📊 状态检查: 🔴 危险 (有未保存修改)
   ❌ 跳过清理 (状态不安全)
 
 🔄 步骤3: 执行安全清理
 
-🗑️ 完整清理: epic-auth-login-ef
-  ✅ 删除本地worktree: .worktrees/epic-auth-login-ef
-  ✅ 删除本地Git分支: epic-auth-login-ef
-  ✅ 删除远程分支: origin/epic-auth-login-ef
+🗑️ 完整清理: epic-auth-e-login-ef
+  ✅ 删除本地worktree: .worktrees/epic-auth-e-login-ef
+  ✅ 删除本地Git分支: epic-auth-e-login-ef
+  ✅ 删除远程分支: origin/epic-auth-e-login-ef
   ✅ 完整清理完成
 
 📋 清理报告:
   ✅ 成功清理: 1个分支（本地worktree + 本地分支 + 远程分支）
   ⚠️ 跳过清理: 3个分支
-    - epic-auth-register-ef: 有未推送提交
-    - epic-auth-forgot-ef: 未完成GitHub review流程
-    - epic-auth-profile-ef: 工作区不干净
+    - epic-auth-e-register-ef: 有未推送提交
+    - epic-auth-e-forgot-ef: 未完成GitHub review流程
+    - epic-auth-e-profile-ef: 工作区不干净
 ```
 
 ## 4. `gpf status` - 查看状态（统一状态检查核心）
@@ -778,11 +778,11 @@ gpf status <epic> --pr       # 显示指定Epic的GitHub PR状态
 
 ```bash
 # Feature分支的完整状态显示
-$ cd .worktrees/epic-auth-login-ef
+$ cd .worktrees/epic-auth-e-login-ef
 $ gpf status
 
-📍 当前环境: Feature分支 (epic-auth-login-ef)
-🎯 PR方向: epic-auth-login-ef → epic-auth-e
+📍 当前环境: Feature分支 (epic-auth-e-login-ef)
+🎯 PR方向: epic-auth-e-login-ef → epic-auth-e
 
 📊 本地Git状态:
   ✅ 工作区干净 (0个未保存修改)
@@ -828,7 +828,7 @@ $ gpf status --pr
 ```bash
 $ gpf status
 
-📍 当前环境: Feature分支 (epic-auth-login-ef)
+📍 当前环境: Feature分支 (epic-auth-e-login-ef)
 
 📊 本地Git状态:
   ✅ 工作区干净
@@ -891,12 +891,12 @@ $ gpf sync
 # 在Epic环境：智能Epic同步策略
 $ cd .worktrees/epic-auth-e  
 $ gpf sync
-→ 检测Epic与develop关系 → 智能同步Epic → sync to all epic-auth-*-ef
+→ 检测Epic与develop关系 → 智能同步Epic → sync to all epic-auth-e-*-ef
 
 # 在Feature环境：级联同步策略
-$ cd .worktrees/epic-auth-login-ef
+$ cd .worktrees/epic-auth-e-login-ef
 $ gpf sync  
-→ Epic先同步develop → pull epic-auth-e → sync to epic-auth-login-ef
+→ Epic先同步develop → pull epic-auth-e → sync to epic-auth-e-login-ef
 ```
 
 ### 🧠 智能同步策略详解
@@ -935,7 +935,7 @@ $ gpf sync
 
 ```bash
 # Feature同步：确保基于最新Epic+develop
-$ cd .worktrees/epic-auth-login-ef
+$ cd .worktrees/epic-auth-e-login-ef
 $ gpf sync
 
 🔄 步骤1: 预检查Epic同步状态
@@ -949,7 +949,7 @@ $ gpf sync
 ✅ 发现3个新提交（包含develop更新）
 
 🔄 步骤3: 执行Feature同步
-🔀 正在合并 epic-auth-e → epic-auth-login-ef
+🔀 正在合并 epic-auth-e → epic-auth-e-login-ef
 ✅ 合并成功，Feature现在基于最新Epic+develop
 
 📊 同步统计:
@@ -1064,7 +1064,7 @@ $ git commit -m "实现用户认证逻辑"
   
   2. 创建子Feature并移动修改：
      gpf start -ef login auth
-     # 系统会自动切换到 .worktrees/epic-auth-login-ef
+     # 系统会自动切换到 .worktrees/epic-auth-e-login-ef
      
   3. 在子Feature中提交：
      git add .
@@ -1075,7 +1075,7 @@ $ git commit -m "实现用户认证逻辑"
      git stash push -m "登录功能实现"
   
   2. 切换到目标Feature：
-     cd .worktrees/epic-auth-login-ef
+     cd .worktrees/epic-auth-e-login-ef
   
   3. 恢复并提交修改：
      git stash pop

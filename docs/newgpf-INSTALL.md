@@ -296,7 +296,7 @@ ls -la .git/hooks/pre-commit
 
 1. **pre-commit hook**：
    - 🚫 **阻止在Epic分支直接提交**（如 `epic-auth-e`）
-   - ✅ **允许在Feature分支提交**（如 `epic-auth-login-ef`）
+   - ✅ **允许在Feature分支提交**（如 `epic-auth-e-login-ef`）
    - 🎯 **只在GPF管理的项目中生效**（检测 `bin/git-pr-flow` 存在）
    - 🌍 **对非GPF项目完全透明**，不影响其他项目
 
@@ -321,7 +321,7 @@ git commit -m "implement login" # 允许提交
 
 # 然后将Feature合并到Epic
 git checkout epic-auth-e
-git merge epic-auth-login-ef    # 允许合并
+git merge epic-auth-e-login-ef    # 允许合并
 ```
 
 **Hook错误示例：**
@@ -334,7 +334,7 @@ Branch type: Epic branch (ends with -e)
 💡 Solution: Create a Feature branch for development:
 
   # 创建Feature分支进行开发：
-  git checkout -b epic-auth-<feature-name>-ef
+  git checkout -b epic-auth-e-<feature-name>-ef
 
   # 或使用GPF命令：
   gpf start -ef <feature-name> auth

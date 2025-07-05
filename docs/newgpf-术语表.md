@@ -10,7 +10,7 @@
 | **Epic** | Epic | 大功能模块，基于主分支创建 | auth、payment、user-system |
 | **Epic 的子 Feature** | Epic 的子 Feature | Epic 下的具体功能实现 | login、register、2fa |
 | **Epic 分支** | Epic 分支 | Epic 对应的 Git 分支 | epic-auth-e |
-| **Feature 分支** | Feature 分支 | Epic 的子 Feature 对应的 Git 分支 | epic-auth-login-ef |
+| **Feature 分支** | Feature 分支 | Epic 的子 Feature 对应的 Git 分支 | epic-auth-e-login-ef |
 
 ### 分支命名术语
 | 术语 | 标准表述 | 格式 | 示例 |
@@ -18,7 +18,7 @@
 | **前缀标识** | epic- 前缀 | epic- | epic-auth-e |
 | **后缀标识** | -e 后缀 / -ef 后缀 | -e / -ef | auth-e / login-ef |
 | **Epic 后缀** | -e 后缀 | -e | epic-auth-e |
-| **Feature 后缀** | -ef 后缀 | -ef | epic-auth-login-ef |
+| **Feature 后缀** | -ef 后缀 | -ef | epic-auth-e-login-ef |
 
 ### Epic Roadmap 术语
 | 术语 | 标准表述 | 说明 | 示例 |
@@ -34,7 +34,7 @@
 |------|----------|------|----------|
 | **Worktree** | Worktree | Git 工作树，物理隔离的开发环境 | .worktrees/epic-auth-e |
 | **Epic 环境** | Epic 环境 | Epic 分支对应的 Worktree 环境 | .worktrees/epic-auth-e |
-| **Feature 环境** | Feature 环境 | Feature 分支对应的 Worktree 环境 | .worktrees/epic-auth-login-ef |
+| **Feature 环境** | Feature 环境 | Feature 分支对应的 Worktree 环境 | .worktrees/epic-auth-e-login-ef |
 | **根目录环境** | 根目录环境 | 项目根目录环境 | /project/root |
 
 ## 🎯 命令相关术语
@@ -68,7 +68,7 @@
 | **智能切换** | 智能切换 | 智能检测现有worktree，存在则自动切换，不存在则创建 | 自动进入对应 Worktree |
 | **环境检测** | 环境检测 | 检测当前执行环境类型 | epic/feature/root |
 | **切换到Epic环境** | 切换到Epic环境 | 进入Epic的worktree目录+自动切换到Epic分支 | 从根目录切换到 .worktrees/epic-auth-e |
-| **切换到Feature环境** | 切换到Feature环境 | 进入Feature的worktree目录+自动切换到Feature分支 | 从Epic环境切换到 .worktrees/epic-auth-login-ef |
+| **切换到Feature环境** | 切换到Feature环境 | 进入Feature的worktree目录+自动切换到Feature分支 | 从Epic环境切换到 .worktrees/epic-auth-e-login-ef |
 | **切换到根目录环境** | 切换到根目录环境 | 进入项目根目录+切换到指定分支 | 从worktree切换到根目录的develop分支 |
 
 ## 🛡️ 安全和验证术语
@@ -94,11 +94,11 @@
 ### 基础示例
 | 场景 | Epic 名称 | Feature 名称 | 完整分支名 |
 |------|-----------|--------------|------------|
-| **用户认证** | auth | login | epic-auth-login-ef |
-| **用户认证** | auth | register | epic-auth-register-ef |
-| **用户认证** | auth | logout | epic-auth-logout-ef |
-| **支付系统** | payment | stripe | epic-payment-stripe-ef |
-| **支付系统** | payment | paypal | epic-payment-paypal-ef |
+| **用户认证** | auth | login | epic-auth-e-login-ef |
+| **用户认证** | auth | register | epic-auth-e-register-ef |
+| **用户认证** | auth | logout | epic-auth-e-logout-ef |
+| **支付系统** | payment | stripe | epic-payment-e-stripe-ef |
+| **支付系统** | payment | paypal | epic-payment-e-paypal-ef |
 
 ### 复杂示例（特殊场景）
 | 场景 | Epic 名称 | Feature 名称 | 说明 |
