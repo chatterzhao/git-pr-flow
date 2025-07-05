@@ -36,11 +36,18 @@ find_project_root() {
 }
 
 # 判断环境类型
-# 参数：(current_path, project_root)
+# 参数：(current_path) - 可选，默认使用当前目录
 # 返回：root|epic|feature|unknown
+# 注意：内部使用find_project_root()获取标准根目录，确保一致性
 determine_environment_type() {
-    local current_path="$1"
-    local project_root="$2"
+    local current_path="${1:-$(pwd)}"
+    
+    # 使用标准方法获取项目根目录
+    local project_root
+    project_root=$(find_project_root) || {
+        echo "unknown"
+        return 1
+    }
     
     # 标准化路径，移除尾部斜杠
     current_path="${current_path%/}"
@@ -78,11 +85,14 @@ extract_worktree_name() {
 }
 
 # 提取Epic环境信息
-# 参数：(current_path, project_root)
+# 参数：(current_path) - 可选，默认使用当前目录
 # 返回：JSON格式的Epic环境信息
 extract_epic_environment() {
-    local current_path="$1"
-    local project_root="$2"
+    local current_path="${1:-$(pwd)}"
+    
+    # 使用标准方法获取项目根目录
+    local project_root
+    project_root=$(find_project_root) || return 1
     
     local worktree_name
     worktree_name=$(extract_worktree_name "$current_path" "$project_root")
@@ -108,11 +118,14 @@ EOF
 }
 
 # 提取Feature环境信息
-# 参数：(current_path, project_root)
+# 参数：(current_path) - 可选，默认使用当前目录
 # 返回：JSON格式的Feature环境信息
 extract_feature_environment() {
-    local current_path="$1"
-    local project_root="$2"
+    local current_path="${1:-$(pwd)}"
+    
+    # 使用标准方法获取项目根目录
+    local project_root
+    project_root=$(find_project_root) || return 1
     
     local worktree_name
     worktree_name=$(extract_worktree_name "$current_path" "$project_root")
@@ -142,11 +155,14 @@ EOF
 }
 
 # 提取根环境信息
-# 参数：(current_path, project_root)
+# 参数：(current_path) - 可选，默认使用当前目录
 # 返回：JSON格式的根环境信息
 extract_root_environment() {
-    local current_path="$1"
-    local project_root="$2"
+    local current_path="${1:-$(pwd)}"
+    
+    # 使用标准方法获取项目根目录
+    local project_root
+    project_root=$(find_project_root) || return 1
     
     local git_branch
     git_branch=$(git -C "$current_path" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
@@ -165,11 +181,14 @@ EOF
 }
 
 # 提取未知环境信息
-# 参数：(current_path, project_root)
+# 参数：(current_path) - 可选，默认使用当前目录
 # 返回：JSON格式的未知环境信息
 extract_unknown_environment() {
-    local current_path="$1"
-    local project_root="$2"
+    local current_path="${1:-$(pwd)}"
+    
+    # 使用标准方法获取项目根目录
+    local project_root
+    project_root=$(find_project_root) || return 1
     
     local git_branch
     git_branch=$(git -C "$current_path" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
