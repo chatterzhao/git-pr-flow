@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# NewGPF Main Entry Point
+# This is a placeholder for testing hooks installation
+
+echo "NewGPF v2.0.0 - Git PR Flow CLI Tool"
+echo ""
+echo "Usage: gpf <command> [options]"
+echo ""
+echo "Commands:"
+echo "  start   Create Epic or Feature branch"
+echo "  pr      Create pull request"
+echo "  status  Show current status"
+echo "  clean   Clean up branches"
+echo "  sync    Sync branches"
+echo ""
+echo "Options:"
+echo "  --help     Show this help message"
+echo "  --version  Show version information"
+echo ""
+
+case "${1:-}" in
+    --version|-v)
+        echo "NewGPF v2.0.0"
+        ;;
+    --help|-h)
+        echo "Full help documentation coming soon..."
+        ;;
+    *)
+        echo "Command not implemented yet: ${1:-}"
+        echo "This is a development version for testing hooks."
+        ;;
+esac

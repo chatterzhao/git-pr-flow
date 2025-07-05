@@ -30,7 +30,9 @@ chmod +x install.sh
 2. 安装GitHub CLI (gh)
 3. 安装GPF本体
 4. 配置环境变量
-5. 验证安装完成
+5. 配置VSCode worktree支持
+6. 安装Git hooks（强制GPF工作流规范）
+7. 验证安装完成
 
 ## 📋 系统要求
 
@@ -178,11 +180,13 @@ gpf status
 
 ### VSCode Worktree支持配置
 
-GPF使用Git worktree创建隔离的开发环境。为了让VSCode正确跟踪worktree中的Git状态，需要配置VSCode支持子目录Git检测：
+GPF使用Git worktree创建隔离的开发环境。为了让VSCode正确跟踪worktree中的Git状态，需要配置VSCode支持子目录Git检测。
+
+**重要提示：配置后需要重新加载VSCode窗口才能生效！**
 
 **方法1：安装脚本自动配置（推荐）**
 ```bash
-# 一键安装脚本会自动配置VSCode
+# 一键安装脚本会自动配置VSCode并提示重新加载
 curl -fsSL https://raw.githubusercontent.com/your-repo/git-pr-cli/main/scripts/install.sh | bash
 ```
 
@@ -196,11 +200,40 @@ curl -fsSL https://raw.githubusercontent.com/your-repo/git-pr-cli/main/scripts/i
 }
 ```
 
-配置方式：
+**配置步骤：**
 1. 打开VSCode设置 (⌘+, 或 Ctrl+,)
 2. 点击右上角"打开设置(JSON)"图标
 3. 添加上述配置到settings.json
-4. 重启VSCode
+4. 保存设置文件
+5. **重要：执行命令重新加载VSCode窗口**
+   - 按 `Ctrl+Shift+P` (Windows/Linux) 或 `⌘+Shift+P` (macOS)
+   - 输入并执行：`Developer: Reload Window`
+
+**或者通过命令行自动配置：**
+```bash
+# macOS/Linux 自动配置脚本
+cat > ~/.vscode-gpf-config.sh << 'EOF'
+#!/bin/bash
+VSCODE_SETTINGS="$HOME/Library/Application Support/Code/User/settings.json"
+# Linux路径: "$HOME/.config/Code/User/settings.json"
+
+# 备份现有配置
+cp "$VSCODE_SETTINGS" "$VSCODE_SETTINGS.backup-$(date +%Y%m%d-%H%M%S)"
+
+# 添加GPF配置（如果不存在）
+if ! grep -q "git.autoRepositoryDetection" "$VSCODE_SETTINGS"; then
+    # 创建临时文件添加配置
+    jq '. + {"git.autoRepositoryDetection": "subFolders", "git.repositoryScanMaxDepth": 2}' "$VSCODE_SETTINGS" > "$VSCODE_SETTINGS.tmp"
+    mv "$VSCODE_SETTINGS.tmp" "$VSCODE_SETTINGS"
+    echo "✅ VSCode配置已更新"
+    echo "⚠️  请在VSCode中执行 Ctrl+Shift+P > 'Developer: Reload Window'"
+else
+    echo "✅ VSCode配置已存在"
+fi
+EOF
+
+chmod +x ~/.vscode-gpf-config.sh && ~/.vscode-gpf-config.sh
+```
 
 **配置效果：**
 - ✅ VSCode会自动检测 `.worktrees/` 下的所有Git仓库
@@ -214,10 +247,16 @@ curl -fsSL https://raw.githubusercontent.com/your-repo/git-pr-cli/main/scripts/i
 gpf start -e test develop
 
 # 在VSCode中打开项目根目录
-# 源代码管理面板应该显示多个仓库：
+# 重新加载窗口后，源代码管理面板应该显示多个仓库：
 # - git-pr-cli (根目录)
 # - epic-test-e (.worktrees/epic-test-e)
 ```
+
+**常见问题：**
+- **Q**: 配置后VSCode仍然不显示worktree仓库？
+- **A**: 确保执行了 `Developer: Reload Window` 命令，这是必需步骤
+- **Q**: 如何检查配置是否生效？
+- **A**: 在VSCode中查看源代码管理面板，应该显示多个Git仓库图标
 
 ### GitHub认证配置
 
@@ -234,6 +273,90 @@ gh repo set-default
 gh api user
 ```
 
+### Git Hooks配置（开发流程控制）
+
+GPF安装时会自动设置Git hooks来强制正确的开发工作流，防止在Epic分支直接开发。
+
+**自动安装（推荐）：**
+```bash
+# 一键安装脚本会自动配置hooks
+curl -fsSL https://raw.githubusercontent.com/your-repo/git-pr-cli/main/scripts/install.sh | bash
+```
+
+**手动安装hooks：**
+```bash
+# 在GPF项目根目录运行
+./scripts/install-hooks.sh
+
+# 验证安装
+ls -la .git/hooks/pre-commit
+```
+
+**Hooks功能说明：**
+
+1. **pre-commit hook**：
+   - 🚫 **阻止在Epic分支直接提交**（如 `epic-auth-e`）
+   - ✅ **允许在Feature分支提交**（如 `epic-auth-login-ef`）
+   - 🎯 **只在GPF管理的项目中生效**（检测 `bin/git-pr-flow` 存在）
+   - 🌍 **对非GPF项目完全透明**，不影响其他项目
+
+2. **智能检测范围**：
+   - 主要针对 `.worktrees/` 目录下的分支
+   - 根目录的开发分支（如develop、main）不受限制
+   - 只有Epic分支（以`-e`结尾，非`-ef`）会被阻止直接提交
+
+**开发流程控制：**
+```bash
+# ❌ 这会被阻止（在Epic分支直接提交）
+git checkout epic-auth-e
+echo "some changes" > file.txt
+git add file.txt
+git commit -m "direct commit"  # 被pre-commit hook阻止
+
+# ✅ 正确的开发流程
+gpf start -ef login auth        # 创建Feature分支
+echo "some changes" > file.txt
+git add file.txt
+git commit -m "implement login" # 允许提交
+
+# 然后将Feature合并到Epic
+git checkout epic-auth-e
+git merge epic-auth-login-ef    # 允许合并
+```
+
+**Hook错误示例：**
+```
+❌ GPF Policy Violation: Direct commits to Epic branches are not allowed
+
+Current branch: epic-auth-e
+Branch type: Epic branch (ends with -e)
+
+💡 Solution: Create a Feature branch for development:
+
+  # 创建Feature分支进行开发：
+  git checkout -b epic-auth-<feature-name>-ef
+
+  # 或使用GPF命令：
+  gpf start -ef <feature-name> auth
+
+GPF开发规则：
+  • Epic分支 (-e)：仅用于整合Feature分支
+  • Feature分支 (-ef)：实际开发工作
+  • 开发流程：Feature → Epic → Develop
+```
+
+**管理hooks：**
+```bash
+# 卸载hooks
+./scripts/install-hooks.sh --uninstall
+
+# 重新安装hooks
+./scripts/install-hooks.sh
+
+# 查看hooks帮助
+./scripts/install-hooks.sh --help
+```
+
 ### GPF工作目录配置
 
 ```bash
@@ -243,6 +366,9 @@ gpf config init
 
 # 配置默认分支
 gpf config set base-branch main  # 或 develop
+
+# 安装开发流程控制hooks
+./scripts/install-hooks.sh
 ```
 
 ## 🐛 故障排查
