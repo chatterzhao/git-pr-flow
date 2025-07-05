@@ -41,9 +41,34 @@ NewGPF 四层架构
 
 ## 🚀 实施计划
 
+### ⚠️ **重要概念澄清**
+
+> **关键理解**: 本实施计划采用"自举式开发"模式 - 我们在构建GPF工具的同时，使用GPF的Epic工作流理念来组织开发GPF本身
+
+#### 🔍 概念对照表
+
+| 概念层次 | GPF产品功能 | 开发GPF时的应用 | 说明 |
+|---------|------------|----------------|------|
+| **Epic** | 用户使用GPF管理的大功能模块 | 开发GPF的大功能模块 | Epic是逻辑概念，一个大的功能主题 |
+| **Feature** | Epic下的具体功能实现 | Epic下的具体代码实现 | Feature是Epic的子功能，具体的开发任务 |
+| **Worktree** | GPF为用户创建的并行开发环境 | 我们开发GPF时的并行环境 | Worktree是Git技术实现，物理隔离的工作区 |
+| **Branch** | GPF管理的Git分支 | 开发GPF的Git分支 | Branch是Git分支，代码版本控制 |
+
+#### 🎯 自举开发的价值
+1. **实战验证**: 开发过程即是对GPF工作流的最真实测试
+2. **设计优化**: 发现设计问题可立即调整架构
+3. **文档生成**: 开发过程本身就是最好的使用示例
+4. **团队协作**: 验证多人并行开发的可行性
+5. **AI友好验证**: 测试AI在Epic/Feature环境下的开发能力
+
 ### 🎯 **开发模式：Worktree + Epic 实践驱动**
 
 **核心策略**：使用我们正在构建的Epic工作流模式来开发NewGPF本身
+
+> 💡 **理解要点**: 
+> - 我们既是GPF的开发者，也是GPF工作流的第一批用户
+> - 开发GPF的过程就是验证GPF设计理念的过程
+> - 每一个开发步骤都在实践我们设计的Epic→Feature→PR工作流
 
 #### 💡 Epic划分策略
 ```bash
@@ -70,41 +95,111 @@ develop                           # 主开发分支
 ```
 
 #### 🔄 Worktree开发流程
+
+> **重要说明**: 以下流程是我们开发GPF时使用的命令，不是GPF产品的最终用户命令
+
 ```bash
-# 1. 创建Epic worktree（例如：核心基础架构）
-git worktree add .worktrees/epic-core-foundation-e develop
+# 场景：开发GPF的"核心基础架构"Epic
+
+# 1. 创建Epic worktree（在主项目根目录执行）
+git worktree add .worktrees/epic-core-foundation-e -b epic-core-foundation-e develop
 cd .worktrees/epic-core-foundation-e
-git checkout -b epic-core-foundation-e
+# 现在在Epic工作区，可以进行Epic层面的整体规划和集成
 
-# 2. 创建Feature worktree（例如：原子层实现）
-git worktree add .worktrees/epic-core-foundation-atomic-ef epic-core-foundation-e
+# 2. 创建Feature worktree（在主项目根目录执行）
+git worktree add .worktrees/epic-core-foundation-atomic-ef -b epic-core-foundation-atomic-ef epic-core-foundation-e
 cd .worktrees/epic-core-foundation-atomic-ef
-git checkout -b epic-core-foundation-atomic-ef
+# 现在在Feature工作区，专注开发原子层功能
 
-# 3. 并行开发模式
-# 终端1: .worktrees/epic-core-foundation-atomic-ef     (开发原子层)
-# 终端2: .worktrees/epic-core-foundation-composite-ef  (开发组合层)
-# 终端3: .worktrees/epic-github-integration-cli-ef     (开发GitHub集成)
+# 3. 并行开发模式示例
+# 📁 主项目目录结构：
+# /Users/project/gpf/                                    # 主项目根目录 (develop分支)
+# ├── .worktrees/
+# │   ├── epic-core-foundation-e/                        # Epic工作区
+# │   ├── epic-core-foundation-atomic-ef/                # Feature1工作区 (原子层)
+# │   ├── epic-core-foundation-composite-ef/             # Feature2工作区 (组合层)
+# │   ├── epic-core-foundation-modules-ef/               # Feature3工作区 (模块层)
+# │   └── epic-github-integration-cli-ef/                # 其他Epic的Feature工作区
+# 
+# 🔄 多终端并行开发：
+# 终端1: cd .worktrees/epic-core-foundation-atomic-ef    # 开发原子层
+# 终端2: cd .worktrees/epic-core-foundation-composite-ef # 开发组合层
+# 终端3: cd .worktrees/epic-github-integration-cli-ef    # 开发GitHub集成
+```
+
+#### 📋 开发工作流实例
+
+```bash
+# 开发者Alice的一天：
+# 09:00 - 开始开发原子层
+cd .worktrees/epic-core-foundation-atomic-ef
+# 在这里编写 lib/core/atomic/environment-atomic.sh
+
+# 11:00 - 切换到组合层
+cd ../epic-core-foundation-composite-ef  
+# 在这里编写 lib/core/composite/environment-composite.sh
+
+# 14:00 - Feature完成，准备PR
+git add . && git commit -m "实现环境检测原子方法"
+# 使用GitHub CLI创建 epic-core-foundation-atomic-ef → epic-core-foundation-e 的PR
+
+# 15:00 - 切换到Epic工作区进行集成测试
+cd ../epic-core-foundation-e
+# 合并已完成的Feature，进行Epic级别的集成测试
 ```
 
 ### Phase 1: 基础架构实施（Week 1-3）
 
 #### 1.1 项目初始化和Epic设置（Day 1-2）
+
+> **执行环境**: 在主项目根目录执行（GPF项目的develop分支）
+
 ```bash
-# 1. 创建四层架构目录（在主项目中）
+# 阶段说明：为开发GPF建立基础架构和Epic开发环境
+
+# 1. 创建四层架构目录（在主项目develop分支中）
+# 目的：为GPF产品建立标准的代码组织结构
 mkdir -p lib/core/{atomic,composite,modules,operations}
 mkdir -p lib/commands
 mkdir -p tests/{unit,integration,e2e}
 mkdir -p bin examples
 
-# 2. 创建基础配置文件
-touch lib/core/common.sh        # 公共配置和工具函数
-touch tests/test-framework.sh   # 测试框架
+# 2. 创建基础配置文件（在主项目develop分支中）
+# 目的：为GPF开发提供公共工具和测试框架
+touch lib/core/common.sh        # GPF公共配置和工具函数
+touch tests/test-framework.sh   # GPF测试框架
 
 # 3. 初始化Epic开发环境
-git worktree add .worktrees/epic-core-foundation-e develop
-cd .worktrees/epic-core-foundation-e
-git checkout -b epic-core-foundation-e
+# 目的：创建开发"核心基础架构"Epic的独立工作区
+git worktree add .worktrees/epic-core-foundation-e -b epic-core-foundation-e develop
+
+# 验证结果：
+# ✓ 主项目develop分支有了基础目录结构
+# ✓ 创建了epic-core-foundation-e工作区用于Epic开发
+# ✓ 可以开始Feature级别的并行开发
+```
+
+#### 💡 Step by Step 执行指南
+
+```bash
+# 当前位置：/path/to/gpf (develop分支)
+pwd  # 确认在主项目根目录
+git branch  # 确认在develop分支
+
+# Step 1: 建立GPF产品的代码架构
+mkdir -p lib/core/{atomic,composite,modules,operations}
+mkdir -p lib/commands tests/{unit,integration,e2e} bin examples
+
+# Step 2: 创建GPF开发的基础工具
+echo '#!/bin/bash' > lib/core/common.sh
+echo '#!/bin/bash' > tests/test-framework.sh
+
+# Step 3: 启动Epic开发模式
+git worktree add .worktrees/epic-core-foundation-e -b epic-core-foundation-e develop
+
+# 验证Epic环境
+ls .worktrees/  # 应该看到epic-core-foundation-e目录
+git worktree list  # 应该看到两个工作区
 ```
 
 #### 🎯 实践驱动开发的优势
@@ -512,6 +607,50 @@ esac
 - [x] `newgpf-术语表.md` - 术语定义
 - [ ] `examples/` - 使用示例
 - [ ] `FAQ.md` - 常见问题
+
+### 🎯 实施计划总结
+
+#### 📊 开发模式验证指标
+
+**Epic工作流验证**
+- [ ] 成功创建和管理4个主要Epic (core-foundation, github-integration, commands-layer, testing-quality)
+- [ ] Epic内Feature的并行开发无冲突
+- [ ] Feature → Epic → develop 的PR流程顺畅
+- [ ] 多终端并行开发体验良好
+
+**自举开发效果**
+- [ ] 发现并解决至少3个Epic工作流设计问题
+- [ ] 生成完整的GPF使用示例和最佳实践
+- [ ] 验证AI在Epic/Feature环境下的开发能力
+- [ ] 团队成员能快速上手Epic工作流
+
+**技术架构验证**
+- [ ] 四层架构设计经过实际开发验证
+- [ ] 组件间依赖关系清晰且合理
+- [ ] 跨平台兼容性得到验证
+- [ ] 性能指标满足预期要求
+
+#### 🚀 交付成果
+
+**代码交付**
+- NewGPF v1.0 完整功能实现
+- >90% 测试覆盖率
+- 完整的CI/CD流程
+- 跨平台兼容性验证
+
+**流程交付**
+- Epic工作流标准操作程序
+- Worktree并行开发最佳实践
+- AI友好的自动化工作流
+- 团队协作规范和模板
+
+**文档交付**
+- 完整的技术文档体系
+- 用户操作手册和示例
+- 开发者贡献指南
+- 故障排除和FAQ
+
+> **关键成功标准**: 开发GPF的过程本身就是对GPF工作流最完整、最真实的验证和展示
 
 ## 🎯 质量标准
 
