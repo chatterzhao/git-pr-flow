@@ -76,7 +76,35 @@ intelligent_parse_user_intent() {
 EOF
 }
 
-# 标准化和验证用户输入
+# 提取+清理+验证用户输入（设计文档要求的方法名）
+# 参数：(user_input, expected_suffix)
+# expected_suffix: "e" | "ef"
+# 返回：清理后的输入或错误
+path_normalize_user_input() {
+    local user_input="$1"
+    local expected_suffix="$2"
+    
+    # 组合：提取+清理+验证
+    local clean_input
+    clean_input=$(strip_epic_prefix_from_input "$user_input")
+    clean_input=$(strip_suffix_from_input "$clean_input")
+    
+    # 验证名称格式
+    if ! validate_name_format "$clean_input"; then
+        echo "❌ 错误：名称格式不正确" >&2
+        return 1
+    fi
+    
+    # 验证后缀匹配
+    if ! validate_input_suffix_matches_expected "$user_input" "$expected_suffix"; then
+        echo "❌ 错误：输入后缀与期望不匹配" >&2
+        return 1
+    fi
+    
+    echo "$clean_input"
+}
+
+# 标准化和验证用户输入（保留现有方法以兼容）
 # 参数：(user_input, expected_type)
 # expected_type: "epic" | "feature"
 # 返回：0（成功）或1（失败），标准化结果输出到stdout
@@ -258,5 +286,67 @@ intelligent_path_transformation() {
     else
         # 直接处理为用户输入
         path_complete_processing "$input_path" "$target_type"
+    fi
+}
+
+# 将用户输入转化为标准Epic分支名
+# 参数：(user_input)
+# 返回：标准Epic分支名 (epic-name-e)
+transform_input_to_epic_branch() {
+    local user_input="$1"
+    
+    # 使用智能解析获取处理结果
+    local intent_result
+    intent_result=$(intelligent_parse_user_intent "$user_input" "epic")
+    
+    # 从JSON结果中提取epic名称
+    local epic_name
+    epic_name=$(echo "$intent_result" | jq -r '.epic_name // empty')
+    
+    if [[ -n "$epic_name" ]]; then
+        echo "epic-$epic_name-e"
+    else
+        # 回退到基础处理
+        local clean_name
+        clean_name=$(strip_suffix_from_input "$user_input")
+        clean_name=$(strip_epic_prefix_from_input "$clean_name")
+        
+        # 验证名称格式
+        if validate_name_format "$clean_name"; then
+            echo "epic-$clean_name-e"
+        else
+            return 1
+        fi
+    fi
+}
+
+# 将用户输入转化为标准Feature分支名
+# 参数：(feature_input, epic_input)
+# 返回：标准Feature分支名 (epic-name-e-feature-ef)
+transform_input_to_feature_branch() {
+    local feature_input="$1"
+    local epic_input="$2"
+    
+    # 处理Epic名称
+    local epic_name
+    epic_name=$(echo "$epic_input" | sed 's/^epic-//' | sed 's/-e$//')
+    
+    # 处理Feature名称
+    local feature_name
+    feature_name=$(strip_suffix_from_input "$feature_input")
+    feature_name=$(strip_epic_prefix_from_input "$feature_name")
+    
+    # 验证名称格式
+    if ! validate_name_format "$feature_name"; then
+        return 1
+    fi
+    
+    # 智能构建Feature名称
+    if [[ "$feature_name" == "$epic_name-"* ]]; then
+        # Feature已包含Epic前缀：auth-login
+        echo "epic-$epic_name-e-$feature_name-ef"
+    else
+        # Feature不包含Epic前缀：login
+        echo "epic-$epic_name-e-$feature_name-ef"
     fi
 }

@@ -8,7 +8,15 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/git-composite.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/validation-composite.sh"
 
-# 验证GitHub环境完整性
+# 验证GitHub环境（设计文档要求的方法名）
+# 参数：无
+# 返回：0（环境就绪）或1（环境异常）
+gh_validate_environment() {
+    # 调用完整版本的实现
+    gh_validate_complete_environment "$@"
+}
+
+# 验证GitHub环境完整性（保留现有方法以兼容）
 # 参数：无
 # 返回：0（环境就绪）或1（环境异常），环境状态输出到stdout
 gh_validate_complete_environment() {
