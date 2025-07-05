@@ -19,24 +19,28 @@ gpf (新版本)
 │   │   │   ├── path-atomic.sh
 │   │   │   ├── worktree-query.sh
 │   │   │   ├── github-pr-query.sh
-│   │   │   └── environment-atomic.sh
+│   │   │   ├── environment-atomic.sh
+│   │   │   ├── roadmap-template.sh
+│   │   │   └── epic-validation.sh
 │   │   ├── composite/      # 中层组合方法 - 组合原子方法
 │   │   │   ├── git-composite.sh
 │   │   │   ├── gh-composite.sh
 │   │   │   ├── path-composite.sh
 │   │   │   ├── worktree-composite.sh
-│   │   │   └── github-pr-composite.sh
+│   │   │   ├── github-pr-composite.sh
+│   │   │   └── roadmap-composite.sh
 │   │   ├── modules/        # 模块层聚拢方法 - 完整功能模块
 │   │   │   ├── status-module.sh
 │   │   │   ├── github-module.sh
 │   │   │   ├── worktree-module.sh
-│   │   │   └── environment-module.sh
+│   │   │   ├── environment-module.sh
+│   │   │   └── roadmap-module.sh
 │   │   └── operations/     # 操作层原子方法 - 仅执行操作
 │   │       ├── worktree-operations.sh
 │   │       ├── github-pr-operations.sh
 │   │       └── git-operations.sh
 │   └── commands/           # 命令编排层 - 只调用模块方法
-│       ├── start.sh        # 只调用 worktree-module + environment-module
+│       ├── start.sh        # 只调用 worktree-module + environment-module + roadmap-module
 │       ├── pr.sh          # 只调用 status-module + github-module
 │       ├── clean.sh       # 只调用 status-module + worktree-module
 │       ├── status.sh      # 只调用 status-module
@@ -213,10 +217,18 @@ lib/core/
 │   │   ├── gh_check_installation()
 │   │   ├── gh_check_auth()
 │   │   └── gh_get_pr_basic_info()
-│   └── path-atomic.sh          # 路径原子操作
-│       ├── path_extract_suffix()
-│       ├── path_strip_prefix()
-│       └── path_validate_format()
+│   ├── path-atomic.sh          # 路径原子操作
+│   │   ├── path_extract_suffix()
+│   │   ├── path_strip_prefix()
+│   │   └── path_validate_format()
+│   ├── roadmap-template.sh     # Roadmap模板原子操作
+│   │   ├── roadmap_generate_template()
+│   │   ├── roadmap_get_epic_info()
+│   │   └── roadmap_validate_path()
+│   └── epic-validation.sh      # Epic分支验证原子操作
+│       ├── epic_check_roadmap_only()
+│       ├── epic_validate_commit_files()
+│       └── epic_get_modified_files()
 │
 ├── composite/          # 中层组合方法 - 组合多个原子方法，形成功能单元
 │   ├── git-composite.sh       # Git组合操作
@@ -225,9 +237,12 @@ lib/core/
 │   ├── gh-composite.sh         # GitHub组合操作
 │   │   ├── gh_validate_environment()       # = gh_check_installation + gh_check_auth
 │   │   └── gh_get_pr_complete_info()       # = gh_get_pr_basic_info + formatting
-│   └── path-composite.sh       # 路径组合操作
-│       ├── path_normalize_user_input()     # = extract + strip + validate
-│       └── path_generate_standard_names()  # = multiple path generations
+│   ├── path-composite.sh       # 路径组合操作
+│   │   ├── path_normalize_user_input()     # = extract + strip + validate
+│   │   └── path_generate_standard_names()  # = multiple path generations
+│   └── roadmap-composite.sh     # Roadmap组合操作
+│       ├── roadmap_initialize_epic()       # = generate_template + validate_path + create_file
+│       └── roadmap_validate_epic_commit()  # = check_roadmap_only + validate_commit_files
 │
 ├── modules/            # 模块层聚拢方法 - 完整功能模块，供命令直接调用
 │   ├── status-module.sh        # 状态检查模块
@@ -236,11 +251,14 @@ lib/core/
 │   │   └── github_module_manage_pr_lifecycle()
 │   ├── worktree-module.sh      # 工作树管理模块
 │   │   └── worktree_module_manage_lifecycle()
-│   └── environment-module.sh   # 环境管理模块
-│       └── environment_module_detect_and_switch()
+│   ├── environment-module.sh   # 环境管理模块
+│   │   └── environment_module_detect_and_switch()
+│   └── roadmap-module.sh        # Roadmap管理模块
+│       ├── roadmap_module_manage_epic_lifecycle()
+│       └── roadmap_module_validate_epic_operations()
 │
 └── commands/           # 命令编排层 - 只做业务编排，调用模块方法
-    ├── start.sh       # 只调用 worktree_module + environment_module
+    ├── start.sh       # 只调用 worktree_module + environment_module + roadmap_module
     ├── pr.sh         # 只调用 status_module + github_module
     ├── clean.sh      # 只调用 status_module + worktree_module
     ├── status.sh     # 只调用 status_module

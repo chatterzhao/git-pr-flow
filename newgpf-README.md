@@ -20,7 +20,9 @@
 - **操作友好**：无参数进入交互模式，有参数直接执行，错误信息包含解决方案
 - **AI友好**：worktree 模式，AI可以同时开发多个功能而目录不冲突，命令设计也对ai友好，ai容易理解本工具并代人自动操作
 - **🆕 智能切换**：不管在哪个目录执行命令，都检测是否可以切换到正确的目标环境
+- **🎯 规划驱动开发**：Epic创建时自动生成roadmap，强制先规划后开发的良好习惯
 - **规范的工作流**：将良好的工作流封装为五个命令，使用命令就符合工作流
+- **🛡️ Epic分支保护**：Epic分支仅允许修改roadmap，其他修改自动引导到子Feature
 - **工作流保护**：自动检查状态，防止数据丢失
 - **零心智负担**：智能推断环境，减少决策
 - **🔄 自动同步**：智能检测同步需求，确保基于最新代码开发
@@ -142,25 +144,52 @@ git worktree add -b epic-auth-login-ef ../epic-auth-login-ef epic-auth-e
 - `epic-`前缀可省略，系统自动补全
 - 受Git worktree限制，不支持斜杠(/)等文件系统特殊字符
 
-**明确命令格式：**
+**🎯 规划驱动的开发流程：**
 ```bash
-# 1. 创建Epic开发环境
+# 1. 创建Epic开发环境（自动生成roadmap）
 gpf start -e auth develop
-# 用户输入: auth, 系统创建: epic-auth-e分支和worktree
+# 系统执行：
+# - 创建: epic-auth-e分支和worktree
+# - 生成: docs/epic_road/epic-auth-roadmap.md
+# - 提示: 请完善roadmap后提交，再创建子Feature
 
-# 2. 创建Epic 的子 Feature（支持三种输入格式）
+# 2. 完善Epic规划（必需步骤）
+# 编辑 docs/epic_road/epic-auth-roadmap.md
+# 定义Epic目标、子Feature列表、验收标准等
+git add docs/epic_road/epic-auth-roadmap.md
+git commit -m "完善auth Epic的开发roadmap"
+
+# 3. 创建Epic子Feature（需要Epic roadmap已提交）
 gpf start -ef login auth                # 最简格式
 gpf start -ef auth-login auth          # 包含Epic前缀
 gpf start -ef epic-auth-login-ef auth  # 完整格式
 # 以上三种输入都创建: epic-auth-login-ef分支和worktree
 
-# 3. 开发完成后创建PR
+# 4. 开发完成后创建PR
 gpf pr
 
-# 4. 清理已合并的分支  
+# 5. 清理已合并的分支  
 gpf clean              # 预览模式（默认）
 gpf clean --safe       # 安全清理
 gpf clean --force      # 强制清理（危险）
+```
+
+**🛡️ Epic分支保护机制：**
+```bash
+# ✅ 在Epic分支中允许的操作
+- 修改 docs/epic_road/epic-*-roadmap.md
+- 提交roadmap相关的更新
+
+# ❌ 在Epic分支中被拦截的操作  
+- 修改业务代码文件
+- 添加新功能实现
+- 其他非roadmap文件的修改
+
+# 系统提示引导
+❌ 错误：Epic分支只允许修改roadmap文件
+💡 解决方案：
+  1. 将当前修改移动到子Feature: gpf start -ef <feature-name> <epic-name>
+  2. 或者重置修改: git checkout -- [非roadmap文件]
 ```
 
 ## 核心命令

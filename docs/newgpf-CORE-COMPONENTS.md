@@ -884,7 +884,254 @@ delete_git_branch() {
 }
 ```
 
-## 6. ui.sh - 用户界面
+## 6. roadmap.sh - Epic Roadmap管理
+
+### 核心功能
+管理Epic的roadmap文件生成、验证和Epic分支保护机制。
+
+### 数据结构
+
+```bash
+# Roadmap信息对象
+RoadmapInfo = {
+    epic_name: "auth"                           # Epic名称
+    roadmap_path: "docs/epic_road/epic-auth-roadmap.md"  # Roadmap文件路径  
+    template_status: "template" | "customized" | "committed"  # 模板状态
+    validation_status: "valid" | "invalid"      # 验证状态
+    commit_status: "uncommitted" | "committed"  # Git提交状态
+}
+```
+
+### Roadmap模板生成
+
+```bash
+# 生成Epic roadmap模板
+generate_roadmap_template() {
+    local epic_name="$1"
+    local base_branch="$2"
+    local roadmap_path="docs/epic_road/epic-${epic_name}-roadmap.md"
+    
+    # 创建目录
+    mkdir -p "$(dirname "$roadmap_path")"
+    
+    # 生成智能模板
+    cat > "$roadmap_path" << EOF
+# Epic: [${epic_name}] 功能模块
+
+## Epic概述
+- **应用背景**: [描述整个应用是什么，解决什么问题]
+- **Epic目标**: [当前Epic要解决的核心问题和功能范围]
+- **预期价值**: [Epic完成后带来的业务价值和用户价值]
+
+## 子Feature规划
+1. **${epic_name}-[feature-name]** - [功能简述]
+   - **功能描述**: [详细描述这个子功能做什么]
+   - **验收标准**: [具体的AC条件，如：用户可以xxx，系统应该xxx]
+   - **优先级**: [P0/P1/P2]
+   - **预估工作量**: [S/M/L 或具体天数]
+
+2. **${epic_name}-[feature-name]** - [功能简述]
+   - **功能描述**: [详细描述]
+   - **验收标准**: [具体的AC条件]
+   - **优先级**: [P0/P1/P2]
+   - **预估工作量**: [S/M/L]
+
+## 技术要求
+- **依赖组件**: [列出需要的第三方库、内部模块等]
+- **性能要求**: [响应时间、并发量等具体指标]
+- **安全要求**: [认证、授权、数据保护等]
+- **兼容性要求**: [浏览器、设备、API版本等]
+- **遵循文档**: [xx规范，xx架构，xx目录下的文档]
+
+## 验收定义 (Definition of Done)
+- [ ] [所有子Feature完成并通过测试]
+- [ ] [API文档完整]
+- [ ] [单元测试覆盖率 > 80%]
+- [ ] [性能测试通过]
+- [ ] [安全扫描通过]
+
+## 开发计划
+- **基础分支**: ${base_branch}
+- **Epic分支**: epic-${epic_name}-e
+- **创建时间**: $(date '+%Y-%m-%d %H:%M:%S')
+- **预计完成**: [设定目标日期]
+EOF
+
+    echo "$roadmap_path"
+}
+```
+
+### Roadmap验证
+
+```bash
+# 验证roadmap是否完善
+validate_roadmap_completeness() {
+    local roadmap_path="$1"
+    
+    if [[ ! -f "$roadmap_path" ]]; then
+        echo "roadmap_not_exists"
+        return 1
+    fi
+    
+    # 检查是否还有未填充的占位符
+    local placeholder_count=$(grep -c '\[.*\]' "$roadmap_path" || true)
+    
+    if [[ $placeholder_count -gt 0 ]]; then
+        echo "template_not_customized:$placeholder_count"
+        return 1
+    fi
+    
+    # 检查是否已提交到Git
+    if ! git ls-files --error-unmatch "$roadmap_path" >/dev/null 2>&1; then
+        echo "not_tracked"
+        return 1
+    fi
+    
+    if git diff --quiet "$roadmap_path" && git diff --cached --quiet "$roadmap_path"; then
+        echo "committed"
+        return 0
+    else
+        echo "uncommitted"
+        return 1
+    fi
+}
+
+# 获取roadmap详细验证信息
+get_roadmap_validation_details() {
+    local roadmap_path="$1"
+    local validation_result
+    validation_result=$(validate_roadmap_completeness "$roadmap_path")
+    
+    case "$validation_result" in
+        "committed")
+            echo "✅ Roadmap已完善且已提交"
+            return 0
+            ;;
+        "template_not_customized:"*)
+            local count="${validation_result#*:}"
+            echo "❌ Roadmap仍有 $count 个未填充的占位符 [...]"
+            grep -n '\[.*\]' "$roadmap_path" | head -5
+            return 1
+            ;;
+        "uncommitted")
+            echo "⚠️ Roadmap已修改但未提交到Git"
+            return 1
+            ;;
+        "not_tracked")
+            echo "❌ Roadmap文件未添加到Git跟踪"
+            return 1
+            ;;
+        "roadmap_not_exists")
+            echo "❌ Roadmap文件不存在"
+            return 1
+            ;;
+    esac
+}
+```
+
+### Epic分支保护
+
+```bash
+# 检查Epic分支提交的文件
+validate_epic_commit_files() {
+    local epic_name="$1"
+    local modified_files
+    
+    # 获取暂存区的修改文件
+    modified_files=$(git diff --cached --name-only)
+    
+    # 定义允许的roadmap文件模式
+    local roadmap_pattern="^docs/epic_road/epic-${epic_name}-roadmap\.md$"
+    
+    local non_roadmap_files=()
+    while IFS= read -r file; do
+        if [[ -n "$file" ]] && ! [[ "$file" =~ $roadmap_pattern ]]; then
+            non_roadmap_files+=("$file")
+        fi
+    done <<< "$modified_files"
+    
+    if [[ ${#non_roadmap_files[@]} -gt 0 ]]; then
+        echo "epic_protection_violation"
+        printf '%s\n' "${non_roadmap_files[@]}"
+        return 1
+    fi
+    
+    echo "epic_commit_allowed"
+    return 0
+}
+
+# Epic分支保护主函数
+enforce_epic_branch_protection() {
+    local current_branch
+    current_branch=$(git branch --show-current)
+    
+    # 检查是否是Epic分支
+    if [[ "$current_branch" =~ ^epic-.*-e$ ]]; then
+        local epic_name="${current_branch#epic-}"
+        epic_name="${epic_name%-e}"
+        
+        local validation_result
+        validation_result=$(validate_epic_commit_files "$epic_name")
+        
+        if [[ "$validation_result" == "epic_protection_violation" ]]; then
+            return 1
+        fi
+    fi
+    
+    return 0
+}
+```
+
+### 组合工作流方法
+
+```bash
+# Epic创建完整流程
+create_epic_with_roadmap() {
+    local epic_name="$1" 
+    local base_branch="$2"
+    local project_root="$3"
+    
+    # 1. 创建roadmap
+    local roadmap_path
+    roadmap_path=$(generate_roadmap_template "$epic_name" "$base_branch")
+    
+    # 2. 提示用户完善
+    ui_info "📋 已生成Epic roadmap: $roadmap_path"
+    ui_info "📝 下一步操作："
+    ui_info "   1. 编辑 $roadmap_path 完善Epic规划"
+    ui_info "   2. 提交roadmap: git add . && git commit -m \"完善${epic_name} Epic roadmap\""
+    ui_info "   3. 创建子Feature: gpf start -ef <feature-name> $epic_name"
+    
+    return 0
+}
+
+# Feature创建前的roadmap检查
+validate_epic_ready_for_feature() {
+    local epic_name="$1"
+    local roadmap_path="docs/epic_road/epic-${epic_name}-roadmap.md"
+    
+    local validation_details
+    validation_details=$(get_roadmap_validation_details "$roadmap_path")
+    local validation_status=$?
+    
+    if [[ $validation_status -ne 0 ]]; then
+        ui_error "Epic roadmap未完善"
+        ui_error "📋 Roadmap状态: $validation_details"
+        ui_info ""
+        ui_info "💡 解决方案："
+        ui_info "   1. 完善roadmap内容: vim $roadmap_path"
+        ui_info "   2. 将所有 [占位符] 替换为实际规划内容"
+        ui_info "   3. 提交roadmap: git add $roadmap_path && git commit -m \"完善$epic_name Epic roadmap\""
+        ui_info "   4. 重新创建子Feature"
+        return 1
+    fi
+    
+    ui_success "$validation_details"
+    return 0
+}
+```
+
+## 7. ui.sh - 用户界面
 
 ### 核心功能
 统一的用户界面输出，避免耦合。

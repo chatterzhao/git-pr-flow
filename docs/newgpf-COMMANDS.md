@@ -79,14 +79,29 @@ gpf start -ef <feature-name> <epic-name>
    - 使用 `create_and_switch_worktree()` 创建并切换
    - 生成最终分支名：`epic-<clean_name>-e`
 
-4. **执行示例**
+4. **🎯 Roadmap自动生成（仅创建时）**
+   - 创建 `docs/epic_road/` 目录（如果不存在）
+   - 生成 `docs/epic_road/epic-<epic-name>-roadmap.md`
+   - 使用智能模板，包含Epic信息和占位符
+   - 提示用户完善roadmap后提交
+
+5. **执行示例**
    ```bash
    # 场景1：Worktree已存在
    $ gpf start -e auth develop
    ✅ Epic auth 已存在，已自动切换到Epic环境 (.worktrees/epic-auth-e)
    
-   # 场景2：Worktree不存在  
+   # 场景2：Worktree不存在 - 首次创建
    $ gpf start -e payment develop
+   🚀 创建Epic: payment
+   📁 工作目录: .worktrees/epic-payment-e
+   🌲 Git分支: epic-payment-e
+   📋 Roadmap: docs/epic_road/epic-payment-roadmap.md
+   
+   📝 下一步操作：
+   1. 编辑 docs/epic_road/epic-payment-roadmap.md 完善Epic规划
+   2. 提交roadmap: git add . && git commit -m "完善payment Epic roadmap"
+   3. 创建子Feature: gpf start -ef <feature-name> payment
    ✅ 已创建并切换到Epic环境 epic-payment-e (.worktrees/epic-payment-e)
    ```
 
@@ -104,23 +119,29 @@ gpf start -ef <feature-name> <epic-name>
    - 如果 `epic-auth-login-ef` 的worktree已存在 → 自动切换并提示
    - 如果不存在 → 继续创建流程
 
-3. **🔄 内部Epic同步检查（必须步骤）**
+3. **🛡️ Epic Roadmap验证（必须步骤）**
+   - **检查Epic roadmap**：验证 `docs/epic_road/epic-<epic-name>-roadmap.md` 是否存在且已提交
+   - **未提交roadmap**：如果roadmap未提交 → 阻止创建，引导完善roadmap
+   - **roadmap完整性检查**：确保roadmap已从模板状态更新为实际规划
+   - **目的**：强制规划驱动开发，确保Feature开发有明确目标
+
+4. **🔄 内部Epic同步检查（必须步骤）**
    - **自动检测**：使用 `check_sync_requirements_remote("epic-auth-e", "develop")` 检查Epic是否落后
    - **自动同步**：如果落后 → 强制执行 `ensure_epic_is_synced_before_feature_creation()`
    - **失败处理**：同步失败 → 终止创建流程，提示用户手动处理
    - **目的**：确保新Feature基于最新的Epic代码，避免过时的基础
 
-4. **🆕 Epic环境准备（创建子功能前必须步骤）**
+5. **🆕 Epic环境准备（创建子功能前必须步骤）**
    - 验证Epic分支 `epic-auth-e` 是否存在
    - **自动切换到Epic环境**: 自动切换到 .worktrees/epic-auth-e 目录
    - 确保基于正确的Epic分支创建子功能分支
 
-5. **创建新Worktree（仅在不存在时）**
+6. **创建新Worktree（仅在不存在时）**
    - 使用 `transform_input_to_feature_branch()` 生成标准分支名
    - 基于Epic分支创建Feature分支和worktree
    - **自动切换到新创建的Feature环境**
 
-6. **内部执行示例**
+7. **内部执行示例**
    ```bash
    # 场景1：Feature已存在
    $ gpf start -ef login auth
@@ -135,16 +156,20 @@ gpf start -ef <feature-name> <epic-name>
    🔄 步骤2: Worktree检测
    📍 Feature不存在，需要创建
    
-   🔄 步骤3: Epic同步检查（必须步骤）
+   🔄 步骤3: Epic Roadmap验证（必须步骤）
+   🔍 检查Epic roadmap状态...
+   ✅ docs/epic_road/epic-auth-roadmap.md 已提交且完整
+   
+   🔄 步骤4: Epic同步检查（必须步骤）
    🔍 检查Epic是否基于最新develop...
    🟡 检测到Epic落后develop 3个提交
    🚀 自动同步Epic: develop → epic-auth-e
    ✅ Epic同步完成
    
-   🔄 步骤4: Epic环境准备
+   🔄 步骤5: Epic环境准备
    📍 切换到Epic环境 (.worktrees/epic-auth-e)
    
-   🔄 步骤5: 创建Feature
+   🔄 步骤6: 创建Feature
    ✅ 已创建并切换到Feature环境 epic-auth-register-ef (.worktrees/epic-auth-register-ef)
    ```
 
@@ -935,4 +960,167 @@ $ gpf sync
 
 💡 建议下一步: 
   git push  # 推送同步后的代码到GitHub
+```
+
+## 🛡️ Epic分支保护和错误处理
+
+### Epic分支保护机制
+
+Epic分支具有特殊的保护机制，确保Epic环境的纯净性和规划驱动开发：
+
+#### 允许的操作
+
+```bash
+# ✅ 在Epic分支中允许的操作
+cd .worktrees/epic-auth-e
+
+# 1. 修改roadmap文件
+vim docs/epic_road/epic-auth-roadmap.md
+git add docs/epic_road/epic-auth-roadmap.md
+git commit -m "更新auth Epic roadmap：新增logout子功能"
+
+# 2. 创建子Feature（通过gpf命令）
+gpf start -ef logout auth  # 自动切换到子Feature环境
+
+# 3. 同步操作
+gpf sync  # 获取develop的最新更新
+```
+
+#### 被拦截的操作
+
+```bash
+# ❌ 在Epic分支中被拦截的操作
+cd .worktrees/epic-auth-e
+
+# 1. 修改业务代码
+vim src/auth/login.js
+git add src/auth/login.js
+git commit -m "实现登录逻辑"
+# → 🚫 Epic分支保护：检测到非roadmap文件修改
+
+# 2. 添加新功能文件
+touch src/auth/register.js
+git add src/auth/register.js
+git commit -m "添加注册功能"
+# → 🚫 Epic分支保护：Epic分支不允许业务代码开发
+
+# 3. 修改配置文件
+vim package.json
+git add package.json
+git commit -m "添加新依赖"
+# → 🚫 Epic分支保护：依赖变更应在子Feature中进行
+```
+
+### 错误处理和解决方案
+
+#### 错误场景1：roadmap未提交时创建子Feature
+
+```bash
+$ gpf start -ef login auth
+
+❌ 错误：Epic roadmap未完善
+📁 当前位置：Epic环境 (.worktrees/epic-auth-e)
+📋 Roadmap状态：docs/epic_road/epic-auth-roadmap.md 存在但未提交
+
+🔍 检测到的问题：
+  - roadmap文件仍为模板状态（包含未填充的 [占位符]）
+  - roadmap修改未提交到Git
+
+💡 解决方案：
+  1. 完善roadmap内容：
+     vim docs/epic_road/epic-auth-roadmap.md
+     # 将所有 [占位符] 替换为实际规划内容
+  
+  2. 提交roadmap：
+     git add docs/epic_road/epic-auth-roadmap.md
+     git commit -m "完善auth Epic的开发roadmap"
+  
+  3. 重新创建子Feature：
+     gpf start -ef login auth
+
+🤖 AI友好命令：
+  # 如果确认roadmap已完善，强制创建（跳过检查）
+  gpf start -ef login auth --force-roadmap
+```
+
+#### 错误场景2：Epic分支中修改业务代码
+
+```bash
+$ git commit -m "实现用户认证逻辑"
+
+❌ Epic分支保护：禁止在Epic分支修改业务代码
+
+📁 当前位置：Epic环境 (.worktrees/epic-auth-e)
+🔍 检测到的非roadmap文件修改：
+  - src/auth/login.js (新增)
+  - src/auth/utils.js (修改)
+  - tests/auth.test.js (新增)
+
+💡 解决方案（选择其一）：
+
+方案1 - 移动到新的子Feature（推荐）：
+  1. 重置当前修改：
+     git reset --soft HEAD~1  # 撤销commit但保留修改
+  
+  2. 创建子Feature并移动修改：
+     gpf start -ef login auth
+     # 系统会自动切换到 .worktrees/epic-auth-login-ef
+     
+  3. 在子Feature中提交：
+     git add .
+     git commit -m "实现用户登录认证逻辑"
+
+方案2 - 移动到现有子Feature：
+  1. 暂存当前修改：
+     git stash push -m "登录功能实现"
+  
+  2. 切换到目标Feature：
+     cd .worktrees/epic-auth-login-ef
+  
+  3. 恢复并提交修改：
+     git stash pop
+     git add .
+     git commit -m "实现用户登录认证逻辑"
+
+方案3 - 重置修改（如果不需要保留）：
+  git reset --hard HEAD~1  # 完全撤销修改
+
+🤖 AI友好命令：
+  # 自动移动到指定Feature（AI推荐）
+  gpf move-changes-to login  # 自动处理修改转移
+```
+
+#### 错误场景3：roadmap文件验证失败
+
+```bash
+$ gpf start -ef register auth
+
+❌ 错误：Epic roadmap不完整
+📋 Roadmap验证失败：docs/epic_road/epic-auth-roadmap.md
+
+🔍 检测到的问题：
+  - 第15行：Epic目标仍为 [当前Epic要解决的核心问题]
+  - 第23行：验收标准仍为 [具体的AC条件]
+  - 第28行：依赖组件为空 []
+
+💡 解决方案：
+  1. 编辑roadmap文件：
+     vim docs/epic_road/epic-auth-roadmap.md
+     
+  2. 替换所有占位符为实际内容：
+     # 将 [当前Epic要解决的核心问题] 
+     # 替换为：实现用户认证体系，包括登录、注册、权限管理
+     
+  3. 提交完善的roadmap：
+     git add docs/epic_road/epic-auth-roadmap.md
+     git commit -m "完善auth Epic roadmap：明确目标和验收标准"
+     
+  4. 重新创建子Feature：
+     gpf start -ef register auth
+
+🎯 Roadmap质量要求：
+  - 所有 [占位符] 必须替换为实际内容
+  - Epic目标明确且可测量
+  - 子Feature列表完整且有优先级
+  - 验收标准具体且可验证
 ```
