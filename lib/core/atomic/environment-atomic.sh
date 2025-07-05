@@ -5,26 +5,60 @@
 set -euo pipefail
 
 # 查找项目根目录
-# 从当前目录向上查找包含 bin/git-pr-flow 的目录
-# 返回：绝对路径字符串 或 返回码1（未找到）
+# 查找主Git仓库目录（包含.git目录，不是worktree的.git文件）
+# 项目根目录 = 主Git仓库目录，Epic/Feature都在其下的.worktrees/中
+# 返回：绝对路径字符串 或 返回码1（未找到主Git仓库）
 find_project_root() {
     local current_dir
     current_dir=$(pwd)
     
-    # 从当前目录向上查找
+    # 从当前目录向上查找主Git仓库
     while [[ "$current_dir" != "/" ]]; do
-        # 检查是否是Git仓库
-        if [[ -f "$current_dir/.git/config" ]] || [[ -d "$current_dir/.git" ]]; then
-            # 检查是否包含GPF标识文件
-            if [[ -f "$current_dir/bin/git-pr-flow" ]] || [[ -f "$current_dir/newgpf-README.md" ]]; then
-                echo "$current_dir"
+        if [[ -d "$current_dir/.git" ]]; then
+            # 找到.git目录（主仓库），这是项目根目录
+            echo "$current_dir"
+            return 0
+        elif [[ -f "$current_dir/.git" ]]; then
+            # 找到.git文件（worktree），需要解析出主仓库位置
+            local main_git_dir
+            main_git_dir=$(extract_main_git_dir_from_worktree "$current_dir/.git")
+            if [[ -n "$main_git_dir" ]]; then
+                # 主仓库目录 = .git目录的父目录
+                echo "$(dirname "$main_git_dir")"
                 return 0
             fi
         fi
         current_dir=$(dirname "$current_dir")
     done
     
+    # 未找到Git仓库
     return 1
+}
+
+# 从worktree的.git文件中提取主仓库的.git目录路径
+# 参数：(worktree_git_file_path)
+# 返回：主仓库.git目录路径 或 空字符串
+extract_main_git_dir_from_worktree() {
+    local git_file="$1"
+    
+    if [[ ! -f "$git_file" ]]; then
+        return 1
+    fi
+    
+    # 读取.git文件内容，格式：gitdir: /path/to/main/.git/worktrees/branch
+    local gitdir_line
+    gitdir_line=$(head -1 "$git_file")
+    
+    # 提取gitdir路径
+    local gitdir_path
+    gitdir_path=$(echo "$gitdir_line" | sed 's/^gitdir:[[:space:]]*//')
+    
+    if [[ -n "$gitdir_path" ]]; then
+        # 从 /main/.git/worktrees/branch 推导出 /main/.git
+        local main_git_dir
+        main_git_dir=$(echo "$gitdir_path" | sed 's|/worktrees/.*||')
+        echo "$main_git_dir"
+    fi
 }
 
 # 判断环境类型
