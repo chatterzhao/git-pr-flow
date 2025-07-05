@@ -206,6 +206,13 @@ mock_file() {
     test_log "DEBUG" "已Mock文件: $file_path"
 }
 
+# 跳过测试函数
+test_skip() {
+    local message="${1:-测试跳过}"
+    echo "⏭️ 跳过: $message"
+    exit 77  # 标准的测试跳过退出码
+}
+
 # 测试用例执行
 run_test() {
     local test_name="$1"
@@ -244,10 +251,18 @@ run_test() {
         end_time=$(date +%s%N)
         local duration_ms=$(( (end_time - start_time) / 1000000 ))
         
-        TESTS_FAILED=$((TESTS_FAILED + 1))
-        TEST_FAILURES+=("$test_name: $test_output")
-        test_log "FAIL" "$test_name (${duration_ms}ms)"
-        echo "$test_output"
+        if [[ $test_result -eq 77 ]]; then
+            # 测试跳过
+            TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
+            test_log "WARN" "$test_name - SKIPPED (${duration_ms}ms)"
+            echo "$test_output"
+        else
+            # 测试失败
+            TESTS_FAILED=$((TESTS_FAILED + 1))
+            TEST_FAILURES+=("$test_name: $test_output")
+            test_log "FAIL" "$test_name (${duration_ms}ms)"
+            echo "$test_output"
+        fi
     fi
     
     # 清理临时目录
