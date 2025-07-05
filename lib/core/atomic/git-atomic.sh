@@ -1,5 +1,5 @@
 #!/bin/bash
-# NewGPF Core - Git Operations Atomic Methods
+# GPF Core - Git Operations Atomic Methods
 # Git操作原子方法 - 单一职责，无副作用，可独立测试
 
 set -euo pipefail

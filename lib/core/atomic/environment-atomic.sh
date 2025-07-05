@@ -1,5 +1,5 @@
 #!/bin/bash
-# NewGPF Core - Environment Detection Atomic Methods
+# GPF Core - Environment Detection Atomic Methods
 # 环境检测原子方法 - 单一职责，无副作用，可独立测试
 
 set -euo pipefail

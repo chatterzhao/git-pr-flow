@@ -1,6 +1,6 @@
-# NewGPF 核心公共组件设计
+# GPF 核心公共组件设计
 
-> 📖 **相关文档**: [主文档](../newgpf-README.md) | [架构设计](newgpf-ARCHITECTURE.md) | [命令详细](newgpf-COMMANDS.md) | [术语表](newgpf-术语表.md)
+> 📖 **相关文档**: [主文档](../README.md) | [架构设计](ARCHITECTURE.md) | [命令详细](COMMANDS.md) | [术语表](术语表.md)
 
 ## 文档说明
 
@@ -21,23 +21,23 @@
 ## 核心组件文档索引
 
 ### 🏗️ 基础组件
-- **[环境检测](core/newgpf-core-context.md)** - 检测当前执行环境，为所有命令提供统一的环境信息
-- **[路径管理](core/newgpf-core-paths.md)** - 统一的路径计算和转换，处理所有与文件系统路径相关的操作
-- **[Worktree管理](core/newgpf-core-worktree.md)** - Worktree创建、检测、切换和清理的统一管理
+- **[环境检测](core/core-context.md)** - 检测当前执行环境，为所有命令提供统一的环境信息
+- **[路径管理](core/core-paths.md)** - 统一的路径计算和转换，处理所有与文件系统路径相关的操作
+- **[Worktree管理](core/core-worktree.md)** - Worktree创建、检测、切换和清理的统一管理
 
 ### 🔧 核心工具
-- **[状态验证](core/newgpf-core-validation.md)** - Git状态验证，工作区干净性检查等
-- **[Git操作](core/newgpf-core-git-ops.md)** - Git操作的统一封装，提供一致的接口
-- **[用户界面](core/newgpf-core-ui.md)** - 统一的用户界面输出，避免耦合
+- **[状态验证](core/core-validation.md)** - Git状态验证，工作区干净性检查等
+- **[Git操作](core/core-git-ops.md)** - Git操作的统一封装，提供一致的接口
+- **[用户界面](core/core-ui.md)** - 统一的用户界面输出，避免耦合
 
 ### 📋 业务组件
-- **[Epic Roadmap管理](core/newgpf-core-roadmap.md)** - 管理Epic的roadmap文件生成、验证和Epic分支保护机制
-- **[同步管理](core/newgpf-core-sync.md)** - 智能的级联同步管理，支持上往下的分支同步、自动pull远程更新、安全检查和冲突处理
-- **[状态检查](core/newgpf-core-status.md)** - 统一状态检查架构，供所有命令使用的状态检查和分析功能
+- **[Epic Roadmap管理](core/core-roadmap.md)** - 管理Epic的roadmap文件生成、验证和Epic分支保护机制
+- **[同步管理](core/core-sync.md)** - 智能的级联同步管理，支持上往下的分支同步、自动pull远程更新、安全检查和冲突处理
+- **[状态检查](core/core-status.md)** - 统一状态检查架构，供所有命令使用的状态检查和分析功能
 
 ### 🚀 高级组件
-- **[工作流方法](core/newgpf-core-workflows.md)** - 多命令共用的中级组合方法和命令级别的高级工作流方法
-- **[GitHub集成](core/newgpf-core-github.md)** - GitHub CLI环境检查、PR状态检查和操作、Issue关联处理
+- **[工作流方法](core/core-workflows.md)** - 多命令共用的中级组合方法和命令级别的高级工作流方法
+- **[GitHub集成](core/core-github.md)** - GitHub CLI环境检查、PR状态检查和操作、Issue关联处理
 
 ## 组件分层架构
 

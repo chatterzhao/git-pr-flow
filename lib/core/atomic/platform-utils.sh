@@ -1,5 +1,5 @@
 #!/bin/bash
-# NewGPF Core - Platform Utilities
+# GPF Core - Platform Utilities
 # 跨平台兼容性工具方法
 
 set -euo pipefail

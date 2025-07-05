@@ -1,5 +1,5 @@
 #!/bin/bash
-# NewGPF Core - Path Processing Atomic Methods
+# GPF Core - Path Processing Atomic Methods
 # 路径处理原子方法 - 单一职责，无副作用，可独立测试
 
 set -euo pipefail

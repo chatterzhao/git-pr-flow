@@ -9,9 +9,9 @@
 - **下到上只能 PR**：push -> Epic-Feature -> pr -> Epic -> review -> 可清理 Epic-Feature 本地worktree目录和本地、远程分支、push -> Epic -> pr -> Develop -> review -> 可清理 Epic 本地worktree目录和本地、远程分支，通过 GitHub PR 完成
 - **上到下本地 sync**：pull -> Develop -> Epic -> merge -> Epic-Feature -> merge， 通过 GPF sync 命令完成
 
-> 📖 **文档导航**: [安装指南](docs/newgpf-INSTALL.md) | [架构设计](docs/newgpf-ARCHITECTURE.md) | [命令详细](docs/newgpf-COMMANDS.md) | [核心组件](docs/newgpf-CORE-COMPONENTS.md) | [GitHub集成](docs/newgpf-GITHUB-CLI-INTEGRATION.md) | [术语表](docs/newgpf-术语表.md)
+> 📖 **文档导航**: [安装指南](docs/INSTALL.md) | [架构设计](docs/ARCHITECTURE.md) | [命令详细](docs/COMMANDS.md) | [核心组件](docs/CORE-COMPONENTS.md) | [GitHub集成](docs/GITHUB-CLI-INTEGRATION.md) | [术语表](docs/术语表.md)
 
-> 详见 [术语表](docs/newgpf-术语表.md) 了解标准术语定义。
+> 详见 [术语表](docs/术语表.md) 了解标准术语定义。
 
 ## gpf 核心理念
 
@@ -502,7 +502,7 @@ epic-auth-logout-ef # Epic 的子 Feature 分支
 
 ## 🚀 快速安装
 
-NewGPF需要GitHub CLI以实现完整的PR功能：
+GPF需要GitHub CLI以实现完整的PR功能：
 
 ```bash
 # 一键安装（推荐）
@@ -513,12 +513,12 @@ gpf --version
 gh auth status
 ```
 
-详见 [安装指南](docs/newgpf-INSTALL.md) | [GitHub CLI集成](docs/newgpf-GITHUB-CLI-INTEGRATION.md)
+详见 [安装指南](docs/INSTALL.md) | [GitHub CLI集成](docs/GITHUB-CLI-INTEGRATION.md)
 
-> 更多技术细节参考 [核心组件设计](docs/newgpf-CORE-COMPONENTS.md)。
+> 更多技术细节参考 [核心组件设计](docs/CORE-COMPONENTS.md)。
 
 ## 开发指南
 
 详见 [DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
-> 了解重构进展和计划参考 [重构路线图](docs/newgpf-roadmap.md)。
+> 了解重构进展和计划参考 [重构路线图](docs/roadmap.md)。

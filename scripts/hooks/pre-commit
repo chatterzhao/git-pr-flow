@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# NewGPF Pre-commit Hook
+# GPF Pre-commit Hook
 # 只控制worktree目录下的Epic分支，强制正确的开发流程
 
 set -euo pipefail

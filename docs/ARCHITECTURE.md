@@ -1,10 +1,10 @@
 # GPF 新版本架构设计
 
-> 📖 **相关文档**: [主文档](../newgpf-README.md) | [命令详细](newgpf-COMMANDS.md) | [核心组件](newgpf-CORE-COMPONENTS.md) | [术语表](newgpf-术语表.md)
+> 📖 **相关文档**: [主文档](../README.md) | [命令详细](COMMANDS.md) | [核心组件](CORE-COMPONENTS.md) | [术语表](术语表.md)
 
-基于 [newgpf-README.md](../newgpf-README.md) 的设计理念，GPF采用明确的参数格式、统一的 **epic- 前缀标识系统** 和 **智能切换功能**。
+基于 [README.md](../README.md) 的设计理念，GPF采用明确的参数格式、统一的 **epic- 前缀标识系统** 和 **智能切换功能**。
 
-> 术语说明：参考 [术语表](newgpf-术语表.md) 了解标准定义。
+> 术语说明：参考 [术语表](术语表.md) 了解标准定义。
 
 ## 总体架构
 
@@ -130,7 +130,7 @@ create_and_switch_worktree(branch, base) # 创建并切换worktree
 
 ### `gpf pr`
 
-> 详细命令说明参考 [命令详细文档](newgpf-COMMANDS.md#gpf-pr---创建github-pull-request)。
+> 详细命令说明参考 [命令详细文档](COMMANDS.md#gpf-pr---创建github-pull-request)。
 
 **🔧 GitHub CLI 集成核心：**
 - **环境强制验证**：必须在Epic或Feature的worktree环境中执行
@@ -149,7 +149,7 @@ create_and_switch_worktree(branch, base) # 创建并切换worktree
 
 ### `gpf clean`
 
-> 详细清理策略参考 [清理命令设计](newgpf-COMMANDS.md#gpf-clean---清理分支)。
+> 详细清理策略参考 [清理命令设计](COMMANDS.md#gpf-clean---清理分支)。
 
 **🆕 环境感知的智能清理：**
 - 基于当前执行环境智能确定清理范围
@@ -561,7 +561,7 @@ worktree优先 → 根目录fallback → 错误处理
 
 ## 与旧版本的改进
 
-> 完整的重构计划参考 [重构路线图](newgpf-roadmap.md)。
+> 完整的重构计划参考 [重构路线图](roadmap.md)。
 
 1. **命令简化**：从8个命令精简到5个核心命令，覆盖完整工作流
 2. **参数明确**：使用-e/-ef参数明确区分操作类型
