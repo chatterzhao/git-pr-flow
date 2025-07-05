@@ -4,23 +4,31 @@
 
 set -euo pipefail
 
+# 导入平台兼容性工具
+source "$(dirname "${BASH_SOURCE[0]}")/platform-utils.sh"
+
 # 查找项目根目录
 # 从当前目录往上找.git，检查路径是否包含.worktree，如果包含则继续往上找
 # 直到找到一个.git路径不包含.worktree的目录，那就是真正的根目录
-# 这样可以处理嵌套worktree的情况
+# 这样可以处理嵌套worktree的情况，并支持跨平台兼容性
 # 返回：绝对路径字符串 或 返回码1（未找到根Git仓库）
 find_project_root() {
     local current_dir
-    current_dir=$(pwd)
+    current_dir=$(get_absolute_path "$(pwd)")
     
     # 从当前目录向上查找Git仓库
-    while [[ "$current_dir" != "/" ]]; do
+    while ! is_root_path "$current_dir"; do
         # 检查是否存在.git（目录或文件）
-        if [[ -d "$current_dir/.git" ]] || [[ -f "$current_dir/.git" ]]; then
+        local git_dir
+        local git_file
+        git_dir=$(join_paths "$current_dir" ".git")
+        git_file="$git_dir"
+        
+        if [[ -d "$git_dir" ]] || [[ -f "$git_file" ]]; then
             # 检查当前路径是否包含.worktree（表示在worktree中）
-            if [[ "$current_dir" == *".worktree"* ]]; then
+            if path_contains "$current_dir" ".worktree"; then
                 # 在worktree中，继续往上找真正的根目录
-                current_dir=$(dirname "$current_dir")
+                current_dir=$(get_parent_directory "$current_dir")
                 continue
             else
                 # 找到不包含.worktree的.git，这是项目根目录
@@ -28,7 +36,7 @@ find_project_root() {
                 return 0
             fi
         fi
-        current_dir=$(dirname "$current_dir")
+        current_dir=$(get_parent_directory "$current_dir")
     done
     
     # 未找到Git仓库
@@ -54,7 +62,10 @@ determine_environment_type() {
     project_root="${project_root%/}"
     
     # 检查是否在工作树中
-    if [[ "$current_path" == "$project_root/.worktrees/"* ]]; then
+    local worktrees_path
+    worktrees_path=$(join_paths "$project_root" ".worktrees")
+    
+    if path_starts_with "$current_path" "$worktrees_path"; then
         local worktree_name
         worktree_name=$(basename "$current_path")
         
