@@ -895,7 +895,7 @@ delete_git_branch() {
 # Roadmap信息对象
 RoadmapInfo = {
     epic_name: "auth"                           # Epic名称
-    roadmap_path: "docs/epic_roadmap/epic-auth-roadmap.md"  # Roadmap文件路径  
+    roadmap_path: "docs/epic_roadmap/epic-auth-e-roadmap.md"  # Roadmap文件路径  
     template_status: "template" | "customized" | "committed"  # 模板状态
     validation_status: "valid" | "invalid"      # 验证状态
     commit_status: "uncommitted" | "committed"  # Git提交状态
@@ -907,16 +907,26 @@ RoadmapInfo = {
 ```bash
 # 生成Epic roadmap模板
 generate_roadmap_template() {
-    local epic_name="$1"
+    local user_input="$1"                          # 用户原始输入，可能包含前缀后缀
     local base_branch="$2"
-    local roadmap_path="docs/epic_roadmap/epic-${epic_name}-roadmap.md"
+    
+    # ✅ 使用标准的前缀后缀处理方法，避免重复拼接
+    local full_branch_name
+    full_branch_name=$(transform_input_to_epic_branch "$user_input")
+    
+    # 从完整分支名提取纯净Epic名称用于模板内容
+    local clean_epic_name
+    clean_epic_name=$(strip_epic_prefix_from_input "$user_input")
+    clean_epic_name=$(strip_suffix_from_input "$clean_epic_name")
+    
+    local roadmap_path="docs/epic_roadmap/${full_branch_name}-roadmap.md"
     
     # 创建目录
     mkdir -p "$(dirname "$roadmap_path")"
     
     # 生成智能模板
     cat > "$roadmap_path" << EOF
-# Epic: [${epic_name}] 功能模块
+# Epic: [${clean_epic_name}] 功能模块
 
 ## Epic概述
 - **应用背景**: [描述整个应用是什么，解决什么问题]
@@ -924,13 +934,13 @@ generate_roadmap_template() {
 - **预期价值**: [Epic完成后带来的业务价值和用户价值]
 
 ## 子Feature规划
-1. **${epic_name}-[feature-name]** - [功能简述]
+1. **${clean_epic_name}-[feature-name]** - [功能简述]
    - **功能描述**: [详细描述这个子功能做什么]
    - **验收标准**: [具体的AC条件，如：用户可以xxx，系统应该xxx]
    - **优先级**: [P0/P1/P2]
    - **预估工作量**: [S/M/L 或具体天数]
 
-2. **${epic_name}-[feature-name]** - [功能简述]
+2. **${clean_epic_name}-[feature-name]** - [功能简述]
    - **功能描述**: [详细描述]
    - **验收标准**: [具体的AC条件]
    - **优先级**: [P0/P1/P2]
@@ -952,13 +962,19 @@ generate_roadmap_template() {
 
 ## 开发计划
 - **基础分支**: ${base_branch}
-- **Epic分支**: epic-${epic_name}-e
+- **Epic分支**: ${full_branch_name}
 - **创建时间**: $(date '+%Y-%m-%d %H:%M:%S')
 - **预计完成**: [设定目标日期]
 EOF
 
     echo "$roadmap_path"
 }
+
+# 测试用例说明（验证前缀后缀处理）
+# 用户输入 "auth"           → roadmap文件: docs/epic_roadmap/epic-auth-e-roadmap.md
+# 用户输入 "epic-auth"      → roadmap文件: docs/epic_roadmap/epic-auth-e-roadmap.md  
+# 用户输入 "epic-auth-e"    → roadmap文件: docs/epic_roadmap/epic-auth-e-roadmap.md
+# 用户输入 "auth-e"         → roadmap文件: docs/epic_roadmap/epic-auth-e-roadmap.md
 ```
 
 ### Roadmap验证
@@ -1034,14 +1050,18 @@ get_roadmap_validation_details() {
 ```bash
 # 检查Epic分支提交的文件
 validate_epic_commit_files() {
-    local epic_name="$1"
+    local user_input="$1"                          # 用户输入的Epic名称
     local modified_files
     
     # 获取暂存区的修改文件
     modified_files=$(git diff --cached --name-only)
     
+    # ✅ 使用标准的前缀后缀处理方法
+    local full_branch_name
+    full_branch_name=$(transform_input_to_epic_branch "$user_input")
+    
     # 定义允许的roadmap文件模式
-    local roadmap_pattern="^docs/epic_roadmap/epic-${epic_name}-roadmap\.md$"
+    local roadmap_pattern="^docs/epic_roadmap/${full_branch_name}-roadmap\.md$"
     
     local non_roadmap_files=()
     while IFS= read -r file; do
@@ -1087,28 +1107,38 @@ enforce_epic_branch_protection() {
 ```bash
 # Epic创建完整流程
 create_epic_with_roadmap() {
-    local epic_name="$1" 
+    local user_input="$1"                          # 用户输入的Epic名称
     local base_branch="$2"
     local project_root="$3"
     
-    # 1. 创建roadmap
+    # 获取纯净Epic名称用于提示
+    local clean_epic_name
+    clean_epic_name=$(strip_epic_prefix_from_input "$user_input")
+    clean_epic_name=$(strip_suffix_from_input "$clean_epic_name")
+    
+    # 1. 创建roadmap（传递用户原始输入给模板生成函数）
     local roadmap_path
-    roadmap_path=$(generate_roadmap_template "$epic_name" "$base_branch")
+    roadmap_path=$(generate_roadmap_template "$user_input" "$base_branch")
     
     # 2. 提示用户完善
     ui_info "📋 已生成Epic roadmap: $roadmap_path"
     ui_info "📝 下一步操作："
     ui_info "   1. 编辑 $roadmap_path 完善Epic规划"
-    ui_info "   2. 提交roadmap: git add . && git commit -m \"完善${epic_name} Epic roadmap\""
-    ui_info "   3. 创建子Feature: gpf start -ef <feature-name> $epic_name"
+    ui_info "   2. 提交roadmap: git add . && git commit -m \"完善${clean_epic_name} Epic roadmap\""
+    ui_info "   3. 创建子Feature: gpf start -ef <feature-name> $clean_epic_name"
     
     return 0
 }
 
 # Feature创建前的roadmap检查
 validate_epic_ready_for_feature() {
-    local epic_name="$1"
-    local roadmap_path="docs/epic_roadmap/epic-${epic_name}-roadmap.md"
+    local user_input="$1"                          # 用户输入的Epic名称
+    
+    # ✅ 使用标准的前缀后缀处理方法
+    local full_branch_name
+    full_branch_name=$(transform_input_to_epic_branch "$user_input")
+    
+    local roadmap_path="docs/epic_roadmap/${full_branch_name}-roadmap.md"
     
     local validation_details
     validation_details=$(get_roadmap_validation_details "$roadmap_path")

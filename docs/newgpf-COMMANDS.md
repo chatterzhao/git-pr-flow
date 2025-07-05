@@ -81,7 +81,7 @@ gpf start -ef <feature-name> <epic-name>
 
 4. **🎯 Roadmap自动生成（仅创建时）**
    - 创建 `docs/epic_roadmap/` 目录（如果不存在）
-   - 生成 `docs/epic_roadmap/epic-<epic-name>-roadmap.md`
+   - 生成 `docs/epic_roadmap/epic-<epic-name>-e-roadmap.md`
    - 使用智能模板，包含Epic信息和占位符
    - 提示用户完善roadmap后提交
 
@@ -96,10 +96,10 @@ gpf start -ef <feature-name> <epic-name>
    🚀 创建Epic: payment
    📁 工作目录: .worktrees/epic-payment-e
    🌲 Git分支: epic-payment-e
-   📋 Roadmap: docs/epic_roadmap/epic-payment-roadmap.md
+   📋 Roadmap: docs/epic_roadmap/epic-payment-e-roadmap.md
    
    📝 下一步操作：
-   1. 编辑 docs/epic_roadmap/epic-payment-roadmap.md 完善Epic规划
+   1. 编辑 docs/epic_roadmap/epic-payment-e-roadmap.md 完善Epic规划
    2. 提交roadmap: git add . && git commit -m "完善payment Epic roadmap"
    3. 创建子Feature: gpf start -ef <feature-name> payment
    ✅ 已创建并切换到Epic环境 epic-payment-e (.worktrees/epic-payment-e)
@@ -120,7 +120,7 @@ gpf start -ef <feature-name> <epic-name>
    - 如果不存在 → 继续创建流程
 
 3. **🛡️ Epic Roadmap验证（必须步骤）**
-   - **检查Epic roadmap**：验证 `docs/epic_roadmap/epic-<epic-name>-roadmap.md` 是否存在且已提交
+   - **检查Epic roadmap**：验证 `docs/epic_roadmap/epic-<epic-name>-e-roadmap.md` 是否存在且已提交
    - **未提交roadmap**：如果roadmap未提交 → 阻止创建，引导完善roadmap
    - **roadmap完整性检查**：确保roadmap已从模板状态更新为实际规划
    - **目的**：强制规划驱动开发，确保Feature开发有明确目标
@@ -158,7 +158,7 @@ gpf start -ef <feature-name> <epic-name>
    
    🔄 步骤3: Epic Roadmap验证（必须步骤）
    🔍 检查Epic roadmap状态...
-   ✅ docs/epic_roadmap/epic-auth-roadmap.md 已提交且完整
+   ✅ docs/epic_roadmap/epic-auth-e-roadmap.md 已提交且完整
    
    🔄 步骤4: Epic同步检查（必须步骤）
    🔍 检查Epic是否基于最新develop...
@@ -975,8 +975,8 @@ Epic分支具有特殊的保护机制，确保Epic环境的纯净性和规划驱
 cd .worktrees/epic-auth-e
 
 # 1. 修改roadmap文件
-vim docs/epic_roadmap/epic-auth-roadmap.md
-git add docs/epic_roadmap/epic-auth-roadmap.md
+vim docs/epic_roadmap/epic-auth-e-roadmap.md
+git add docs/epic_roadmap/epic-auth-e-roadmap.md
 git commit -m "更新auth Epic roadmap：新增logout子功能"
 
 # 2. 创建子Feature（通过gpf命令）
@@ -1020,7 +1020,7 @@ $ gpf start -ef login auth
 
 ❌ 错误：Epic roadmap未完善
 📁 当前位置：Epic环境 (.worktrees/epic-auth-e)
-📋 Roadmap状态：docs/epic_roadmap/epic-auth-roadmap.md 存在但未提交
+📋 Roadmap状态：docs/epic_roadmap/epic-auth-e-roadmap.md 存在但未提交
 
 🔍 检测到的问题：
   - roadmap文件仍为模板状态（包含未填充的 [占位符]）
@@ -1028,11 +1028,11 @@ $ gpf start -ef login auth
 
 💡 解决方案：
   1. 完善roadmap内容：
-     vim docs/epic_roadmap/epic-auth-roadmap.md
+     vim docs/epic_roadmap/epic-auth-e-roadmap.md
      # 将所有 [占位符] 替换为实际规划内容
   
   2. 提交roadmap：
-     git add docs/epic_roadmap/epic-auth-roadmap.md
+     git add docs/epic_roadmap/epic-auth-e-roadmap.md
      git commit -m "完善auth Epic的开发roadmap"
   
   3. 重新创建子Feature：
@@ -1096,7 +1096,7 @@ $ git commit -m "实现用户认证逻辑"
 $ gpf start -ef register auth
 
 ❌ 错误：Epic roadmap不完整
-📋 Roadmap验证失败：docs/epic_roadmap/epic-auth-roadmap.md
+📋 Roadmap验证失败：docs/epic_roadmap/epic-auth-e-roadmap.md
 
 🔍 检测到的问题：
   - 第15行：Epic目标仍为 [当前Epic要解决的核心问题]
@@ -1105,14 +1105,14 @@ $ gpf start -ef register auth
 
 💡 解决方案：
   1. 编辑roadmap文件：
-     vim docs/epic_roadmap/epic-auth-roadmap.md
+     vim docs/epic_roadmap/epic-auth-e-roadmap.md
      
   2. 替换所有占位符为实际内容：
      # 将 [当前Epic要解决的核心问题] 
      # 替换为：实现用户认证体系，包括登录、注册、权限管理
      
   3. 提交完善的roadmap：
-     git add docs/epic_roadmap/epic-auth-roadmap.md
+     git add docs/epic_roadmap/epic-auth-e-roadmap.md
      git commit -m "完善auth Epic roadmap：明确目标和验收标准"
      
   4. 重新创建子Feature：

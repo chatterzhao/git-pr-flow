@@ -23,7 +23,7 @@
 ### Epic Roadmap 术语
 | 术语 | 标准表述 | 说明 | 示例 |
 |------|----------|------|------|
-| **Epic Roadmap** | Epic Roadmap | Epic 的开发规划文档 | epic-auth-roadmap.md |
+| **Epic Roadmap** | Epic Roadmap | Epic 的开发规划文档 | epic-auth-e-roadmap.md |
 | **规划驱动开发** | 规划驱动开发 | 先完善 roadmap 再开发的工作模式 | Epic创建→完善roadmap→创建Feature |
 | **Epic分支保护** | Epic分支保护 | 限制Epic分支只能修改roadmap的保护机制 | 阻止在Epic分支修改业务代码 |
 | **Roadmap模板** | Roadmap模板 | 自动生成的包含占位符的初始roadmap | 包含 [占位符] 的模板文件 |
@@ -122,7 +122,7 @@
 | 术语 | 标准表述 | 说明 | 路径示例 |
 |------|----------|------|----------|
 | **Epic Roadmap目录** | docs/epic_roadmap/ | 存放所有Epic roadmap的目录 | docs/epic_roadmap/ |
-| **Roadmap文件** | epic-*-roadmap.md | Epic对应的roadmap文件 | docs/epic_roadmap/epic-auth-roadmap.md |
+| **Roadmap文件** | epic-*-roadmap.md | Epic对应的roadmap文件 | docs/epic_roadmap/epic-auth-e-roadmap.md |
 | **Worktree目录** | .worktrees/ | 存放所有worktree的根目录 | .worktrees/ |
 | **模板验证** | 模板验证 | 检查roadmap是否还包含未填充占位符 | 检测 [占位符] 数量 |
 

@@ -176,6 +176,49 @@ gpf status
 
 ## 🔧 高级配置
 
+### VSCode Worktree支持配置
+
+GPF使用Git worktree创建隔离的开发环境。为了让VSCode正确跟踪worktree中的Git状态，需要配置VSCode支持子目录Git检测：
+
+**方法1：安装脚本自动配置（推荐）**
+```bash
+# 一键安装脚本会自动配置VSCode
+curl -fsSL https://raw.githubusercontent.com/your-repo/git-pr-cli/main/scripts/install.sh | bash
+```
+
+**方法2：手动配置VSCode**
+在VSCode设置中添加以下配置：
+
+```json
+{
+  "git.autoRepositoryDetection": "subFolders",
+  "git.repositoryScanMaxDepth": 2
+}
+```
+
+配置方式：
+1. 打开VSCode设置 (⌘+, 或 Ctrl+,)
+2. 点击右上角"打开设置(JSON)"图标
+3. 添加上述配置到settings.json
+4. 重启VSCode
+
+**配置效果：**
+- ✅ VSCode会自动检测 `.worktrees/` 下的所有Git仓库
+- ✅ 每个worktree都有独立的Git状态显示
+- ✅ 源代码管理面板正确显示当前worktree的变更
+- ✅ Git操作（提交、推送等）在正确的worktree环境中执行
+
+**验证配置：**
+```bash
+# 创建一个Epic环境
+gpf start -e test develop
+
+# 在VSCode中打开项目根目录
+# 源代码管理面板应该显示多个仓库：
+# - git-pr-cli (根目录)
+# - epic-test-e (.worktrees/epic-test-e)
+```
+
 ### GitHub认证配置
 
 GPF需要GitHub访问权限来检查PR状态：
