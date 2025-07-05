@@ -42,29 +42,45 @@ ui_debug() {
 }
 
 # 性能计时工具
-declare -A _GPF_TIMERS
+# 检查Bash版本是否支持关联数组
+if (( BASH_VERSINFO[0] >= 4 )); then
+    declare -A _GPF_TIMERS
+else
+    # 对于旧版本Bash，使用简单变量
+    _GPF_TIMERS_SUPPORTED=false
+fi
 
 timer_start() {
     local timer_name="$1"
-    _GPF_TIMERS["$timer_name"]=$(date +%s%N)
+    if (( BASH_VERSINFO[0] >= 4 )); then
+        _GPF_TIMERS["$timer_name"]=$(date +%s%N)
+    else
+        # 对于旧版本Bash，简单记录但不实际计时
+        return 0
+    fi
 }
 
 timer_end() {
     local timer_name="$1"
-    local start_time="${_GPF_TIMERS[$timer_name]:-}"
-    
-    if [[ -z "$start_time" ]]; then
-        ui_error "计时器 $timer_name 未启动"
-        return 1
+    if (( BASH_VERSINFO[0] >= 4 )); then
+        local start_time="${_GPF_TIMERS[$timer_name]:-}"
+        
+        if [[ -z "$start_time" ]]; then
+            ui_error "计时器 $timer_name 未启动"
+            return 1
+        fi
+        
+        local end_time=$(date +%s%N)
+        local duration_ns=$((end_time - start_time))
+        local duration_ms=$((duration_ns / 1000000))
+        
+        ui_debug "$timer_name 执行时间: ${duration_ms}ms"
+        unset _GPF_TIMERS["$timer_name"]
+        echo "$duration_ms"
+    else
+        ui_debug "$timer_name 执行完成（旧版本Bash不支持精确计时）"
+        echo "0"
     fi
-    
-    local end_time=$(date +%s%N)
-    local duration_ns=$((end_time - start_time))
-    local duration_ms=$((duration_ns / 1000000))
-    
-    ui_debug "$timer_name 执行时间: ${duration_ms}ms"
-    unset _GPF_TIMERS["$timer_name"]
-    echo "$duration_ms"
 }
 
 # 错误处理
