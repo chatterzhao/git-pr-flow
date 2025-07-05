@@ -72,14 +72,15 @@ tramp
 # GPF Specific Files
 # =============================================================================
 
-# Worktree directories (managed by git worktree)
-.worktrees/
-# Note: .worktrees/ should be in .gitignore because:
-# 1. Git worktrees are local development environments
-# 2. Each developer may have different worktree layouts  
-# 3. Worktree paths are machine-specific
-# 4. They contain working copies, not source code
-# 5. GPF creates Epic/Feature worktrees dynamically during development
+# Note: .worktrees/ should NOT be ignored because:
+# 1. Worktree directories contain actual source code that needs version control
+# 2. Team members need to see commits made in Epic/Feature worktrees
+# 3. Git worktree creates separate working directories but shares the same repository
+# 4. The files inside worktrees are the actual development work that must be tracked
+
+# GPF worktree-specific temporary files (if any are created in the future)
+.worktrees/**/.gpf-temp
+.worktrees/**/gpf.local.config
 
 # GPF runtime files
 .gpf/
