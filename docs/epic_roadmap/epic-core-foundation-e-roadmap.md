@@ -2,8 +2,8 @@
 
 ## Epic概述
 - **应用背景**: GPF是一个基于四层架构的现代化Git PR工作流工具，旨在简化Epic并行开发和PR管理流程
-- **Epic目标**: 构建NewGPF的核心基础架构，实现四层架构设计（atomic、composite、modules、operations），为后续的GitHub集成和命令层提供稳定的基础组件
-- **预期价值**: 提供高内聚低耦合的模块化基础，支撑整个NewGPF工具的功能实现，确保代码质量和可维护性
+- **Epic目标**: 构建GPF的核心基础架构，实现四层架构设计（atomic、composite、modules、operations），为后续的GitHub集成和命令层提供稳定的基础组件
+- **预期价值**: 提供高内聚低耦合的模块化基础，支撑整个GPF工具的功能实现，确保代码质量和可维护性
 
 ## 子Feature规划
 1. **core-foundation-atomic** - 原子层实现
