@@ -69,7 +69,7 @@
   - 危险操作需要确认
   - 状态检查一致性
 - **兼容性要求**: macOS 10.15+, Linux主流发行版, Git 2.22+
-- **遵循文档**: newgpf-ARCHITECTURE.md四层架构设计，newgpf-CORE-COMPONENTS.md组件规范
+- **遵循文档**: ARCHITECTURE.md四层架构设计，CORE-COMPONENTS.md组件规范
 
 ## 验收定义 (Definition of Done)
 - [ ] 所有子Feature完成并通过测试 (进度: 1/4 ✅)

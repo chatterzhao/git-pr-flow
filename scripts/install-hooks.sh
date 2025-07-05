@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# NewGPF Git Hooks Installation Script
+# GPF Git Hooks Installation Script
 # 安装Git hooks以强制GPF工作流规范
 
 set -euo pipefail
@@ -147,7 +147,7 @@ show_usage() {
 
 # 主函数
 main() {
-    echo -e "${GREEN}🚀 NewGPF Git Hooks 安装器${NC}"
+    echo -e "${GREEN}🚀 GPF Git Hooks 安装器${NC}"
     echo ""
     
     # 检查环境

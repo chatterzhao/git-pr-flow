@@ -1,12 +1,12 @@
-# NewGPF 安装指南
+# GPF 安装指南
 
-> 📖 **相关文档**: [主文档](../newgpf-README.md) | [架构设计](newgpf-ARCHITECTURE.md) | [命令详细](newgpf-COMMANDS.md) | [核心组件](newgpf-CORE-COMPONENTS.md)
+> 📖 **相关文档**: [主文档](../README.md) | [架构设计](ARCHITECTURE.md) | [命令详细](COMMANDS.md) | [核心组件](CORE-COMPONENTS.md)
 
-NewGPF作为**PR友好工具**，需要与GitHub深度集成。本安装指南将引导您完成GPF和必要依赖的安装。
+GPF作为**PR友好工具**，需要与GitHub深度集成。本安装指南将引导您完成GPF和必要依赖的安装。
 
 ## 🎯 安装概述
 
-NewGPF的完整功能依赖以下组件：
+GPF的完整功能依赖以下组件：
 - **GPF本体**：核心CLI工具
 - **GitHub CLI (gh)**：用于GitHub PR状态检查和操作
 - **Git**：版本控制基础（通常已安装）
@@ -492,4 +492,4 @@ chmod +x deploy-gpf-team.sh
 3. **提交问题**：[GitHub Issues](https://github.com/your-repo/git-pr-cli/issues)
 4. **社区支持**：[讨论区](https://github.com/your-repo/git-pr-cli/discussions)
 
-**成功安装后，请参考 [命令详细文档](newgpf-COMMANDS.md) 开始使用GPF！**
+**成功安装后，请参考 [命令详细文档](COMMANDS.md) 开始使用GPF！**
