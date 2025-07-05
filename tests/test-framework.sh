@@ -397,6 +397,26 @@ benchmark_function() {
     echo "  总迭代数: $iterations"
 }
 
+# 测试助手函数
+print_test_header() {
+    local message="$1"
+    echo ""
+    echo "🔬 $message"
+    echo "---"
+}
+
+# 测试总结的别名函数
+print_test_summary() {
+    show_test_summary
+}
+
+# 测试跳过函数
+test_skip() {
+    local message="${1:-测试跳过}"
+    echo "⏭️ 跳过: $message"
+    exit 77  # Standard test skip exit code
+}
+
 # 初始化测试框架
 init_test_framework() {
     test_log "INFO" "初始化测试框架 v$TEST_FRAMEWORK_VERSION"
