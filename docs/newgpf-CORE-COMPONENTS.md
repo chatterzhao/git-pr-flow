@@ -895,7 +895,7 @@ delete_git_branch() {
 # Roadmap信息对象
 RoadmapInfo = {
     epic_name: "auth"                           # Epic名称
-    roadmap_path: "docs/epic_road/epic-auth-roadmap.md"  # Roadmap文件路径  
+    roadmap_path: "docs/epic_roadmap/epic-auth-roadmap.md"  # Roadmap文件路径  
     template_status: "template" | "customized" | "committed"  # 模板状态
     validation_status: "valid" | "invalid"      # 验证状态
     commit_status: "uncommitted" | "committed"  # Git提交状态
@@ -909,7 +909,7 @@ RoadmapInfo = {
 generate_roadmap_template() {
     local epic_name="$1"
     local base_branch="$2"
-    local roadmap_path="docs/epic_road/epic-${epic_name}-roadmap.md"
+    local roadmap_path="docs/epic_roadmap/epic-${epic_name}-roadmap.md"
     
     # 创建目录
     mkdir -p "$(dirname "$roadmap_path")"
@@ -1041,7 +1041,7 @@ validate_epic_commit_files() {
     modified_files=$(git diff --cached --name-only)
     
     # 定义允许的roadmap文件模式
-    local roadmap_pattern="^docs/epic_road/epic-${epic_name}-roadmap\.md$"
+    local roadmap_pattern="^docs/epic_roadmap/epic-${epic_name}-roadmap\.md$"
     
     local non_roadmap_files=()
     while IFS= read -r file; do
@@ -1108,7 +1108,7 @@ create_epic_with_roadmap() {
 # Feature创建前的roadmap检查
 validate_epic_ready_for_feature() {
     local epic_name="$1"
-    local roadmap_path="docs/epic_road/epic-${epic_name}-roadmap.md"
+    local roadmap_path="docs/epic_roadmap/epic-${epic_name}-roadmap.md"
     
     local validation_details
     validation_details=$(get_roadmap_validation_details "$roadmap_path")

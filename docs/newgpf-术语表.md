@@ -121,8 +121,8 @@
 ### 目录结构术语
 | 术语 | 标准表述 | 说明 | 路径示例 |
 |------|----------|------|----------|
-| **Epic Road目录** | docs/epic_road/ | 存放所有Epic roadmap的目录 | docs/epic_road/ |
-| **Roadmap文件** | epic-*-roadmap.md | Epic对应的roadmap文件 | docs/epic_road/epic-auth-roadmap.md |
+| **Epic Roadmap目录** | docs/epic_roadmap/ | 存放所有Epic roadmap的目录 | docs/epic_roadmap/ |
+| **Roadmap文件** | epic-*-roadmap.md | Epic对应的roadmap文件 | docs/epic_roadmap/epic-auth-roadmap.md |
 | **Worktree目录** | .worktrees/ | 存放所有worktree的根目录 | .worktrees/ |
 | **模板验证** | 模板验证 | 检查roadmap是否还包含未填充占位符 | 检测 [占位符] 数量 |
 

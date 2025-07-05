@@ -150,13 +150,13 @@ git worktree add -b epic-auth-login-ef ../epic-auth-login-ef epic-auth-e
 gpf start -e auth develop
 # 系统执行：
 # - 创建: epic-auth-e分支和worktree
-# - 生成: docs/epic_road/epic-auth-roadmap.md
+# - 生成: docs/epic_roadmap/epic-auth-roadmap.md
 # - 提示: 请完善roadmap后提交，再创建子Feature
 
 # 2. 完善Epic规划（必需步骤）
-# 编辑 docs/epic_road/epic-auth-roadmap.md
+# 编辑 docs/epic_roadmap/epic-auth-roadmap.md
 # 定义Epic目标、子Feature列表、验收标准等
-git add docs/epic_road/epic-auth-roadmap.md
+git add docs/epic_roadmap/epic-auth-roadmap.md
 git commit -m "完善auth Epic的开发roadmap"
 
 # 3. 创建Epic子Feature（需要Epic roadmap已提交）
@@ -177,7 +177,7 @@ gpf clean --force      # 强制清理（危险）
 **🛡️ Epic分支保护机制：**
 ```bash
 # ✅ 在Epic分支中允许的操作
-- 修改 docs/epic_road/epic-*-roadmap.md
+- 修改 docs/epic_roadmap/epic-*-roadmap.md
 - 提交roadmap相关的更新
 
 # ❌ 在Epic分支中被拦截的操作  
