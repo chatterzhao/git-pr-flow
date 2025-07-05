@@ -1,0 +1,255 @@
+# NewGPF .gitignore
+# Git PR Flow - Modern PR development tool
+
+# =============================================================================
+# Operating System Files
+# =============================================================================
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# =============================================================================
+# IDE and Editor Files
+# =============================================================================
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# =============================================================================
+# GPF Specific Files
+# =============================================================================
+
+# Worktree directories (managed by git worktree)
+.worktrees/
+# Note: .worktrees/ should be in .gitignore because:
+# 1. Git worktrees are local development environments
+# 2. Each developer may have different worktree layouts  
+# 3. Worktree paths are machine-specific
+# 4. They contain working copies, not source code
+# 5. GPF creates Epic/Feature worktrees dynamically during development
+
+# GPF runtime files
+.gpf/
+gpf.log
+*.gpf.log
+
+# GPF configuration backups
+*.gpf.backup
+settings.json.backup-*
+.git/hooks/*.backup-*
+
+# =============================================================================
+# Development and Build Files
+# =============================================================================
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Log files
+*.log
+logs/
+*.log.*
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Test artifacts
+test-results/
+test-output/
+coverage/
+.coverage
+test_*.tmp
+
+# Shell script artifacts
+*.pid
+*.seed
+*.pid.lock
+
+# Compressed files (unless specifically needed)
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# =============================================================================
+# Installation and Package Management
+# =============================================================================
+
+# Package management
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (if any Python tools are added)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Ruby (if any Ruby tools are added)
+*.gem
+.bundle/
+vendor/
+
+# =============================================================================
+# Security and Credentials
+# =============================================================================
+
+# SSH keys
+id_rsa
+id_rsa.pub
+*.pem
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.test
+
+# API keys and tokens
+.secrets
+*.key
+*.token
+auth.json
+
+# GPG keys
+*.gpg
+*.asc
+
+# =============================================================================
+# Documentation Build Artifacts
+# =============================================================================
+
+# Generated documentation
+docs/_build/
+docs/build/
+site/
+_site/
+
+# =============================================================================
+# Testing and CI/CD
+# =============================================================================
+
+# CI/CD artifacts
+.github/workflows/artifacts/
+ci-artifacts/
+
+# Test databases
+*.test.db
+test.db
+
+# =============================================================================
+# Local Development
+# =============================================================================
+
+# Local configuration
+local.config
+*.local
+.local/
+
+# Development scripts (that shouldn't be committed)
+dev-*.sh
+debug-*.sh
+local-*.sh
+
+# Scratch files
+scratch/
+playground/
+sandbox/
+
+# Personal notes
+NOTES.md
+TODO.personal.md
+SCRATCH.md
+
+# =============================================================================
+# Performance and Monitoring
+# =============================================================================
+
+# Performance logs
+perf.data
+*.perf
+
+# Monitoring
+*.monitoring
+
+# =============================================================================
+# Generated Files (if any automation is added)
+# =============================================================================
+
+# Auto-generated documentation
+auto-docs/
+generated/
+
+# Compiled or processed scripts
+*.compiled
+
+# Version files (if auto-generated)
+VERSION.auto
