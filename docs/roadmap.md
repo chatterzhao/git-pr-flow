@@ -1,8 +1,8 @@
-# NewGPF 实施路线图
+# GPF 实施路线图
 
 > GPF (Git PR Flow) 全新实现 - 基于四层架构的现代化PR工作流工具
 
-> 📖 **相关文档**: [主文档](../newgpf-README.md) | [架构设计](newgpf-ARCHITECTURE.md) | [命令详细](newgpf-COMMANDS.md) | [核心组件](newgpf-CORE-COMPONENTS.md) | [术语表](newgpf-术语表.md)
+> 📖 **相关文档**: [主文档](../README.md) | [架构设计](ARCHITECTURE.md) | [命令详细](COMMANDS.md) | [核心组件](CORE-COMPONENTS.md) | [术语表](术语表.md)
 
 ## 🎯 项目目标
 
@@ -23,7 +23,7 @@
 ## 🏗️ 架构概览
 
 ```
-NewGPF 四层架构
+GPF 四层架构
 ├── bin/git-pr-flow              # 主入口脚本
 ├── lib/core/                    # 核心四层架构
 │   ├── atomic/                  # 原子层：单一功能，无业务逻辑
@@ -63,7 +63,7 @@ NewGPF 四层架构
 
 ### 🎯 **开发模式：Worktree + Epic 实践驱动**
 
-**核心策略**：使用我们正在构建的Epic工作流模式来开发NewGPF本身
+**核心策略**：使用我们正在构建的Epic工作流模式来开发GPF本身
 
 > 💡 **理解要点**: 
 > - 我们既是GPF的开发者，也是GPF工作流的第一批用户
@@ -72,7 +72,7 @@ NewGPF 四层架构
 
 #### 💡 Epic划分策略
 ```bash
-# NewGPF开发的Epic结构
+# GPF开发的Epic结构
 develop                           # 主开发分支
 ├── epic-core-foundation-e        # Epic1: 核心基础架构
 │   ├── epic-core-foundation-e-atomic-ef      # Feature1: 原子层实现
@@ -599,12 +599,12 @@ esac
 ```
 
 #### 5.2 完善文档
-- [x] `newgpf-README.md` - 主文档
-- [x] `newgpf-ARCHITECTURE.md` - 架构设计
-- [x] `newgpf-COMMANDS.md` - 命令详细
-- [x] `newgpf-CORE-COMPONENTS.md` - 组件设计
-- [x] `newgpf-INSTALL.md` - 安装指南
-- [x] `newgpf-术语表.md` - 术语定义
+- [x] `README.md` - 主文档
+- [x] `ARCHITECTURE.md` - 架构设计
+- [x] `COMMANDS.md` - 命令详细
+- [x] `CORE-COMPONENTS.md` - 组件设计
+- [x] `INSTALL.md` - 安装指南
+- [x] `术语表.md` - 术语定义
 - [ ] `examples/` - 使用示例
 - [ ] `FAQ.md` - 常见问题
 
@@ -633,7 +633,7 @@ esac
 #### 🚀 交付成果
 
 **代码交付**
-- NewGPF v1.0 完整功能实现
+- GPF v1.0 完整功能实现
 - >90% 测试覆盖率
 - 完整的CI/CD流程
 - 跨平台兼容性验证
@@ -705,7 +705,7 @@ esac
 - 📋 集成测试Feature：`epic-testing-quality-e-integration-ef`
 - 📋 端到端测试Feature：`epic-testing-quality-e-e2e-ef`
 - 📋 **Epic4完成**：`epic-testing-quality-e` → PR to develop
-- 🎉 **项目发布**：所有Epic合并，NewGPF v1.0发布
+- 🎉 **项目发布**：所有Epic合并，GPF v1.0发布
 
 ### 🎯 Epic驱动开发的验证目标
 - [ ] 每个Epic都能独立开发和测试
@@ -730,11 +730,11 @@ esac
 
 **让高质量PR开发变得自然而简单**
 
-通过NewGPF，我们将为开发者提供：
+通过GPF，我们将为开发者提供：
 - 🚀 **零心智负担**的并行开发体验
 - 🤖 **AI友好**的自动化工作流
 - 🛡️ **安全可靠**的分支管理
 - 📊 **状态透明**的开发进度跟踪
 - 🔄 **智能同步**的团队协作支持
 
-NewGPF不仅是一个工具，更是现代化Git工作流的最佳实践载体。
+GPF不仅是一个工具，更是现代化Git工作流的最佳实践载体。

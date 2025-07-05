@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# NewGPF Main Entry Point
+# GPF Main Entry Point
 # This is a placeholder for testing hooks installation
 
-echo "NewGPF v2.0.0 - Git PR Flow CLI Tool"
+echo "GPF v2.0.0 - Git PR Flow CLI Tool"
 echo ""
 echo "Usage: gpf <command> [options]"
 echo ""
@@ -21,7 +21,7 @@ echo ""
 
 case "${1:-}" in
     --version|-v)
-        echo "NewGPF v2.0.0"
+        echo "GPF v2.0.0"
         ;;
     --help|-h)
         echo "Full help documentation coming soon..."

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# NewGPF Installation Script
+# GPF Installation Script
 # 完整安装GPF及其依赖，包括VSCode配置和Git hooks
 
 set -euo pipefail
@@ -8,7 +8,7 @@ set -euo pipefail
 # Constants
 readonly GPF_VERSION="2.0.0"
 readonly GPF_REPO="https://github.com/your-repo/git-pr-cli.git"
-readonly GPF_INSTALL_DIR="$HOME/.local/share/newgpf"
+readonly GPF_INSTALL_DIR="$HOME/.local/share/gpf"
 readonly GPF_BIN_DIR="$HOME/.local/bin"
 readonly GPF_SYMLINK="$GPF_BIN_DIR/git-pr-flow"
 readonly GPF_ALIAS="$GPF_BIN_DIR/gpf"
@@ -157,7 +157,7 @@ create_directories() {
 
 # Download and install GPF
 download_and_install() {
-    log_info "下载NewGPF..."
+    log_info "下载GPF..."
     
     # Remove existing installation if present
     if [[ -d "$GPF_INSTALL_DIR" ]]; then
@@ -171,13 +171,13 @@ download_and_install() {
         exit 1
     fi
     
-    # Switch to newgpf branch
+    # Switch to gpf branch
     cd "$GPF_INSTALL_DIR"
-    git checkout newgpf || {
-        log_warn "newgpf分支不存在，使用默认分支"
+    git checkout gpf || {
+        log_warn "gpf分支不存在，使用默认分支"
     }
     
-    log_success "NewGPF下载完成: $GPF_INSTALL_DIR"
+    log_success "GPF下载完成: $GPF_INSTALL_DIR"
 }
 
 # Create symbolic links
@@ -340,7 +340,7 @@ update_path() {
     if [[ -n "$shell_config" ]]; then
         log_info "添加 $GPF_BIN_DIR 到PATH: $shell_config"
         echo "" >> "$shell_config"
-        echo "# NewGPF" >> "$shell_config"
+        echo "# GPF" >> "$shell_config"
         echo "export PATH=\"\$PATH:$GPF_BIN_DIR\"" >> "$shell_config"
         log_success "PATH已更新: $shell_config"
         log_warn "请重启shell或执行: source $shell_config"
@@ -369,8 +369,8 @@ test_installation() {
 
 # Show completion message
 show_completion() {
-    log_header "NewGPF 安装完成！"
-    echo -e "${GREEN}│${NC} NewGPF v$GPF_VERSION 安装成功！"
+    log_header "GPF 安装完成！"
+    echo -e "${GREEN}│${NC} GPF v$GPF_VERSION 安装成功！"
     echo -e "${GREEN}│${NC}"
     echo -e "${GREEN}│${NC} 安装位置: $GPF_INSTALL_DIR"
     echo -e "${GREEN}│${NC} 可执行文件:"
@@ -406,8 +406,8 @@ show_completion() {
 
 # Main installation function
 main() {
-    log_header "NewGPF 安装器 v$GPF_VERSION"
-    echo -e "${GREEN}│${NC} 安装NewGPF - 现代化PR开发工具"
+    log_header "GPF 安装器 v$GPF_VERSION"
+    echo -e "${GREEN}│${NC} 安装GPF - 现代化PR开发工具"
     echo -e "${GREEN}│${NC} 包含VSCode配置和开发流程控制"
     log_footer
     echo ""

@@ -1,10 +1,10 @@
-# NewGPF 命令详细设计
+# GPF 命令详细设计
 
-> 📖 **相关文档**: [主文档](../newgpf-README.md) | [架构设计](newgpf-ARCHITECTURE.md) | [核心组件](newgpf-CORE-COMPONENTS.md) | [术语表](newgpf-术语表.md)
+> 📖 **相关文档**: [主文档](../README.md) | [架构设计](ARCHITECTURE.md) | [核心组件](CORE-COMPONENTS.md) | [术语表](术语表.md)
 
-根据 [newgpf-README.md](../newgpf-README.md) 的设计理念，GPF提供5个核心命令，支持明确的参数格式、智能的 **epic- 前缀处理**、**自动目录切换功能**、**级联同步管理** 和 **完整状态可视化**。
+根据 [README.md](../README.md) 的设计理念，GPF提供5个核心命令，支持明确的参数格式、智能的 **epic- 前缀处理**、**自动目录切换功能**、**级联同步管理** 和 **完整状态可视化**。
 
-> 有关技术实现细节参考 [核心组件设计](newgpf-CORE-COMPONENTS.md)。
+> 有关技术实现细节参考 [核心组件设计](CORE-COMPONENTS.md)。
 
 ## 设计理念
 
@@ -607,7 +607,7 @@ clean_command_implementation() {
 
 **核心安全理念**：依赖GitHub CLI提供完整的PR工作流状态检查，确保不误删正在Review的分支
 
-> 📋 **安装说明**: GitHub CLI会在GPF安装时自动安装，详见 [安装指南](newgpf-INSTALL.md)
+> 📋 **安装说明**: GitHub CLI会在GPF安装时自动安装，详见 [安装指南](INSTALL.md)
 
 ### 🔧 Clean --safe 内部执行逻辑
 

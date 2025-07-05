@@ -1,5 +1,5 @@
 #!/bin/bash
-# NewGPF Core - Worktree Operations Atomic Methods
+# GPF Core - Worktree Operations Atomic Methods
 # Worktree操作原子方法 - 单一职责，无副作用，可独立测试
 
 set -euo pipefail

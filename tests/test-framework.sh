@@ -1,5 +1,5 @@
 #!/bin/bash
-# NewGPF Test Framework
+# GPF Test Framework
 # 统一的测试运行框架
 
 set -euo pipefail
@@ -217,7 +217,7 @@ run_test() {
     
     # 创建临时目录
     local test_temp_dir
-    test_temp_dir=$(mktemp -d -t "newgpf-test-XXXXXX")
+    test_temp_dir=$(mktemp -d -t "test-XXXXXX")
     export TEST_TEMP_DIR="$test_temp_dir"
     
     local start_time
@@ -288,7 +288,7 @@ generate_test_report() {
     mkdir -p "$TEST_RESULTS_DIR"
     
     cat > "$report_file" << EOF
-NewGPF 测试报告
+GPF 测试报告
 ================
 生成时间: $(date)
 测试框架版本: $TEST_FRAMEWORK_VERSION

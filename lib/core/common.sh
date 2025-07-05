@@ -1,12 +1,12 @@
 #!/bin/bash
-# NewGPF Core - Common Utilities and Configuration
+# GPF Core - Common Utilities and Configuration
 # 公共工具和配置
 
 set -euo pipefail
 
-# NewGPF版本信息
-readonly NEWGPF_VERSION="1.0.0-dev"
-readonly NEWGPF_BUILD_DATE="2025-07-05"
+# GPF版本信息
+readonly GPF_VERSION="1.0.0-dev"
+readonly GPF_BUILD_DATE="2025-07-05"
 
 # 颜色配置
 readonly COLOR_RED='\033[0;31m'
@@ -36,22 +36,22 @@ ui_info() {
 }
 
 ui_debug() {
-    if [[ "${NEWGPF_DEBUG:-}" == "1" ]]; then
+    if [[ "${GPF_DEBUG:-}" == "1" ]]; then
         echo -e "${COLOR_PURPLE}🔍 DEBUG: $*${COLOR_RESET}" >&2
     fi
 }
 
 # 性能计时工具
-declare -A _NEWGPF_TIMERS
+declare -A _GPF_TIMERS
 
 timer_start() {
     local timer_name="$1"
-    _NEWGPF_TIMERS["$timer_name"]=$(date +%s%N)
+    _GPF_TIMERS["$timer_name"]=$(date +%s%N)
 }
 
 timer_end() {
     local timer_name="$1"
-    local start_time="${_NEWGPF_TIMERS[$timer_name]:-}"
+    local start_time="${_GPF_TIMERS[$timer_name]:-}"
     
     if [[ -z "$start_time" ]]; then
         ui_error "计时器 $timer_name 未启动"
@@ -63,7 +63,7 @@ timer_end() {
     local duration_ms=$((duration_ns / 1000000))
     
     ui_debug "$timer_name 执行时间: ${duration_ms}ms"
-    unset _NEWGPF_TIMERS["$timer_name"]
+    unset _GPF_TIMERS["$timer_name"]
     echo "$duration_ms"
 }
 
@@ -75,7 +75,7 @@ handle_error() {
     ui_error "脚本执行失败，行号: $line_number, 退出码: $exit_code"
     
     # 如果在调试模式，显示调用栈
-    if [[ "${NEWGPF_DEBUG:-}" == "1" ]]; then
+    if [[ "${GPF_DEBUG:-}" == "1" ]]; then
         ui_debug "调用栈:"
         local frame=0
         while caller $frame; do
@@ -95,8 +95,8 @@ log_operation() {
     local details="$2"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     
-    if [[ "${NEWGPF_LOG_FILE:-}" ]]; then
-        echo "[$timestamp] $operation: $details" >> "$NEWGPF_LOG_FILE"
+    if [[ "${GPF_LOG_FILE:-}" ]]; then
+        echo "[$timestamp] $operation: $details" >> "$GPF_LOG_FILE"
     fi
     
     ui_debug "操作日志: $operation - $details"
@@ -135,18 +135,18 @@ validate_environment() {
 }
 
 # 初始化函数
-newgpf_init() {
+gpf_init() {
     # 验证环境
     validate_environment || return 1
     
     # 设置调试模式
     if [[ "${1:-}" == "--debug" ]]; then
-        export NEWGPF_DEBUG=1
+        export GPF_DEBUG=1
         ui_debug "调试模式已启用"
     fi
     
     # 记录初始化
-    log_operation "INIT" "NewGPF v$NEWGPF_VERSION 初始化完成"
+    log_operation "INIT" "GPF v$GPF_VERSION 初始化完成"
     
     return 0
 }
@@ -208,8 +208,8 @@ get_script_dir() {
 # 显示版本信息
 show_version() {
     cat << EOF
-NewGPF (Git PR Flow) v$NEWGPF_VERSION
-构建日期: $NEWGPF_BUILD_DATE
+GPF (Git PR Flow) v$GPF_VERSION
+构建日期: $GPF_BUILD_DATE
 平台: $(get_platform)
 Git版本: $(git --version | awk '{print $3}')
 EOF

@@ -69,7 +69,7 @@
   - 危险操作需要确认
   - 状态检查一致性
 - **兼容性要求**: macOS 10.15+, Linux主流发行版, Git 2.22+
-- **遵循文档**: newgpf-ARCHITECTURE.md四层架构设计，newgpf-CORE-COMPONENTS.md组件规范
+- **遵循文档**: ARCHITECTURE.md四层架构设计，CORE-COMPONENTS.md组件规范
 
 ## 验收定义 (Definition of Done)
 - [ ] 所有子Feature完成并通过测试 (进度: 1/4 ✅)
@@ -94,13 +94,14 @@
 4. **PR提交**: ⏳ epic-core-foundation-e → develop (待完成)
 
 ## 📊 当前进度状态 (2025-07-05)
-- **总体完成度**: 25% (1/4个Feature完成)
-- **已完成**: atomic层实现和测试
-- **正在进行**: Feature atomic层提交完成
+- **总体完成度**: 30% (1/4个Feature完成 + 命名标准化完成)
+- **已完成**: atomic层实现和测试，命名标准化清理
+- **正在进行**: 准备开发composite层
 - **下一步**: 创建composite层Feature分支开始开发
 - **里程碑**: 
   - ✅ 2025-07-05 23:47 - Epic创建和roadmap规划
   - ✅ 2025-07-05 02:45 - atomic层实现完成(47个测试，跨平台兼容)
+  - ✅ 2025-07-05 03:15 - 命名标准化完成(移除newgpf前缀，统一为gpf)
   - ⏳ 预计 2025-07-06 - composite层开发开始
   - ⏳ 预计 2025-07-08 - modules层开发开始  
   - ⏳ 预计 2025-07-10 - operations层开发开始
