@@ -87,7 +87,7 @@ file_get_absolute_path() {
         file_name=$(basename "$file_path")
         
         # 获取目录的绝对路径，然后拼接文件名
-        (cd "$dir_path" && pwd)/"$file_name"
+        echo "$(cd "$dir_path" && pwd)/$file_name"
     else
         # 文件不存在，返回基于当前目录的绝对路径
         local dir_path
