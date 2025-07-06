@@ -10,6 +10,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # 加载依赖
 source "$PROJECT_ROOT/lib/core/common.sh"
+# 加载composite层依赖 - 使用相对路径从composite层worktree加载
 source "$PROJECT_ROOT/lib/core/composite/validation-composite.sh"
 source "$PROJECT_ROOT/lib/core/composite/git-composite.sh"
 source "$PROJECT_ROOT/lib/core/composite/environment-composite.sh"
@@ -48,6 +49,9 @@ validation_module_unified_check() {
             ;;
         "operation_safety")
             validation_module_check_operation_safety "$validation_target" "$validation_context" "$strict_mode"
+            ;;
+        "gitignore_for_start")
+            validation_module_ensure_gitignore_for_start "$validation_target"
             ;;
         *)
             echo "❌ 错误：未知的验证类型: $validation_type" >&2
@@ -602,4 +606,16 @@ validation_module_check_sync_freshness() {
     "is_fresh": $is_fresh
 }
 EOF
+}
+
+# 为start命令提供静默gitignore检查
+# 参数：(project_root)
+# 返回：0（成功）或1（失败）
+validation_module_ensure_gitignore_for_start() {
+    local project_root="${1:-$PROJECT_ROOT}"
+    
+    # 调用composite层方法
+    gitignore_ensure_worktrees_ignored "$project_root"
+    
+    # 静默处理，只返回成功/失败
 }

@@ -79,24 +79,41 @@ gpf start -ef <feature-name> <epic-name>
    - 使用 `create_and_switch_worktree()` 创建并切换
    - 生成最终分支名：`epic-<clean_name>-e`
 
-4. **🎯 Roadmap自动生成（仅创建时）**
+4. **🔍 GitIgnore配置静默处理（每次执行）**
+   - **处理方式**：静默自动处理，无用户交互
+   - **核心逻辑**：
+     - 检查项目根目录是否有`.gitignore`文件
+     - 没有则创建并添加`.worktrees/`忽略规则
+     - 有文件则检查是否包含`.worktrees/`规则，没有则添加
+     - 添加时包含注释说明GPF使用worktree的原因
+   - **调用链**：Commands → Modules → Composite → Atomic
+
+5. **🎯 Roadmap自动生成（仅创建时）**
    - 创建 `docs/epic_roadmap/` 目录（如果不存在）
    - 生成 `docs/epic_roadmap/epic-<epic-name>-e-roadmap.md`
    - 使用智能模板，包含Epic信息和占位符
    - 提示用户完善roadmap后提交
 
-5. **执行示例**
+6. **执行示例（静默处理）**
    ```bash
-   # 场景1：Worktree已存在
+   # 场景1：.gitignore已存在且配置正确
    $ gpf start -e auth develop
    ✅ Epic auth 已存在，已自动切换到Epic环境 (.worktrees/epic-auth-e)
    
-   # 场景2：Worktree不存在 - 首次创建
+   # 场景2：.gitignore不存在，静默创建
    $ gpf start -e payment develop
    🚀 创建Epic: payment
    📁 工作目录: .worktrees/epic-payment-e
    🌲 Git分支: epic-payment-e
    📋 Roadmap: docs/epic_roadmap/epic-payment-e-roadmap.md
+   # 注：此时已自动创建.gitignore并添加.worktrees/规则
+   
+   # 场景3：.gitignore存在但缺少.worktrees/规则，静默添加
+   $ gpf start -ef login auth
+   🚀 创建Feature: login (Epic: auth)
+   📁 工作目录: .worktrees/epic-auth-e-login-ef
+   🌲 Git分支: epic-auth-e-login-ef
+   # 注：此时已自动在.gitignore中添加.worktrees/规则
    
    📝 下一步操作：
    1. 编辑 docs/epic_roadmap/epic-payment-e-roadmap.md 完善Epic规划
