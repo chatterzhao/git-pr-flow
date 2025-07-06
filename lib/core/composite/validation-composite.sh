@@ -9,6 +9,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/path-composite.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/git-composite.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/worktree-composite.sh"
 
+# 导入file-atomic.sh for gitignore functionality
+source "$(dirname "${BASH_SOURCE[0]}")/../atomic/file-atomic.sh"
+
 # 验证PR准备就绪状态
 # 参数：(branch_name, target_branch, optional: worktree_path)
 # 返回：0（准备就绪）或1（未准备就绪），详细状态输出到stdout
@@ -469,4 +472,43 @@ EOF
         printf '  - %s\n' "${env_issues[@]}"
         return 1
     fi
+}
+
+# 静默确保.worktrees被gitignore忽略
+# 参数：(project_root)
+# 返回：0（成功）或1（失败）
+gitignore_ensure_worktrees_ignored() {
+    local project_root="$1"
+    local gitignore_path="$project_root/.gitignore"
+    
+    # 组合调用atomic层方法
+    
+    # 检查.gitignore是否存在
+    if ! file_exists "$gitignore_path"; then
+        # 创建.gitignore并添加规则
+        cat > "$gitignore_path" << 'EOF'
+# GPF (Git PR Flow) worktree管理
+# GPF使用git worktree功能在.worktrees/目录下创建独立的工作区
+# 这些工作区不应该被git跟踪，因为：
+# 1. worktree是本地开发环境，不应提交到仓库
+# 2. 不同开发者的worktree结构可能不同
+# 3. 避免.worktrees目录污染git状态
+.worktrees/
+EOF
+        return 0
+    fi
+    
+    # 检查是否已包含.worktrees/规则
+    if ! file_contains_line "$gitignore_path" ".worktrees/"; then
+        # 添加规则和注释
+        cat >> "$gitignore_path" << 'EOF'
+
+# GPF (Git PR Flow) worktree管理
+# GPF使用git worktree功能在.worktrees/目录下创建独立的工作区
+# 这些工作区不应该被git跟踪，避免污染git状态
+.worktrees/
+EOF
+    fi
+    
+    return 0
 }
