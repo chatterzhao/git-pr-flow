@@ -4,29 +4,32 @@
 
 set -euo pipefail
 
-# 获取脚本所在目录
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
 # 1. 导入依赖Modules（严格遵循四层架构）
 # 注意：只调用Modules层，绝不跨层调用Composite或Atomic层
 
-# 尝试加载modules，如果不存在则会在开发过程中回到Epic1补充
+# 临时获取脚本目录以加载modules（之后通过modules获取项目根目录）
+TEMP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEMP_PROJECT_ROOT="$(cd "$TEMP_SCRIPT_DIR/../.." && pwd)"
+
+# 加载environment module获取正确的项目根目录
+source "$TEMP_PROJECT_ROOT/lib/core/modules/environment-module.sh"
+
+# 通过modules层获取项目根目录（遵循四层架构）
+PROJECT_ROOT=$(environment_get_project_root) || {
+    echo "❌ 错误：无法通过modules层获取项目根目录" >&2
+    exit 1
+}
+
+# 加载其他必需的modules
+source "$PROJECT_ROOT/lib/core/modules/validation-module.sh"
+
+# 尝试加载status module，如果不存在则会在开发过程中回到Epic1补充
 if [[ -f "$PROJECT_ROOT/lib/core/modules/status-module.sh" ]]; then
     source "$PROJECT_ROOT/lib/core/modules/status-module.sh"
 else
     echo "⚠️  模块缺失: status-module.sh"
     echo "📋 需要回到Epic1补充此模块"
 fi
-
-if [[ -f "$PROJECT_ROOT/lib/core/modules/environment-module.sh" ]]; then
-    source "$PROJECT_ROOT/lib/core/modules/environment-module.sh"
-else
-    echo "⚠️  模块缺失: environment-module.sh"
-    echo "📋 需要回到Epic1补充此模块"
-fi
-
-source "$PROJECT_ROOT/lib/core/modules/validation-module.sh"
 
 # 全局变量存储命令参数
 COMMAND_SCOPE=""      # epic名称或feature名称
