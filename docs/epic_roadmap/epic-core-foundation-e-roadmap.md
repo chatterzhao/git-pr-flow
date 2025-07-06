@@ -67,23 +67,16 @@
      - ✅ `lib/core/modules/validation-module.sh` - 数据验证模块（统一的安全检查和数据验证）
      - ✅ `lib/core/modules/paths-module.sh` - 路径管理模块（统一的路径处理和转换接口）
 
-4. **core-foundation-operations** - 操作层实现 ✅ **已完成**
+4. **core-foundation-operations** - 操作层实现 ⏳ **待实现**
    - **功能描述**: 实现纯操作方法，如文件创建、Git命令执行、目录切换等
    - **验收标准**: 
-     - ✅ 所有操作方法只执行操作，不包含业务逻辑
-     - ✅ 操作安全性验证（防止数据丢失）
-     - ✅ 跨平台操作兼容性测试
-     - ✅ 操作失败时的回滚机制
+     - ❌ 所有操作方法只执行操作，不包含业务逻辑
+     - ❌ 操作安全性验证（防止数据丢失）
+     - ❌ 跨平台操作兼容性测试
+     - ❌ 操作失败时的回滚机制
    - **优先级**: P1
    - **预估工作量**: M（3-5天）
-   - **实际完成**: 2025-07-05（1天）
-   - **状态**: 完全实现，5个操作文件，2078行代码
-   - **实现文件**: 
-     - `lib/core/operations/git-operations.sh` - Git命令操作（分支创建、推送、合并、检出等）
-     - `lib/core/operations/worktree-operations.sh` - Worktree操作（创建、删除、切换等）
-     - `lib/core/operations/github-operations.sh` - GitHub CLI操作（PR创建、合并、状态查询等）
-     - `lib/core/operations/file-operations.sh` - 文件系统操作（创建、删除、复制、移动等）
-     - `lib/core/operations/directory-operations.sh` - 目录操作（创建、删除、切换、列表等）
+   - **状态**: 尚未开始
 
 ## 技术要求
 - **依赖组件**: Git 2.22+, Bash 4.0+, 基础Unix工具（mkdir, pwd, cd等）
@@ -122,17 +115,15 @@
 4. **PR提交**: ⏳ epic-core-foundation-e → develop (待operations层完成后)
 
 ## 📊 当前进度状态 (2025-07-05)
-- **总体完成度**: 100% (4/4个Feature完成) 🎉
+- **总体完成度**: 75% (3/4个Feature完成)
 - **已完成**: 
   - ✅ **atomic层实现和测试**（87个函数，36个测试用例，100%通过）
   - ✅ **composite层实现和测试**（41个方法，47个测试用例，100%通过）
   - ✅ **modules层实现和测试**（8个核心模块，完整测试套件，架构合规性100%）
-  - ✅ **operations层实现和测试**（5个操作文件，2078行代码，语法验证100%通过）
-  - ✅ **四层架构设计完整实现**（atomic→composite→modules→operations）
   - ✅ **架构合规性验证**（完全符合设计文档要求）
   - ✅ **缺失功能补充**（roadmap管理、方法命名修正、同步/验证/路径模块）
-- **正在进行**: Epic完整性验证和代码审查
-- **下一步**: 准备Epic→develop的PR合并
+- **正在进行**: 评估operations层实现需求
+- **下一步**: 确定operations层设计和实现计划
 - **里程碑**: 
   - ✅ 2025-07-05 23:47 - Epic创建和roadmap规划
   - ✅ 2025-07-05 02:45 - atomic层实现完成(36个测试，跨平台兼容)
@@ -141,10 +132,9 @@
   - ✅ 2025-07-05 07:35 - composite层完整性分析和gap修复完成
   - ✅ 2025-07-05 07:35 - 补充roadmap-composite.sh及相关测试
   - ✅ 2025-07-05 07:35 - 修正方法命名以符合设计文档(100%符合)
-  - ✅ 2025-07-05 XX:XX - modules层实现完成(8个核心模块，100%架构合规)
-  - ✅ 2025-07-05 09:49 - operations层实现完成(5个操作文件，2078行代码)
-  - ✅ 2025-07-05 09:49 - 四层架构完整实现，Epic core-foundation 100%完成
-  - ⏳ 预计 2025-07-06 - Epic完整性测试和PR准备
+  - ✅ 2025-07-05 XX:XX - modules层实现完成(5个核心模块，100%架构合规)
+  - ⏳ 预计 2025-07-06 - operations层开发开始  
+  - ⏳ 预计 2025-07-08 - Epic完整实现
 
 ## 🎯 Composite层Gap分析总结 (2025-07-05)
 ### 已修复的主要问题：
@@ -224,165 +214,3 @@
 
 ### 预期最终完成率: 100%
 完成后将有8个modules核心模块，100%覆盖GPF命令层的所有业务需求，为operations层和commands层提供完整的业务功能基础设施。特别是sync-module的补充将解锁GPF的核心价值"智能同步"功能的实现。
-
-## 🎯 Operations层详细实施计划 (2025-07-05)
-
-### 🏗️ Operations层架构设计原则
-
-**核心特征**：
-- **纯操作执行**：只执行系统操作，无业务逻辑判断
-- **安全第一**：所有危险操作包含rollback机制
-- **跨平台兼容**：支持macOS/Linux/Windows
-- **依赖隔离**：不依赖GPF其他层，只依赖系统命令
-- **错误透明**：清晰的错误传播，技术错误vs业务错误分离
-
-### 📦 Operations层5个核心组件
-
-#### 1. **Git Operations** (`git-operations.sh`)
-```bash
-# Git操作原语 - 纯执行，无业务逻辑
-git_branch_create_operation()     # git checkout -b
-git_branch_delete_operation()     # git branch -d/-D  
-git_branch_push_operation()       # git push -u origin
-git_merge_operation()             # git merge --no-edit
-git_checkout_operation()          # git checkout
-git_commit_operation()            # git commit -m
-git_fetch_operation()             # git fetch origin
-git_pull_operation()              # git pull origin
-
-# 每个操作包含：前置验证 → 执行 → 验证结果 → rollback支持
-```
-
-#### 2. **Worktree Operations** (`worktree-operations.sh`)
-```bash
-# Worktree操作原语
-worktree_create_operation()       # git worktree add
-worktree_delete_operation()       # git worktree remove
-worktree_list_operation()         # git worktree list
-worktree_prune_operation()        # git worktree prune
-
-# 特殊安全要求：删除前检查未保存工作，支持强制删除模式
-```
-
-#### 3. **GitHub Operations** (`github-operations.sh`)
-```bash
-# GitHub CLI操作原语
-github_pr_create_operation()     # gh pr create
-github_pr_merge_operation()      # gh pr merge  
-github_pr_close_operation()      # gh pr close
-github_pr_update_operation()     # gh pr edit
-github_auth_check_operation()    # gh auth status
-
-# 所有操作处理gh CLI的输出格式，统一错误码映射
-```
-
-#### 4. **File Operations** (`file-operations.sh`)
-```bash
-# 文件系统操作原语
-file_create_operation()          # touch/echo >
-file_delete_operation()          # rm (安全删除)
-file_copy_operation()            # cp
-file_move_operation()            # mv
-file_backup_operation()          # 安全备份创建
-file_restore_operation()         # 从备份恢复
-
-# 安全特性：自动备份，确认删除，跨平台路径处理
-```
-
-#### 5. **Directory Operations** (`directory-operations.sh`)
-```bash
-# 目录操作原语
-directory_create_operation()     # mkdir -p
-directory_delete_operation()     # rmdir (安全删除)
-directory_change_operation()     # cd (with verification)
-directory_list_operation()       # ls/find
-directory_exists_operation()     # [ -d ]
-
-# 特殊要求：路径安全验证，防止删除系统目录
-```
-
-### 🔒 Operations层安全设计
-
-#### 安全操作模式
-```bash
-# 每个危险操作的标准模式
-operation_with_safety() {
-    local operation_data="$1"
-    local safety_mode="${2:-safe}"  # safe/force
-    
-    # 1. 前置安全检查
-    validate_operation_safety "$operation_data" || return 1
-    
-    # 2. 创建rollback点（如果需要）
-    if is_destructive_operation "$operation_data"; then
-        create_rollback_checkpoint "$operation_data" || return 1
-    fi
-    
-    # 3. 执行操作
-    execute_actual_operation "$operation_data" || {
-        rollback_if_needed "$operation_data"
-        return 1
-    }
-    
-    # 4. 验证操作结果
-    verify_operation_success "$operation_data" || {
-        rollback_if_needed "$operation_data"
-        return 1
-    }
-    
-    return 0
-}
-```
-
-#### Rollback机制设计
-- **Git操作**：利用Git的自然回滚能力
-- **文件操作**：自动备份关键文件
-- **目录操作**：删除前备份目录结构
-- **Worktree操作**：删除前备份工作区状态
-
-### 📋 Operations层实施路线图
-
-#### Phase 1: Git & Worktree Operations (Day 1) ✅ **已完成**
-- ✅ 创建operations目录结构
-- ✅ 实现`git-operations.sh`（8个核心Git操作，398行）
-- ✅ 实现`worktree-operations.sh`（4个Worktree操作，395行）
-- ✅ 实现基础安全检查和rollback框架
-
-#### Phase 2: GitHub & File Operations (Day 2) ✅ **已完成**
-- ✅ 实现`github-operations.sh`（5个GitHub CLI操作，146行）
-- ✅ 实现`file-operations.sh`（6个文件操作，559行）
-- ✅ 实现跨平台兼容性处理
-
-#### Phase 3: Directory Operations & Testing (Day 3) ✅ **已完成**
-- ✅ 实现`directory-operations.sh`（5个目录操作，582行）
-- ✅ 创建operations层测试套件（语法验证100%通过）
-- ✅ 性能基准测试（轻量级实现，符合<100ms要求）
-- ✅ 安全性测试（所有操作包含rollback机制）
-
-#### Phase 4: Integration & Validation (Day 4-5)
-- 🔄 与modules层集成测试
-- 🔄 四层架构完整性验证
-- 🔄 跨平台测试（macOS/Linux）
-- 🔄 文档完善和代码审查
-
-### 🎯 Operations层验收标准
-
-#### 功能完整性
-- ✅ 5个operations组件文件实现
-- ✅ 每个组件包含必要的操作原语
-- ✅ 统一的错误处理和返回码规范
-
-#### 安全性验证
-- ✅ 所有破坏性操作包含rollback机制
-- ✅ 前置安全检查防止数据丢失
-- ✅ 操作确认机制（force模式支持）
-
-#### 性能要求
-- ✅ 每个操作执行时间<100ms
-- ✅ 内存使用最小化
-- ✅ 并发操作安全性
-
-#### 架构合规性
-- ✅ 纯操作执行，无业务逻辑
-- ✅ 不依赖GPF其他层
-- ✅ 为modules层提供完整操作支持
