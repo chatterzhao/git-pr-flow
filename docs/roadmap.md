@@ -1,8 +1,8 @@
 # GPF 实施路线图
 
-> GPF (Git PR Flow) 全新实现 - 基于四层架构的现代化PR工作流工具
+> GPF (Git PR Flow) Cli 工具是一个结合 Epic 开发流程、Git Worktree 和 GitHub Cli 设计的 PR 友好工具，通过 gpf start，gpf sync，gpf stauts，gpf pr，gpf clean 五个命令实现从创建分支到清理分支的 PR 完整流程
 
-> 📖 **相关文档**: [主文档](../README.md) | [架构设计](ARCHITECTURE.md) | [命令详细](COMMANDS.md) | [核心组件](CORE-COMPONENTS.md) | [术语表](术语表.md)
+> 📖 **相关文档**: [主文档](../README.md) | [架构设计](ARCHITECTURE.md) | [命令详细](COMMANDS.md) | [核心组件](CORE-COMPONENTS.md) | [Commands实施](commands-implementation-roadmap.md) | [术语表](术语表.md)
 
 ## 🎯 项目目标
 
@@ -14,7 +14,7 @@
 5. **安全状态管理**：统一的状态检查和清理策略
 
 ### 技术特色
-- **四层架构设计**：atomic → composite → modules → commands
+- **三层架构设计**：atomic → composite → modules (+ commands)
 - **组件化开发**：高内聚低耦合的模块设计
 - **AI友好接口**：参数化设计，支持自动化操作
 - **智能切换机制**：零心智负担的环境管理
@@ -23,13 +23,12 @@
 ## 🏗️ 架构概览
 
 ```
-GPF 四层架构
+GPF 三层架构
 ├── bin/git-pr-flow              # 主入口脚本
-├── lib/core/                    # 核心四层架构
+├── lib/core/                    # 核心三层架构
 │   ├── atomic/                  # 原子层：单一功能，无业务逻辑 ✅
 │   ├── composite/               # 组合层：组合原子方法 ✅
-│   ├── modules/                 # 模块层：完整功能模块 ✅
-│   └── operations/              # 操作层：仅执行操作 ⏳
+│   └── modules/                 # 模块层：完整功能模块 ✅
 ├── lib/commands/                # 命令层：业务编排
 │   ├── start.sh                 # 开始开发
 │   ├── pr.sh                    # 创建PR
@@ -74,21 +73,17 @@ GPF 四层架构
 ```bash
 # GPF开发的Epic结构
 develop                           # 主开发分支
-├── epic-core-foundation-e        # Epic1: 核心基础架构
-│   ├── epic-core-foundation-e-atomic-ef      # Feature1: 原子层实现
-│   ├── epic-core-foundation-e-composite-ef   # Feature2: 组合层实现
-│   └── epic-core-foundation-e-modules-ef     # Feature3: 模块层实现
-├── epic-github-integration-e     # Epic2: GitHub集成功能
-│   ├── epic-github-integration-e-cli-ef      # Feature1: CLI检查集成
-│   ├── epic-github-integration-e-pr-ef       # Feature2: PR管理集成
-│   └── epic-github-integration-e-auth-ef     # Feature3: 认证和权限
-├── epic-commands-layer-e         # Epic3: 命令层实现
-│   ├── epic-commands-layer-e-status-ef       # Feature1: status命令
-│   ├── epic-commands-layer-e-start-ef        # Feature2: start命令
-│   ├── epic-commands-layer-e-pr-ef           # Feature3: pr命令
-│   ├── epic-commands-layer-e-clean-ef        # Feature4: clean命令
-│   └── epic-commands-layer-e-sync-ef         # Feature5: sync命令
-└── epic-testing-quality-e        # Epic4: 测试和质量保证
+├── epic-core-foundation-e        # Epic1: 核心基础架构 ✅
+│   ├── epic-core-foundation-e-atomic-ef      # Feature1: 原子层实现 ✅
+│   ├── epic-core-foundation-e-composite-ef   # Feature2: 组合层实现 ✅
+│   └── epic-core-foundation-e-modules-ef     # Feature3: 模块层实现 ✅
+├── epic-commands-layer-e         # Epic2: 命令层实现 (用户价值核心)
+│   ├── epic-commands-layer-e-status-ef       # Feature1: status命令 (基础支撑)
+│   ├── epic-commands-layer-e-start-ef        # Feature2: start命令 (创建环境)
+│   ├── epic-commands-layer-e-pr-ef           # Feature3: pr命令 (核心价值)
+│   ├── epic-commands-layer-e-sync-ef         # Feature4: sync命令 (同步管理)
+│   └── epic-commands-layer-e-clean-ef        # Feature5: clean命令 (清理管理)
+└── epic-testing-quality-e        # Epic3: 测试和质量保证
     ├── epic-testing-quality-e-unit-ef        # Feature1: 单元测试框架
     ├── epic-testing-quality-e-integration-ef # Feature2: 集成测试
     └── epic-testing-quality-e-e2e-ef         # Feature3: 端到端测试
@@ -157,9 +152,9 @@ cd ../epic-core-foundation-e
 ```bash
 # 阶段说明：为开发GPF建立基础架构和Epic开发环境
 
-# 1. 创建四层架构目录（在主项目develop分支中）
+# 1. 创建三层架构目录（在主项目develop分支中）
 # 目的：为GPF产品建立标准的代码组织结构
-mkdir -p lib/core/{atomic,composite,modules,operations}
+mkdir -p lib/core/{atomic,composite,modules}
 mkdir -p lib/commands
 mkdir -p tests/{unit,integration,e2e}
 mkdir -p bin examples
@@ -187,7 +182,7 @@ pwd  # 确认在主项目根目录
 git branch  # 确认在develop分支
 
 # Step 1: 建立GPF产品的代码架构
-mkdir -p lib/core/{atomic,composite,modules,operations}
+mkdir -p lib/core/{atomic,composite,modules}
 mkdir -p lib/commands tests/{unit,integration,e2e} bin examples
 
 # Step 2: 创建GPF开发的基础工具
@@ -450,7 +445,7 @@ roadmap_module_status_monitoring()  # ✅ Roadmap状态监控
 - **完整业务接口**：为pr/clean/sync/status/start命令提供高内聚的功能模块
 - **JSON标准输出**：统一的数据交换格式，支持不同purpose的专门处理
 - **测试套件完整**：模块验证脚本、功能测试、架构合规性检查
-- **依赖关系正确**：严格遵循四层架构，为operations层提供完整基础
+- **依赖关系正确**：严格遵循三层架构，为commands层提供完整基础
 
 **📋 模块完成状态（8个模块）**
 - ✅ **status-module.sh** - 统一状态检查模块（已完成）
@@ -468,240 +463,59 @@ roadmap_module_status_monitoring()  # ✅ Roadmap状态监控
 - ✅ 验证了Epic内Feature到Epic的开发流程
 - ✅ 为Epic→develop的PR工作流做好准备
 
-### Phase 2: GitHub集成实施（Week 2-3）
+### Phase 2: 命令层实施（Week 4-6）- 用户价值核心
 
-#### 2.1 GitHub原子方法
-```bash
-# lib/core/atomic/gh-atomic.sh
-gh_check_installation()          # 检查gh工具安装
-gh_check_auth()                  # 检查GitHub认证
-gh_check_repo_access()           # 检查仓库访问权限
+> **详细实施指南**: 参见 [Commands层实施路线图](commands-implementation-roadmap.md)
 
-# lib/core/atomic/github-pr-query.sh
-github_pr_exists()               # 检查PR是否存在
-github_pr_get_basic_info()       # 获取PR基本信息
-github_pr_get_review_status()    # 获取PR审核状态
-```
+#### 2.1 命令层总体规划
 
-#### 2.2 GitHub组合方法
-```bash
-# lib/core/composite/gh-composite.sh
-gh_validate_environment()        # GitHub环境验证组合
-github_check_environment()       # 统一GitHub环境检查
-# 参数：(check_type) basic|full|version
+**5个核心命令**：
+- **status命令**: 基础支撑，统一状态检查接口
+- **start命令**: 智能环境创建，预同步逻辑
+- **pr命令**: 核心价值功能，GitHub集成
+- **sync命令**: 智能级联同步，协作支持 
+- **clean命令**: 安全分支清理，状态感知
 
-# lib/core/composite/github-pr-composite.sh
-github_pr_get_complete_info()    # 获取完整PR信息
-github_pr_verify_safe_to_clean() # 验证清理安全性
-```
+**实施优先级**：
+1. Week 4: status命令 (基础支撑)
+2. Week 4-5: start命令 (环境创建)
+3. Week 5: pr命令 (核心价值)
+4. Week 5-6: sync命令 (协作管理)
+5. Week 6: clean命令 (清理管理)
 
-#### 2.3 GitHub模块
-```bash
-# lib/core/modules/github-module.sh
-github_module_manage_pr_lifecycle() # PR生命周期管理
-github_pr_get_status()           # 统一PR状态检查
-# 参数：(branch, target, purpose)
-# purpose: exists|status|clean_safety|display
-```
+**关键设计原则**：
+- 每个命令都有智能支撑逻辑，用户"省事"
+- 统一的状态检查接口，确保一致性
+- 基于环境的智能感知和行为调整
+- 安全第一，危险操作多重验证
 
-#### 2.4 GitHub操作层
-```bash
-# lib/core/operations/github-pr-operations.sh
-github_pr_create()               # 创建PR
-github_pr_update()               # 更新PR
-github_pr_close()                # 关闭PR
-```
+### Phase 3: 测试和质量保证（Week 6-7）
 
-### Phase 3: 命令层实施（Week 4-6）
+> **详细测试计划**: 参见 Epic3 测试质量路线图
 
-#### 3.1 命令实现顺序（调整优化）
+#### 3.1 测试策略概览
 
-**1. status命令（Week 4，基础支撑优先）**
-```bash
-# lib/commands/status.sh
-# 功能：环境感知状态显示
-# 依赖：status-module
-# 实施细节：
-#   - 根据当前环境智能确定显示范围
-#   - 支持 gpf status / gpf status <epic> / gpf status <epic> <feature>
-#   - 集成GitHub PR状态显示
-# 验证：其他命令的状态检查基础
-```
+**分层测试体系**：
+- **单元测试**: 原子层和组合层功能验证 (>95% 覆盖率)
+- **集成测试**: 模块层业务逻辑验证 (完整功能路径)
+- **端到端测试**: Commands层用户场景验证 (真实使用场景)
+- **跨平台测试**: macOS/Linux兼容性验证
 
-**2. start命令（Week 4-5，核心创建功能）**
-```bash
-# lib/commands/start.sh
-# 功能：创建Epic和Feature分支
-# 依赖：environment-module, worktree-module
-# 实施细节：
-#   - 智能切换：检测现有worktree，存在则切换，不存在则创建
-#   - 双模式：无参数交互式，有参数直接执行
-#   - 同步检查：创建Feature前确保Epic同步最新
-# 参数：gpf start -e <epic> <base> / gpf start -ef <feature> <epic>
-```
+**质量门禁**：
+- 所有测试通过率 100%
+- 性能基准: 命令响应时间 <2秒
+- 错误处理覆盖率 100%
+- GitHub CLI集成测试通过
 
-**3. pr命令（Week 5，核心价值功能）**
-```bash
-# lib/commands/pr.sh
-# 功能：智能PR创建
-# 依赖：status-module, github-module
-# 实施细节：
-#   - 环境强制验证：必须在Epic或Feature环境执行
-#   - GitHub CLI集成：完整的gh工具检查和PR创建
-#   - Issue关联强制：PR必须关联GitHub issue
-#   - 智能方向检测：Feature→Epic, Epic→Develop
-# 特性：同步新鲜度检查，确保基于最新上游代码
-```
+### Phase 4: 项目交付（Week 7）
 
-**4. clean命令（Week 5-6，安全管理）**
-```bash
-# lib/commands/clean.sh
-# 功能：安全清理分支
-# 依赖：status-module, worktree-module
-# 实施细节：
-#   - 安全级别分析：🟢安全 🟡警告 🔴危险
-#   - 预览模式：gpf clean（默认）显示清理建议
-#   - 执行模式：gpf clean --safe / gpf clean --force
-#   - 环境感知：根据当前位置确定清理范围
-```
+#### 4.1 主入口和工具链
+- GPF主入口脚本实现
+- 安装和部署脚本
+- CI/CD管道配置
+- 跨平台兼容性验证
 
-**5. sync命令（Week 6，协作支持）**
-```bash
-# lib/commands/sync.sh
-# 功能：智能级联同步
-# 依赖：worktree-module, environment-module
-# 实施细节：
-#   - 级联同步：develop→epic→features（上往下同步）
-#   - 安全检查：工作区干净性、冲突检测
-#   - Pull策略：自动pull最新远程代码
-#   - 智能范围：根据环境确定同步范围
-```
-
-#### 3.2 命令实现规范
-
-**统一命令结构**
-```bash
-#!/bin/bash
-# 每个命令文件的标准结构：
-
-# 1. 导入依赖模块
-source "$(dirname "$0")/../core/modules/status-module.sh"
-
-# 2. 命令参数解析
-parse_command_arguments() { ... }
-
-# 3. 环境验证
-validate_command_environment() { ... }
-
-# 4. 核心业务逻辑（只调用模块方法）
-execute_command_logic() { ... }
-
-# 5. 主入口
-main() {
-    parse_command_arguments "$@"
-    validate_command_environment
-    execute_command_logic
-}
-
-main "$@"
-```
-
-### Phase 4: 测试和验证（Week 6-7）
-
-#### 4.1 分层测试策略
-
-**原子层测试（单元测试）**
-```bash
-tests/unit/atomic/
-├── test-environment-atomic.sh   # Mock文件系统，验证环境检测逻辑
-├── test-path-atomic.sh         # 参数化测试，覆盖各种输入格式
-├── test-git-atomic.sh          # Mock git命令，验证Git状态检查
-└── test-worktree-query.sh      # Mock worktree列表，测试查询逻辑
-# 目标：每个原子方法覆盖率>95%，执行时间<100ms
-```
-
-**组合层测试（集成测试）**
-```bash
-tests/integration/composite/
-├── test-environment-composite.sh  # 测试多个原子方法组合的逻辑
-├── test-path-composite.sh        # 测试用户输入的各种边缘情况
-└── test-worktree-composite.sh    # 测试工作树管理的完整流程
-# 目标：验证原子方法协作，错误传播正确
-```
-
-**模块层测试（业务逻辑测试）**
-```bash
-tests/integration/modules/
-├── test-status-module.sh       # 测试统一状态检查的各种purpose
-├── test-github-module.sh       # 测试GitHub集成（需要测试环境）
-└── test-worktree-module.sh     # 测试工作树生命周期管理
-# 目标：验证完整业务逻辑，性能<500ms
-```
-
-**命令层测试（端到端测试）**
-```bash
-tests/e2e/
-├── test-complete-workflow.sh   # 完整Epic开发流程：start→pr→clean
-├── test-github-integration.sh  # GitHub CLI集成的真实场景
-├── test-error-scenarios.sh     # 异常情况和错误恢复
-└── test-cross-platform.sh      # 跨平台兼容性验证
-# 目标：模拟真实用户使用场景
-```
-
-#### 4.2 验证里程碑和质量门禁
-
-**Week 6 中期验证**
-- [ ] 单元测试覆盖率>90%
-- [ ] 所有原子方法性能<100ms
-- [ ] 集成测试通过率100%
-- [ ] 错误处理覆盖率100%
-
-**Week 7 发布验证**
-- [ ] 端到端测试通过率100%
-- [ ] 跨平台兼容性验证（macOS/Linux）
-- [ ] GitHub CLI集成测试（需要真实仓库）
-- [ ] 性能基准：命令响应时间<2秒
-
-#### 4.3 测试框架和工具
-
-**测试框架设计**
-```bash
-# tests/test-framework.sh
-run_test_suite() {
-    # 统一的测试运行框架
-    # 支持：参数化测试、Mock、断言、报告生成
-}
-
-mock_git_command() {
-    # Git命令Mock工具
-    # 模拟各种Git状态和返回值
-}
-
-assert_json_equals() {
-    # JSON格式断言工具
-    # 验证复杂数据结构的返回值
-}
-```
-
-### Phase 5: 入口和部署（Week 7-8）
-
-#### 5.1 主入口脚本
-```bash
-# bin/git-pr-flow
-#!/bin/bash
-# GPF主入口，分发到具体命令
-
-case "$1" in
-    start)  lib/commands/start.sh "${@:2}" ;;
-    pr)     lib/commands/pr.sh "${@:2}" ;;
-    clean)  lib/commands/clean.sh "${@:2}" ;;
-    status) lib/commands/status.sh "${@:2}" ;;
-    sync)   lib/commands/sync.sh "${@:2}" ;;
-    *)      show_help ;;
-esac
-```
-
-#### 5.2 完善文档
+#### 4.2 文档完善
 - [x] `README.md` - 主文档
 - [x] `ARCHITECTURE.md` - 架构设计
 - [x] `COMMANDS.md` - 命令详细
@@ -786,34 +600,33 @@ esac
 
 ### Week 2-3: Epic1持续完善（已完成）
 - ✅ 组合层Feature：`epic-core-foundation-e-composite-ef`（41个方法，47个测试，100%符合设计文档）
-- ✅ 模块层Feature：`epic-core-foundation-e-modules-ef`（5个核心模块，100%完成）
-- 📋 **Epic1完成**：`epic-core-foundation-e` → PR to develop（准备中）
-- 🚀 **Epic2启动**：GitHub集成Epic (`epic-github-integration-e`)（可以开始）
+- ✅ 模块层Feature：`epic-core-foundation-e-modules-ef`（8个核心模块，100%完成）
+- ✅ **Epic1完成**：`epic-core-foundation-e` → PR to develop（已完成，三层架构）
 
-### Week 4-5: Epic3命令层核心
-- 🚀 **Epic3启动**：命令层Epic (`epic-commands-layer-e`)
-- 📋 status命令Feature：`epic-commands-layer-e-status-ef`
-- 📋 start命令Feature：`epic-commands-layer-e-start-ef`
-- 📋 pr命令Feature：`epic-commands-layer-e-pr-ef`
-- 📋 **实战验证**：使用开发的工具来管理自己的开发
+### Week 4-5: Epic2命令层核心（用户价值实现）
+- 🚀 **Epic2启动**：命令层Epic (`epic-commands-layer-e`)
+- 📋 status命令Feature：`epic-commands-layer-e-status-ef`（基础支撑）
+- 📋 start命令Feature：`epic-commands-layer-e-start-ef`（创建环境）
+- 📋 pr命令Feature：`epic-commands-layer-e-pr-ef`（核心价值）
+- 📋 **实战验证**：使用开发的GPF工具来管理自己的开发
 
-### Week 6: Epic3完成 + Epic4启动
-- 📋 clean命令Feature：`epic-commands-layer-e-clean-ef`
-- 📋 sync命令Feature：`epic-commands-layer-e-sync-ef`
-- 📋 **Epic3完成**：`epic-commands-layer-e` → PR to develop
-- 🚀 **Epic4启动**：测试质量Epic (`epic-testing-quality-e`)
+### Week 6: Epic2完成 + Epic3启动
+- 📋 sync命令Feature：`epic-commands-layer-e-sync-ef`（同步管理）
+- 📋 clean命令Feature：`epic-commands-layer-e-clean-ef`（清理管理）
+- 📋 **Epic2完成**：`epic-commands-layer-e` → PR to develop
+- 🚀 **Epic3启动**：测试质量Epic (`epic-testing-quality-e`)
 
-### Week 7-8: Epic4完成 + 项目发布
+### Week 7: Epic3完成 + 项目发布
 - 📋 单元测试Feature：`epic-testing-quality-e-unit-ef`
 - 📋 集成测试Feature：`epic-testing-quality-e-integration-ef`
 - 📋 端到端测试Feature：`epic-testing-quality-e-e2e-ef`
-- 📋 **Epic4完成**：`epic-testing-quality-e` → PR to develop
+- 📋 **Epic3完成**：`epic-testing-quality-e` → PR to develop
 - 🎉 **项目发布**：所有Epic合并，GPF v1.0发布
 
 ### 🎯 Epic驱动开发的验证目标
 - ✅ 每个Epic都能独立开发和测试（epic-core-foundation-e验证通过）
 - ✅ Feature到Epic的PR流程顺畅（atomic-ef和composite-ef验证通过）
-- 📋 Epic到develop的PR流程完整（待modules层完成后验证）
+- ✅ Epic到develop的PR流程完整（Epic1已完成验证）
 - ✅ 多Epic并行开发无冲突（多worktree并行开发验证通过）
 - ✅ 开发过程就是最佳使用示例（实战验证Epic工作流的可行性）
 

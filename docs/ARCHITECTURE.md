@@ -35,10 +35,6 @@ gpf (新版本)
 │   │   │   ├── worktree-module.sh
 │   │   │   ├── environment-module.sh
 │   │   │   └── roadmap-module.sh
-│   │   └── operations/     # 操作层原子方法 - 仅执行操作
-│   │       ├── worktree-operations.sh
-│   │       ├── github-pr-operations.sh
-│   │       └── git-operations.sh
 │   └── commands/           # 命令编排层 - 只调用模块方法
 │       ├── start.sh        # 只调用 worktree-module + environment-module + roadmap-module
 │       ├── pr.sh          # 只调用 status-module + github-module
@@ -57,11 +53,12 @@ gpf (新版本)
 - **模块层聚拢方法**：完整功能模块，供命令直接调用
 - **命令层编排**：只做业务编排，调用模块方法
 
-### 2. 模块复用原则
-- 命令需要完整功能时：直接调用模块方法（如status模块）
-- 命令需要部分功能时：调用中层组合方法
-- 命令有特殊需求时：自有方法+底层原子方法组合
-- 避免命令间直接调用，改为调用共同的模块方法
+### 2. 严格分层原则
+- **命令层**：只能调用模块层方法，绝不跨层调用
+- **模块层**：只能调用组合层方法，提供完整业务功能
+- **组合层**：只能调用原子层方法，组合基础功能单元
+- **原子层**：不依赖任何GPF内部层，提供最基础的功能
+- **功能不足时**：回到对应Epic的Feature补充，而非跨层调用
 
 ### 3. 单一职责原则
 - 每个命令只负责一个核心功能
@@ -268,19 +265,20 @@ lib/core/
 ### 调用关系规范
 
 ```bash
-# ✅ 正确的四层调用关系
+# ✅ 正确的三层调用关系
 命令层 (commands/): pr_command()
   ↓ 只调用模块层方法
 模块层 (modules/): github_module_manage_pr_lifecycle()
-  ↓ 调用中层组合方法
-中层 (composite/): gh_validate_environment() + git_validate_branch_state()
-  ↓ 调用底层原子方法
-底层 (atomic/): gh_check_installation() + git_check_working_tree_clean()
+  ↓ 只调用组合层方法
+组合层 (composite/): gh_validate_environment() + git_validate_branch_state()
+  ↓ 只调用原子层方法
+原子层 (atomic/): gh_check_installation() + git_check_working_tree_clean()
 
-# ❌ 错误的调用关系
-命令层 → 命令层     # 禁止：命令间直接调用
-命令层 → 底层原子    # 禁止：跨层调用
-中层 → 模块层      # 禁止：反向调用
+# ❌ 严格禁止的调用关系
+命令层 → 组合层     # 禁止：跨层调用
+命令层 → 原子层     # 禁止：跨层调用
+模块层 → 原子层     # 禁止：跨层调用
+任何反向调用       # 禁止：下层调用上层
 ```
 
 ### 层级职责说明
