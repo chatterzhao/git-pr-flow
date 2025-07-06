@@ -4,13 +4,18 @@
 
 set -euo pipefail
 
-# 获取脚本所在目录
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+# 按四层架构获取项目根目录（通过composite层）
+# 临时加载environment-composite以获取项目根目录
+source "$(dirname "${BASH_SOURCE[0]}")/../composite/environment-composite.sh"
 
-# 加载依赖
+# 通过composite层获取项目根目录（遵循四层架构）
+PROJECT_ROOT=$(environment_get_project_root) || {
+    echo "❌ 错误：无法通过composite层获取项目根目录" >&2
+    exit 1
+}
+
+# 加载其他依赖
 source "$PROJECT_ROOT/lib/core/common.sh"
-source "$PROJECT_ROOT/lib/core/composite/environment-composite.sh"
 source "$PROJECT_ROOT/lib/core/composite/git-composite.sh"
 source "$PROJECT_ROOT/lib/core/composite/validation-composite.sh"
 source "$PROJECT_ROOT/lib/core/composite/path-composite.sh"
