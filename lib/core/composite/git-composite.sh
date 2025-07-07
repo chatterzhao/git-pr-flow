@@ -327,3 +327,14 @@ git_check_safe_branch_deletion() {
     echo "✅ 分支 $branch_name 可以安全删除"
     return 0
 }
+
+# 获取完整的Git状态信息（为status模块提供）
+# 参数：(branch_name, worktree_path)
+# 返回：JSON格式的完整状态信息
+git_get_complete_status() {
+    local branch_name="$1"
+    local worktree_path="$2"
+    
+    # 直接调用git_validate_branch_state，它已经返回了需要的JSON格式
+    git_validate_branch_state "$branch_name" "$worktree_path"
+}

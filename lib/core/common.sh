@@ -4,6 +4,12 @@
 
 set -euo pipefail
 
+# 防止重复加载
+if [[ "${_GPF_COMMON_LOADED:-}" == "true" ]]; then
+    return 0
+fi
+readonly _GPF_COMMON_LOADED="true"
+
 # GPF版本信息
 readonly GPF_VERSION="1.0.0-dev"
 readonly GPF_BUILD_DATE="2025-07-05"

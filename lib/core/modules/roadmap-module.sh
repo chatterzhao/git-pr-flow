@@ -14,11 +14,11 @@ PROJECT_ROOT=$(environment_get_project_root) || {
 }
 
 # 加载依赖
-source "$PROJECT_ROOT/lib/core/common.sh"
-source "$PROJECT_ROOT/lib/core/composite/roadmap-composite.sh"
-source "$PROJECT_ROOT/lib/core/composite/validation-composite.sh"
-source "$PROJECT_ROOT/lib/core/composite/git-composite.sh"
-source "$PROJECT_ROOT/lib/core/composite/environment-composite.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../composite/roadmap-composite.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../composite/validation-composite.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../composite/git-composite.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../composite/environment-composite.sh"
 
 # ==============================================================================
 # Roadmap管理模块 - 核心方法
