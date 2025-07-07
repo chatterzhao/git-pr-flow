@@ -316,7 +316,7 @@ EOF
             
             echo "🎯 GPF 状态报告"
             echo "==============="
-            echo "📍 当前环境: $environment_type"
+            echo "📍 当前Epic环境类型: $environment_type"
             echo "🌿 Git分支: $branch_name"
             echo "🎯 目的: $status_purpose"
             echo ""
@@ -332,11 +332,36 @@ EOF
             branch_pushed=$(echo "$status_data" | jq -r '.complete_status.base_status.branch_pushed // false')
             conflicts=$(echo "$status_data" | jq -r '.complete_status.base_status.has_merge_conflicts // false')
             
-            echo "📊 基础状态:"
+            echo "📊 本地Git状态:"
             echo "   Git工作区干净: $(status_command_format_boolean "$working_clean")"
             echo "   Git暂存区干净: $(status_command_format_boolean "$staging_clean")"
             echo "   Git分支已推送: $(status_command_format_boolean "$branch_pushed")"
-            echo "   Git合并冲突: $(status_command_format_conflict_boolean "$conflicts")"
+            echo "   Git合并是否有冲突: $(status_command_format_conflict_boolean "$conflicts")"
+            
+                        # 显示GitHub/PR状态
+            local gh_available
+            local pr_exists
+            local pr_number
+            local pr_state
+            
+            gh_available=$(echo "$status_data" | jq -r '.complete_status.github_status.gh_available // false')
+            pr_exists=$(echo "$status_data" | jq -r '.complete_status.github_status.pr_exists // false')
+            pr_number=$(echo "$status_data" | jq -r '.complete_status.github_status.pr_number // ""')
+            pr_state=$(echo "$status_data" | jq -r '.complete_status.github_status.pr_state // ""')
+            
+            echo ""
+            echo "🔗 GitHub状态:"
+            echo "   GitHub CLI可用: $(status_command_format_boolean "$gh_available")"
+            if [[ "$gh_available" == "true" ]]; then
+                echo "   PR存在: $(status_command_format_boolean "$pr_exists")"
+                if [[ "$pr_exists" == "true" ]]; then
+                    echo "   PR编号: #$pr_number"
+                    echo "   PR状态: $pr_state"
+                fi
+            else
+                echo "   💡 提示: 在终端运行 'gh auth login' 命令启用GitHub功能"
+            fi
+            
             echo ""
             echo "✅ 状态检查完成"
             ;;
