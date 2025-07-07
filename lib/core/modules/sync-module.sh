@@ -32,9 +32,13 @@ sync_module_intelligent_cascade() {
     local force_mode="${4:-false}"       # 是否强制同步
     
     # 解析同步选项
-    local pull_remote=$(echo "${sync_options:-{}}" | jq -r '.pull_remote // true')
-    local check_conflicts=$(echo "${sync_options:-{}}" | jq -r '.check_conflicts // true')
-    local cascade_down=$(echo "${sync_options:-{}}" | jq -r '.cascade_down // true')
+    if [[ -z "$sync_options" ]]; then
+        sync_options="{}"
+    fi
+    
+    local pull_remote=$(echo "$sync_options" | jq -r '.pull_remote // true')
+    local check_conflicts=$(echo "$sync_options" | jq -r '.check_conflicts // true')
+    local cascade_down=$(echo "$sync_options" | jq -r '.cascade_down // true')
     
     # 确定同步范围
     local sync_plan

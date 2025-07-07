@@ -63,8 +63,12 @@ paths_module_intelligent_path_inference() {
     local inference_options="${3:-}"     # JSON格式推断选项
     
     # 解析推断选项
-    local prefer_existing=$(echo "${inference_options:-{}}" | jq -r '.prefer_existing // true')
-    local suggest_alternatives=$(echo "${inference_options:-{}}" | jq -r '.suggest_alternatives // true')
+    if [[ -z "$inference_options" ]]; then
+        inference_options="{}"
+    fi
+    
+    local prefer_existing=$(echo "$inference_options" | jq -r '.prefer_existing // true')
+    local suggest_alternatives=$(echo "$inference_options" | jq -r '.suggest_alternatives // true')
     
     # 分析用户输入模式
     local input_analysis
@@ -735,7 +739,8 @@ paths_module_smart_branch_resolve() {
     
     # 使用智能推断
     local inference_result
-    inference_result=$(paths_module_intelligent_path_inference "$user_input" "$current_env" "{\"prefer_existing\": true}") || {
+    local json_options='{"prefer_existing": true}'
+    inference_result=$(paths_module_intelligent_path_inference "$user_input" "$current_env" "$json_options") || {
         # 后备方案：直接转换
         paths_module_user_input_to_branch "$user_input" "auto" "$context_hint"
         return

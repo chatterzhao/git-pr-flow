@@ -31,9 +31,13 @@ validation_module_unified_check() {
     local validation_options="${4:-}"   # JSON格式的验证选项
     
     # 解析验证选项
-    local strict_mode=$(echo "${validation_options:-{}}" | jq -r '.strict_mode // false')
-    local skip_warnings=$(echo "${validation_options:-{}}" | jq -r '.skip_warnings // false')
-    local include_suggestions=$(echo "${validation_options:-{}}" | jq -r '.include_suggestions // true')
+    if [[ -z "$validation_options" ]]; then
+        validation_options="{}"
+    fi
+    
+    local strict_mode=$(echo "$validation_options" | jq -r '.strict_mode // false')
+    local skip_warnings=$(echo "$validation_options" | jq -r '.skip_warnings // false')
+    local include_suggestions=$(echo "$validation_options" | jq -r '.include_suggestions // true')
     
     case "$validation_type" in
         "git_safety")
