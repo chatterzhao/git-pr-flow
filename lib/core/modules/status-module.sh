@@ -247,13 +247,18 @@ status_module_format_pr_status() {
     fi
     
     # 返回PR状态
+    local blocking_issues_json=""
+    if [[ ${#blocking_issues[@]} -gt 0 ]]; then
+        blocking_issues_json=$(printf '"%s",' "${blocking_issues[@]}" | sed 's/,$//')
+    fi
+    
     cat <<EOF
 {
     "purpose": "pr",
     "branch_name": "$branch_name",
     "target_branch": "$target_branch",
     "pr_ready": $pr_ready,
-    "blocking_issues": [$(printf '"%s",' "${blocking_issues[@]}" | sed 's/,$//')],
+    "blocking_issues": [$blocking_issues_json],
     "base_status": $base_status,
     "target_status": $target_status,
     "github_status": $github_status
@@ -336,6 +341,11 @@ status_module_format_sync_status() {
     fi
     
     # 返回同步状态
+    local blocking_issues_json=""
+    if [[ ${#blocking_issues[@]} -gt 0 ]]; then
+        blocking_issues_json=$(printf '"%s",' "${blocking_issues[@]}" | sed 's/,$//')
+    fi
+    
     cat <<EOF
 {
     "purpose": "sync",
@@ -344,7 +354,7 @@ status_module_format_sync_status() {
     "sync_ready": $sync_ready,
     "needs_sync": $needs_sync,
     "commits_behind": $commits_behind,
-    "blocking_issues": [$(printf '"%s",' "${blocking_issues[@]}" | sed 's/,$//')],
+    "blocking_issues": [$blocking_issues_json],
     "base_status": $base_status,
     "target_status": $target_status
 }
@@ -394,6 +404,16 @@ status_module_format_start_status() {
     fi
     
     # 返回start状态
+    local blocking_issues_json=""
+    if [[ ${#blocking_issues[@]} -gt 0 ]]; then
+        blocking_issues_json=$(printf '"%s",' "${blocking_issues[@]}" | sed 's/,$//')
+    fi
+    
+    local warnings_json=""
+    if [[ ${#warnings[@]} -gt 0 ]]; then
+        warnings_json=$(printf '"%s",' "${warnings[@]}" | sed 's/,$//')
+    fi
+    
     cat <<EOF
 {
     "purpose": "start",
@@ -402,8 +422,8 @@ status_module_format_start_status() {
     "start_ready": $start_ready,
     "base_fresh": $base_fresh,
     "commits_behind": $commits_behind,
-    "blocking_issues": [$(printf '"%s",' "${blocking_issues[@]}" | sed 's/,$//')],
-    "warnings": [$(printf '"%s",' "${warnings[@]}" | sed 's/,$//')],
+    "blocking_issues": [$blocking_issues_json],
+    "warnings": [$warnings_json],
     "base_status": $base_status,
     "target_status": $target_status
 }

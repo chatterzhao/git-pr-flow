@@ -14,11 +14,11 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # 避免在测试模式下加载模块（防止冲突）
 if [[ "${GPF_TEST_MODE:-}" != "true" ]]; then
-    # 加载必需的modules
-    source "$PROJECT_ROOT/lib/core/modules/environment-module.sh"
-    source "$PROJECT_ROOT/lib/core/modules/status-module.sh"
-    source "$PROJECT_ROOT/lib/core/modules/paths-module.sh"
-    source "$PROJECT_ROOT/lib/core/modules/worktree-module.sh"
+    # 使用相对路径加载必需的modules
+    source "$(dirname "${BASH_SOURCE[0]}")/../core/modules/environment-module.sh"
+    source "$(dirname "${BASH_SOURCE[0]}")/../core/modules/status-module.sh"
+    source "$(dirname "${BASH_SOURCE[0]}")/../core/modules/paths-module.sh"
+    source "$(dirname "${BASH_SOURCE[0]}")/../core/modules/worktree-module.sh"
 fi
 
 # ===================================================================
@@ -362,6 +362,12 @@ GPF Status Command - 查看分支和环境状态
                    例如: auth, epic-auth-e, feature-login
 
 选项:
+    --json          JSON格式输出
+    --compact       紧凑格式输出
+    --pr            检查PR准备状态
+    --clean         检查清理安全性
+    --sync          检查同步状态
+    --start         检查开始操作状态
     --format FORMAT 输出格式 (human|json|compact，默认: human)
     --purpose PURPOSE 状态目的 (status|pr|clean|sync|start，默认: status)
     --help          显示此帮助信息
@@ -369,8 +375,11 @@ GPF Status Command - 查看分支和环境状态
 示例:
     gpf status                    # 检查当前环境状态
     gpf status auth               # 检查auth相关分支状态
-    gpf status --format=json     # JSON格式输出
-    gpf status --purpose=pr      # 检查PR准备状态
+    gpf status --pr               # 检查PR准备状态
+    gpf status auth --pr          # 检查auth分支的PR状态
+    gpf status --clean            # 检查清理安全性
+    gpf status --json             # JSON格式输出
+    gpf status auth --pr --json   # 检查auth分支PR状态，JSON输出
 
 功能:
     - 智能环境检测和状态显示
@@ -387,7 +396,12 @@ status_command_main() {
     local target_input="${1:-}"
     local output_format="${2:-human}"
     local status_purpose="${3:-status}"
-    local options_json="${4:-{}}"
+    local options_json="$4"
+    
+    # 安全处理JSON选项
+    if [[ -z "$options_json" ]]; then
+        options_json="{}"
+    fi
     
     # 第一阶段：参数处理
     local processed_params
@@ -419,8 +433,32 @@ main() {
                 output_format="${1#*=}"
                 shift
                 ;;
+            --json)
+                output_format="json"
+                shift
+                ;;
+            --compact)
+                output_format="compact"
+                shift
+                ;;
             --purpose=*)
                 status_purpose="${1#*=}"
+                shift
+                ;;
+            --pr)
+                status_purpose="pr"
+                shift
+                ;;
+            --clean)
+                status_purpose="clean"
+                shift
+                ;;
+            --sync)
+                status_purpose="sync"
+                shift
+                ;;
+            --start)
+                status_purpose="start"
                 shift
                 ;;
             --help|-h)

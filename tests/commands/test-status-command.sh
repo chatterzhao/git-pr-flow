@@ -20,6 +20,9 @@ if [[ ! -f "$PROJECT_ROOT/lib/commands/status.sh" ]]; then
     exit 1
 fi
 
+# 加载Commands层文件用于测试
+source "$PROJECT_ROOT/lib/commands/status.sh"
+
 # 测试计数器
 TOTAL_TESTS=0
 PASSED_TESTS=0

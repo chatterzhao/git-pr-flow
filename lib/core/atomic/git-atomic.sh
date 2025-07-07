@@ -198,3 +198,12 @@ git_check_detached_head() {
     
     ! git -C "$worktree_path" symbolic-ref HEAD >/dev/null 2>&1
 }
+
+# 获取未合并的冲突文件列表（纯Git命令）
+# 参数：(optional: worktree_path)
+# 返回：冲突文件列表，每行一个文件
+git_ls_files_unmerged() {
+    local worktree_path="${1:-$(pwd)}"
+    
+    git -C "$worktree_path" ls-files --unmerged 2>/dev/null | cut -f2 | sort -u
+}

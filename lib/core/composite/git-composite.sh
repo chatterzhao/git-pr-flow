@@ -51,6 +51,16 @@ git_validate_branch_state() {
         behind_count="0"
     fi
     
+    # 检查合并冲突状态（调用atomic层）
+    local has_merge_conflicts
+    local unmerged_files
+    unmerged_files=$(git_ls_files_unmerged "$worktree_path")
+    if [[ -n "$unmerged_files" ]]; then
+        has_merge_conflicts="true"
+    else
+        has_merge_conflicts="false"
+    fi
+    
     # 输出状态信息
     cat << EOF
 {
@@ -62,6 +72,7 @@ git_validate_branch_state() {
     "remote_exists": $remote_exists,
     "ahead_count": $ahead_count,
     "behind_count": $behind_count,
+    "has_merge_conflicts": $has_merge_conflicts,
     "worktree_path": "$worktree_path"
 }
 EOF
