@@ -62,6 +62,28 @@ check_branch_merged_remote() {
     [[ "$commit_count" -eq 0 ]]
 }
 
+# 🆕 冲突状态检查（远程）
+check_merge_conflict_remote() {
+    local worktree_path="$1"
+    [[ -d "$worktree_path" ]] || return 1
+    
+    # 检查是否存在冲突标记文件
+    [[ -f "$worktree_path/.git/MERGE_HEAD" ]] || \
+    [[ -f "$worktree_path/.git/CHERRY_PICK_HEAD" ]] || \
+    [[ -f "$worktree_path/.git/REBASE_HEAD" ]]
+}
+
+# 🆕 基础分支新鲜度检查（for start命令）
+check_base_branch_freshness_remote() {
+    local base_branch="$1"
+    local project_root="$2"
+    
+    # 检查本地base分支是否落后远程
+    local behind_count
+    behind_count=$(git -C "$project_root" rev-list --count "$base_branch..origin/$base_branch" 2>/dev/null || echo "0")
+    [[ "$behind_count" -eq 0 ]]
+}
+
 # 🆕 同步状态检查（远程）
 check_sync_requirements_remote() {
     local branch_name="$1"

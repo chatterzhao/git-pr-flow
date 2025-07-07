@@ -67,16 +67,24 @@
      - ✅ `lib/core/modules/validation-module.sh` - 数据验证模块（统一的安全检查和数据验证）
      - ✅ `lib/core/modules/paths-module.sh` - 路径管理模块（统一的路径处理和转换接口）
 
-4. **core-foundation-operations** - 操作层实现 ⏳ **待实现**
-   - **功能描述**: 实现纯操作方法，如文件创建、Git命令执行、目录切换等
+4. **🆕 core-foundation-status-system** - Status系统完善 🔄 **进行中**
+   - **功能描述**: 完善Status系统的三层架构实现，为Commands层提供完整的状态检测基础设施
+   - **背景**: Commands层开发中发现Status系统功能不完整，需要回到Epic1补充缺失功能
    - **验收标准**: 
-     - ❌ 所有操作方法只执行操作，不包含业务逻辑
-     - ❌ 操作安全性验证（防止数据丢失）
-     - ❌ 跨平台操作兼容性测试
-     - ❌ 操作失败时的回滚机制
-   - **优先级**: P1
+     - ⏳ **Atomic层补充**: 实现11个原子状态检测方法（冲突检测、基础分支新鲜度等）
+     - ⏳ **Composite层补充**: 实现4个组合状态检测方法（PR就绪性、清理安全性、同步就绪性、Start预检查）
+     - ⏳ **Modules层完善**: 完善status模块统一接口，支持所有命令的状态检查需求
+     - ⏳ **GitHub集成**: 完善GitHub CLI状态检查（PR状态、CI状态、审核状态）
+     - ⏳ **跨命令集成测试**: 验证start/pr/clean/sync命令对status系统的正确调用
+   - **优先级**: P0（Commands层的前置依赖）
    - **预估工作量**: M（3-5天）
-   - **状态**: 尚未开始
+   - **状态**: 🔄 进行中（已完成设计规划）
+   - **实现文件**:
+     - ⏳ `lib/core/atomic/status-atomic.sh` - 11个原子状态检测方法
+     - ⏳ `lib/core/composite/status-composite.sh` - 4个组合状态检测方法  
+     - ⏳ `lib/core/modules/status-module.sh` - 完善统一状态接口
+     - ⏳ GitHub CLI集成优化
+     - ⏳ 跨命令集成测试套件
 
 ## 技术要求
 - **依赖组件**: Git 2.22+, Bash 4.0+, 基础Unix工具（mkdir, pwd, cd等）

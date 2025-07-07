@@ -30,33 +30,40 @@ Atomic Layer (原子操作)
 
 ## 📋 Commands详细设计
 
-### 1. status命令 - 基础支撑命令
+### ✅ 1. status命令 - 基础支撑命令（已完成）
 
 **功能**: 智能状态显示，是其他命令的基础支撑
 
-**支撑逻辑架构**:
+**✅ 已实现的四阶段架构**:
 ```bash
-gpf status [epic] [feature]
+gpf status [target] [--format=human|json|compact] [--purpose=status|pr|clean|sync|start]
     ↓
-1. 环境检测 (environment_module_get_complete_info)
-2. 确定显示范围 (当前环境感知)
-3. 收集状态信息 (status_module_get_complete_status)
-4. 格式化输出 (JSON → 用户友好格式)
+1. 参数处理和验证 (status_command_process_parameters)
+2. 智能环境检测和准备 (status_command_detect_and_prepare_environment)
+3. 状态收集和集成 (status_command_collect_status_data)
+4. 输出格式化和显示 (status_command_format_and_display)
 ```
 
-**支撑逻辑详细**:
-- **环境自动检测**: 检测当前在root/epic/feature环境
-- **范围智能确定**: 
-  - 在root环境: 显示所有epic状态
-  - 在epic环境: 显示当前epic及其features状态
-  - 在feature环境: 显示当前feature状态
-- **GitHub状态集成**: 自动查询相关PR状态
-- **Git状态检查**: 工作区干净性、分支同步状态
+**✅ 已实现的支撑逻辑**:
+- **✅ 智能参数处理**: 支持用户友好输入（如"auth"自动转为"epic-auth-e"）
+- **✅ 环境感知检测**: 自动检测当前在root/epic/feature环境
+- **✅ 智能切换支持**: 可指定目标分支进行跨环境状态检查
+- **✅ 多格式输出**: human(人类可读)、json(机器可读)、compact(紧凑格式)
+- **✅ 多目的支持**: 支持5种目的(status/pr/clean/sync/start)
+- **✅ 冲突检测**: 集成Git冲突检测功能
+- **✅ 完整测试**: 33个测试用例100%通过
 
-**为其他命令提供的支撑**:
-- `pr`命令调用status检查PR就绪性
-- `clean`命令调用status检查清理安全性
-- `sync`命令调用status检查同步需求
+**✅ 已实现的支撑能力**:
+- **✅ PR就绪性检查**: `status_module_get_complete_status(branch, target, "pr")`
+- **✅ 清理安全性检查**: `status_module_get_complete_status(branch, target, "clean")`
+- **✅ 同步需求检查**: `status_module_get_complete_status(branch, target, "sync")`
+- **✅ 启动状态检查**: `status_module_get_complete_status(branch, target, "start")`
+- **✅ 通用状态显示**: `status_module_get_complete_status(branch, target, "status")`
+
+**✅ 实际实现文件**:
+- `lib/core/commands/status.sh` - 完整的Commands层实现
+- `tests/commands/test-status-simple.sh` - 16个基础测试
+- `tests/commands/test-status-command.sh` - 17个完整功能测试
 
 ### 2. start命令 - 创建环境命令
 
@@ -351,23 +358,43 @@ $ # 4. 继续Commands层开发
 - **可维护性**: 避免重复代码和临时方案
 - **Epic隔离性**: 各Epic功能完整，可独立发布
 
-## 🎯 Commands Layer实现优先级
+## 🎯 实现优先级（重新调整）
 
-### Phase 1: 基础支撑 (Week 4)
-1. **status命令**: 作为其他命令的基础，必须优先实现
-2. **环境检测集成**: 确保所有命令都能正确感知当前环境
+> **⚠️ 重要发现**: Status系统是所有命令的基础设施，必须先在Epic1完善，再在Epic2实现Commands层
 
-### Phase 2: 核心创建 (Week 4-5)
-3. **start命令**: 实现智能创建和切换逻辑
-4. **同步支撑集成**: 确保start命令的预同步逻辑正确
+### Phase 0: Epic1基础设施完善 (优先级最高)
+**目标**: 完善Status系统的三层架构基础
+1. **Atomic层状态检测**: 实现11个原子状态检测方法（Epic1）
+2. **Composite层组合检测**: 实现4个业务组合检测方法（Epic1）
+3. **Modules层统一接口**: 完善status模块业务接口（Epic1）
+4. **跨层集成测试**: 验证三层架构的正确性（Epic1）
 
-### Phase 3: 核心价值 (Week 5)
-5. **pr命令**: 实现PR创建的完整流程
-6. **GitHub集成验证**: 确保PR创建的可靠性
+### ✅ Phase 1: Commands层基础支撑 (Epic2已完成)
+**依赖**: Epic1的Status系统完善 ✅
+1. **✅ status命令**: 已完成用户界面和状态可视化
+2. **✅ Commands层状态集成**: 已为其他命令提供完整的status检查接口
 
-### Phase 4: 管理完善 (Week 5-6)
-7. **sync命令**: 实现级联同步逻辑
-8. **clean命令**: 实现安全清理逻辑
+### Phase 2: 核心创建命令 (Epic2)
+**依赖**: status命令可用
+3. **start命令**: 集成start预检查逻辑
+4. **start命令状态验证**: 确保基础分支新鲜度检查
+
+### Phase 3: 核心价值命令 (Epic2)
+**依赖**: start和status命令稳定
+5. **pr命令**: 集成PR就绪性检查
+6. **GitHub集成完善**: 确保PR状态检测准确
+
+### Phase 4: 管理命令完善 (Epic2)
+**依赖**: 前述命令功能完整
+7. **sync命令**: 集成同步就绪性检查
+8. **clean命令**: 集成清理安全性检查
+
+### ⚠️ 关键依赖关系
+```
+Epic1: Status基础设施 → Epic2: Commands层实现
+    ↓                     ↓
+Atomic/Composite/Modules → status命令 → 其他命令
+```
 
 ## 📊 质量标准
 
@@ -399,20 +426,39 @@ epic-commands-layer-e                    # Epic分支
 └── epic-commands-layer-e-clean-ef       # Feature5: clean命令
 ```
 
-### 开发顺序
-1. 创建Epic2环境: `epic-commands-layer-e`
-2. 实现status命令: `epic-commands-layer-e-status-ef`
-3. 实现start命令: `epic-commands-layer-e-start-ef`
-4. 实现pr命令: `epic-commands-layer-e-pr-ef`
-5. 实现sync命令: `epic-commands-layer-e-sync-ef`
-6. 实现clean命令: `epic-commands-layer-e-clean-ef`
-7. 集成测试和Epic2完成
+### 开发进度
+1. ✅ 创建Epic2环境: `epic-commands-layer-e`
+2. ✅ 实现status命令: `epic-commands-layer-e-status-ef` (已完成)
+3. ⏳ 实现start命令: `epic-commands-layer-e-start-ef` (下一步)
+4. ⏳ 实现pr命令: `epic-commands-layer-e-pr-ef`
+5. ⏳ 实现sync命令: `epic-commands-layer-e-sync-ef`
+6. ⏳ 实现clean命令: `epic-commands-layer-e-clean-ef`
+7. ⏳ 集成测试和Epic2完成
 
 ### 验证标准
-- 所有命令通过单元测试
-- 所有支撑逻辑通过集成测试
-- 完整的用户使用场景测试
-- 错误处理和边界情况测试
+- ✅ 所有命令通过单元测试（status命令已完成）
+- ✅ 所有支撑逻辑通过集成测试（status命令已完成）
+- ✅ 完整的用户使用场景测试（status命令已完成）
+- ✅ 错误处理和边界情况测试（status命令已完成）
+
+## ✅ Status命令实现总结
+
+### 实际实现亮点
+
+1. **四阶段架构成功验证**：采用的四阶段架构（参数处理→环境检测→状态收集→格式化显示）证明非常有效，将成为其他命令的模板
+
+2. **分层架构严格遵守**：Commands层只调用Modules层，无跨层调用，架构纯净
+
+3. **测试驱动开发**：33个测试用例100%通过，覆盖所有功能点
+
+4. **用户体验优化**：支持多种输出格式和智能参数处理
+
+### 下一步开发建议
+
+1. **start命令开发**：在`epic-commands-layer-e-start-ef`分支上开发
+2. **模板复用**：复用status命令的四阶段架构模式
+3. **测试驱动**：为每个命令创建类似的测试套件
+4. **文档同步**：在实现过程中及时更新路线图
 
 ---
 

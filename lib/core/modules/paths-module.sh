@@ -667,6 +667,203 @@ EOF
 }
 
 # ==============================================================================
+# 🆕 Commands层专用简化接口
+# ==============================================================================
+
+# 用户输入转分支名（为Commands层提供简化接口）
+paths_module_user_input_to_branch() {
+    local user_input="$1"
+    local branch_type="${2:-auto}"      # epic/feature/auto
+    local epic_context="${3:-}"         # 当Feature需要Epic上下文时提供
+    
+    # 自动检测分支类型（如果未指定）
+    if [[ "$branch_type" == "auto" ]]; then
+        # 根据输入模式推断类型
+        if [[ "$user_input" =~ ^epic-.*-e(-.*-ef)?$ ]]; then
+            # 已经是完整分支名
+            echo "$user_input"
+            return 0
+        elif [[ "$user_input" =~ - ]] || [[ -n "$epic_context" ]]; then
+            branch_type="feature"
+        else
+            branch_type="epic"
+        fi
+    fi
+    
+    # 执行转换
+    case "$branch_type" in
+        "epic")
+            local result
+            result=$(paths_module_convert_and_validate "$user_input" "epic_branch" "" "{\"strict_validation\": false}") || return 1
+            echo "$result" | jq -r '.result'
+            ;;
+        "feature")
+            local result
+            result=$(paths_module_convert_and_validate "$user_input" "feature_branch" "$epic_context" "{\"strict_validation\": false}") || return 1
+            echo "$result" | jq -r '.result'
+            ;;
+        *)
+            echo "❌ 错误：未知的分支类型: $branch_type" >&2
+            return 1
+            ;;
+    esac
+}
+
+# 用户输入转工作树路径（为Commands层提供）
+paths_module_user_input_to_worktree() {
+    local user_input="$1"
+    
+    # 先转换为分支名，再转换为工作树路径
+    local branch_name
+    branch_name=$(paths_module_user_input_to_branch "$user_input" "auto") || return 1
+    
+    local result
+    result=$(paths_module_convert_and_validate "$branch_name" "worktree_path" "" "{\"strict_validation\": false}") || return 1
+    echo "$result" | jq -r '.result'
+}
+
+# 智能分支名解析（为Commands层提供最简接口）
+paths_module_smart_branch_resolve() {
+    local user_input="$1"
+    local context_hint="${2:-}"         # 可选的上下文提示
+    
+    # 获取当前环境上下文
+    local current_env="unknown"
+    if command -v environment_module_detect_environment_type >/dev/null 2>&1; then
+        current_env=$(environment_module_detect_environment_type 2>/dev/null || echo "unknown")
+    fi
+    
+    # 使用智能推断
+    local inference_result
+    inference_result=$(paths_module_intelligent_path_inference "$user_input" "$current_env" "{\"prefer_existing\": true}") || {
+        # 后备方案：直接转换
+        paths_module_user_input_to_branch "$user_input" "auto" "$context_hint"
+        return
+    }
+    
+    # 提取最佳建议
+    local suggestions
+    suggestions=$(echo "$inference_result" | jq -r '.path_suggestions')
+    
+    if [[ "$suggestions" != "null" && "$suggestions" != "[]" ]]; then
+        # 返回第一个建议的分支名
+        echo "$suggestions" | jq -r '.[0].result // empty' || {
+            # 如果没有结果，使用后备方案
+            paths_module_user_input_to_branch "$user_input" "auto" "$context_hint"
+        }
+    else
+        # 后备方案
+        paths_module_user_input_to_branch "$user_input" "auto" "$context_hint"
+    fi
+}
+
+# 验证用户输入格式（为Commands层提供快速验证）
+paths_module_validate_user_input() {
+    local user_input="$1"
+    local expected_type="${2:-any}"     # epic/feature/any
+    
+    # 基础格式检查
+    [[ -n "$user_input" ]] || {
+        echo "❌ 错误：输入不能为空" >&2
+        return 1
+    }
+    
+    # 移除前缀后缀进行验证
+    local cleaned_input
+    cleaned_input=$(strip_epic_prefix_from_input "$user_input")
+    cleaned_input=$(strip_suffix_from_input "$cleaned_input")
+    
+    # 验证清理后的名称
+    if ! validate_name_format "$cleaned_input"; then
+        echo "❌ 错误：输入格式不正确: $user_input" >&2
+        return 1
+    fi
+    
+    # 类型特定验证
+    case "$expected_type" in
+        "epic")
+            # Epic名称不应包含过多层级
+            if [[ "$cleaned_input" =~ ^[^-]+-[^-]+-[^-]+- ]]; then
+                echo "❌ 错误：Epic名称过于复杂: $user_input" >&2
+                return 1
+            fi
+            ;;
+        "feature")
+            # Feature名称通常较简单
+            if [[ ${#cleaned_input} -gt 50 ]]; then
+                echo "❌ 错误：Feature名称过长: $user_input" >&2
+                return 1
+            fi
+            ;;
+    esac
+    
+    return 0
+}
+
+# 获取输入建议（为Commands层提供用户体验增强）
+paths_module_get_input_suggestions() {
+    local partial_input="$1"
+    local suggestion_type="${2:-all}"   # epic/feature/all
+    
+    local suggestions="[]"
+    
+    # 基于现有分支提供建议
+    if [[ "$suggestion_type" =~ ^(epic|all)$ ]]; then
+        # Epic分支建议
+        if [[ -d "$PROJECT_ROOT/.worktrees" ]]; then
+            find "$PROJECT_ROOT/.worktrees" -maxdepth 1 -type d -name "epic-*-e" 2>/dev/null | while read -r epic_dir; do
+                local epic_branch=$(basename "$epic_dir")
+                local epic_name="${epic_branch#epic-}"
+                epic_name="${epic_name%-e}"
+                
+                if [[ "$epic_name" == *"$partial_input"* ]]; then
+                    local suggestion_item
+                    suggestion_item=$(cat <<EOF
+{
+    "type": "epic",
+    "input_suggestion": "$epic_name",
+    "branch_name": "$epic_branch",
+    "worktree_path": "$epic_dir",
+    "exists": true
+}
+EOF
+                    )
+                    suggestions=$(echo "$suggestions" | jq --argjson item "$suggestion_item" '. += [$item]')
+                fi
+            done
+        fi
+    fi
+    
+    if [[ "$suggestion_type" =~ ^(feature|all)$ ]]; then
+        # Feature分支建议
+        if [[ -d "$PROJECT_ROOT/.worktrees" ]]; then
+            find "$PROJECT_ROOT/.worktrees" -maxdepth 1 -type d -name "epic-*-e-*-ef" 2>/dev/null | while read -r feature_dir; do
+                local feature_branch=$(basename "$feature_dir")
+                local feature_part="${feature_branch#*-e-}"
+                local feature_name="${feature_part%-ef}"
+                
+                if [[ "$feature_name" == *"$partial_input"* ]]; then
+                    local suggestion_item
+                    suggestion_item=$(cat <<EOF
+{
+    "type": "feature",
+    "input_suggestion": "$feature_name",
+    "branch_name": "$feature_branch",
+    "worktree_path": "$feature_dir",
+    "exists": true
+}
+EOF
+                    )
+                    suggestions=$(echo "$suggestions" | jq --argjson item "$suggestion_item" '. += [$item]')
+                fi
+            done
+        fi
+    fi
+    
+    echo "$suggestions"
+}
+
+# ==============================================================================
 # 验证和完整性检查
 # ==============================================================================
 

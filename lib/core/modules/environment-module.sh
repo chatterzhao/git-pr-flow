@@ -734,3 +734,70 @@ version_compare() {
             ;;
     esac
 }
+
+# ==============================================================================
+# 🆕 Commands层专用简化接口
+# ==============================================================================
+
+# 获取当前环境的简洁上下文信息（为Commands层提供）
+environment_module_get_current_context() {
+    local current_path=$(pwd)
+    local project_root
+    project_root=$(find_project_root) || {
+        echo '{"type": "unknown", "error": "not in GPF project"}' 
+        return 1
+    }
+    
+    # 调用Composite层获取环境检测结果
+    local env_info
+    env_info=$(environment_detect_complete) || {
+        echo '{"type": "unknown", "error": "environment detection failed"}'
+        return 1
+    }
+    
+    # 提取关键信息
+    local env_type=$(echo "$env_info" | jq -r '.environment.type // "unknown"')
+    local current_branch=$(echo "$env_info" | jq -r '.git.current_branch // "unknown"')
+    local epic_name=""
+    local feature_name=""
+    
+    # 根据环境类型提取Epic/Feature名称
+    case "$env_type" in
+        "epic")
+            local env_details=$(echo "$env_info" | jq -r '.environment.details')
+            epic_name=$(echo "$env_details" | jq -r '.epic_name // ""')
+            ;;
+        "feature")
+            local env_details=$(echo "$env_info" | jq -r '.environment.details')
+            epic_name=$(echo "$env_details" | jq -r '.epic_name // ""')
+            feature_name=$(echo "$env_details" | jq -r '.feature_name // ""')
+            ;;
+    esac
+    
+    # 返回简洁的环境上下文
+    cat <<EOF
+{
+    "type": "$env_type",
+    "current_path": "$current_path",
+    "project_root": "$project_root",
+    "current_branch": "$current_branch",
+    "epic_name": "$epic_name",
+    "feature_name": "$feature_name"
+}
+EOF
+}
+
+# 检测当前环境类型（为Commands层提供）
+environment_module_detect_environment_type() {
+    local current_path="${1:-$(pwd)}"
+    
+    # 通过Composite层获取环境信息
+    local env_info
+    env_info=$(environment_detect_complete) || {
+        echo "unknown"
+        return 1
+    }
+    
+    # 提取环境类型
+    echo "$env_info" | jq -r '.environment.type // "unknown"'
+}

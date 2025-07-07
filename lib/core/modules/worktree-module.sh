@@ -638,3 +638,143 @@ EOF
         return 1
     fi
 }
+
+# ==============================================================================
+# 🆕 Commands层专用简化接口
+# ==============================================================================
+
+# 智能环境切换（为Commands层提供最简接口）
+worktree_module_smart_switch() {
+    local user_input="$1"
+    local switch_mode="${2:-auto}"     # auto/create/switch
+    local base_branch="${3:-develop}"
+    
+    # 使用paths模块解析用户输入
+    local target_branch
+    if command -v paths_module_smart_branch_resolve >/dev/null 2>&1; then
+        target_branch=$(paths_module_smart_branch_resolve "$user_input") || {
+            echo "❌ 错误：无法解析目标分支: $user_input" >&2
+            return 1
+        }
+    else
+        # 后备方案：直接解析
+        local parse_result
+        parse_result=$(worktree_module_parse_target "$user_input") || return 1
+        
+        local target_type="${parse_result%%:*}"
+        local clean_name="${parse_result#*:}"
+        
+        case "$target_type" in
+            "epic")
+                target_branch="epic-$clean_name-e"
+                ;;
+            "feature")
+                local current_epic
+                current_epic=$(worktree_module_extract_current_epic) || {
+                    echo "❌ 错误：Feature切换需要Epic环境" >&2
+                    return 1
+                }
+                target_branch="epic-$current_epic-e-$clean_name-ef"
+                ;;
+        esac
+    fi
+    
+    # 执行智能切换
+    worktree_module_intelligent_switch "$target_branch" "$switch_mode" "$base_branch"
+}
+
+# 当前环境检测（为Commands层提供）
+worktree_module_get_current_context() {
+    local current_path=$(pwd)
+    local project_root
+    project_root=$(environment_get_project_root) || {
+        echo '{"type": "unknown", "error": "not in GPF project"}'
+        return 1
+    }
+    
+    # 检查是否在worktree中
+    if [[ "$current_path" == "$project_root/.worktrees/"* ]]; then
+        local worktree_name=$(basename "$current_path")
+        local branch_type="unknown"
+        local epic_name=""
+        local feature_name=""
+        
+        if [[ "$worktree_name" =~ ^epic-(.+)-e$ ]]; then
+            branch_type="epic"
+            epic_name="${BASH_REMATCH[1]}"
+        elif [[ "$worktree_name" =~ ^epic-(.+)-e-(.+)-ef$ ]]; then
+            branch_type="feature"
+            epic_name="${BASH_REMATCH[1]}"
+            feature_name="${BASH_REMATCH[2]}"
+        fi
+        
+        cat <<EOF
+{
+    "type": "$branch_type",
+    "current_path": "$current_path",
+    "project_root": "$project_root",
+    "worktree_name": "$worktree_name",
+    "epic_name": "$epic_name",
+    "feature_name": "$feature_name"
+}
+EOF
+    elif [[ "$current_path" == "$project_root" ]] || [[ "$current_path" == "$project_root"* ]]; then
+        cat <<EOF
+{
+    "type": "root",
+    "current_path": "$current_path",
+    "project_root": "$project_root",
+    "worktree_name": "",
+    "epic_name": "",
+    "feature_name": ""
+}
+EOF
+    else
+        cat <<EOF
+{
+    "type": "unknown",
+    "current_path": "$current_path",
+    "project_root": "$project_root",
+    "error": "not in GPF environment"
+}
+EOF
+    fi
+}
+
+# 快速状态检查（为Commands层提供）
+worktree_module_quick_status() {
+    local target_input="${1:-}"
+    
+    if [[ -z "$target_input" ]]; then
+        # 检查当前环境
+        local context
+        context=$(worktree_module_get_current_context) || return 1
+        
+        local current_type=$(echo "$context" | jq -r '.type')
+        if [[ "$current_type" =~ ^(epic|feature)$ ]]; then
+            local worktree_name=$(echo "$context" | jq -r '.worktree_name')
+            local current_path=$(echo "$context" | jq -r '.current_path')
+            worktree_module_get_worktree_status "$current_path" "$worktree_name" "summary"
+        else
+            echo '{"error": "not in worktree environment"}'
+            return 1
+        fi
+    else
+        # 检查指定目标
+        local target_branch
+        target_branch=$(paths_module_smart_branch_resolve "$target_input") || return 1
+        
+        local worktree_path="$PROJECT_ROOT/.worktrees/$target_branch"
+        if [[ -d "$worktree_path" ]]; then
+            worktree_module_get_worktree_status "$worktree_path" "$target_branch" "summary"
+        else
+            cat <<EOF
+{
+    "branch_name": "$target_branch",
+    "exists": false,
+    "message": "worktree does not exist"
+}
+EOF
+        fi
+    fi
+}

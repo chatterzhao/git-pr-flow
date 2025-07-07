@@ -69,6 +69,9 @@ status_module_get_complete_status() {
         "sync")
             status_module_format_sync_status "$branch_name" "$target_branch" "$base_status" "$target_status"
             ;;
+        "start")
+            status_module_format_start_status "$branch_name" "$target_branch" "$base_status" "$target_status"
+            ;;
         "status"|"general")
             status_module_format_general_status "$branch_name" "$base_status" "$target_status" "$github_status"
             ;;
@@ -110,23 +113,18 @@ status_module_get_base_status() {
         return 1
     }
     
-    # 工作区状态
-    local working_tree_clean="false"
-    if check_working_tree_clean_remote "$worktree_path"; then
-        working_tree_clean="true"
-    fi
+    # 通过Composite层获取Git状态
+    local git_status
+    git_status=$(git_get_complete_status "$branch_name" "$worktree_path") || {
+        echo "❌ 错误：无法获取Git状态" >&2
+        return 1
+    }
     
-    # 暂存区状态
-    local staging_area_clean="false"
-    if check_staging_area_clean_remote "$worktree_path"; then
-        staging_area_clean="true"
-    fi
-    
-    # 分支推送状态
-    local branch_pushed="false"
-    if check_branch_pushed_remote "$branch_name" "$worktree_path"; then
-        branch_pushed="true"
-    fi
+    # 提取状态信息
+    local working_tree_clean=$(echo "$git_status" | jq -r '.working_tree_clean')
+    local staging_area_clean=$(echo "$git_status" | jq -r '.staging_area_clean')
+    local branch_pushed=$(echo "$git_status" | jq -r '.remote_exists')
+    local has_merge_conflicts=$(echo "$git_status" | jq -r '.has_merge_conflicts // false')
     
     # 返回JSON格式状态
     cat <<EOF
@@ -134,6 +132,7 @@ status_module_get_base_status() {
     "working_tree_clean": $working_tree_clean,
     "staging_area_clean": $staging_area_clean,
     "branch_pushed": $branch_pushed,
+    "has_merge_conflicts": $has_merge_conflicts,
     "branch_exists": true
 }
 EOF
@@ -145,24 +144,20 @@ status_module_get_target_relationship() {
     local target_branch="$2"
     local worktree_path="$3"
     
-    # 检查分支是否已合并
-    local branch_merged="false"
-    if check_branch_merged_remote "$branch_name" "$target_branch" "$worktree_path"; then
-        branch_merged="true"
-    fi
+    # 通过Composite层检查合并状态
+    local merge_status
+    merge_status=$(git_check_merge_status "$branch_name" "$target_branch" "$worktree_path") || {
+        echo "❌ 错误：无法检查合并状态" >&2
+        return 1
+    }
     
-    # 检查是否需要同步
+    local branch_merged=$(echo "$merge_status" | jq -r '.is_merged')
+    local commits_ahead=$(echo "$merge_status" | jq -r '.ahead_count // 0')
+    local commits_behind=$(echo "$merge_status" | jq -r '.behind_count // 0')
     local needs_sync="false"
-    if check_sync_requirements_remote "$branch_name" "$target_branch" "$worktree_path"; then
-        needs_sync="true"
-    fi
     
-    # 获取commit差异
-    local commits_ahead="0"
-    local commits_behind="0"
-    if [[ -d "$worktree_path" ]]; then
-        commits_ahead=$(git -C "$worktree_path" rev-list --count "origin/$target_branch..$branch_name" 2>/dev/null || echo "0")
-        commits_behind=$(git -C "$worktree_path" rev-list --count "$branch_name..origin/$target_branch" 2>/dev/null || echo "0")
+    if [[ "$commits_behind" -gt 0 ]]; then
+        needs_sync="true"
     fi
     
     # 返回JSON格式状态
@@ -356,6 +351,65 @@ status_module_format_sync_status() {
 EOF
 }
 
+# 格式化开始命令状态输出
+status_module_format_start_status() {
+    local branch_name="$1"
+    local target_branch="$2"
+    local base_status="$3"
+    local target_status="$4"
+    
+    # 解析状态
+    local working_clean=$(echo "$base_status" | jq -r '.working_tree_clean')
+    local staging_clean=$(echo "$base_status" | jq -r '.staging_area_clean')
+    local has_conflicts=$(echo "$base_status" | jq -r '.has_merge_conflicts // false')
+    local base_fresh=$(echo "$target_status" | jq -r '.base_branch_fresh // true')
+    local commits_behind=$(echo "$target_status" | jq -r '.commits_behind // 0')
+    
+    # 判断开始操作的准备状态
+    local start_ready="true"
+    local blocking_issues=()
+    local warnings=()
+    
+    # 检查阻断性问题
+    if [[ "$has_conflicts" == "true" ]]; then
+        start_ready="false"
+        blocking_issues+=("存在未解决的合并冲突")
+    fi
+    
+    # 检查警告性问题
+    if [[ "$working_clean" != "true" ]]; then
+        warnings+=("工作区有未保存的修改")
+    fi
+    
+    if [[ "$staging_clean" != "true" ]]; then
+        warnings+=("暂存区有未提交的内容")
+    fi
+    
+    if [[ "$base_fresh" != "true" ]]; then
+        warnings+=("基础分支不是最新版本，建议先同步")
+    fi
+    
+    if [[ "$commits_behind" -gt 0 ]]; then
+        warnings+=("分支落后基础分支 $commits_behind 个提交")
+    fi
+    
+    # 返回start状态
+    cat <<EOF
+{
+    "purpose": "start",
+    "branch_name": "$branch_name",
+    "target_branch": "$target_branch",
+    "start_ready": $start_ready,
+    "base_fresh": $base_fresh,
+    "commits_behind": $commits_behind,
+    "blocking_issues": [$(printf '"%s",' "${blocking_issues[@]}" | sed 's/,$//')],
+    "warnings": [$(printf '"%s",' "${warnings[@]}" | sed 's/,$//')],
+    "base_status": $base_status,
+    "target_status": $target_status
+}
+EOF
+}
+
 # 格式化通用状态输出
 status_module_format_general_status() {
     local branch_name="$1"
@@ -419,54 +473,3 @@ status_module_check_sync_needed() {
 # 辅助状态检查方法（从composite层调用）
 # ==============================================================================
 
-# 远程检查工作区是否干净
-check_working_tree_clean_remote() {
-    local worktree_path="$1"
-    [[ -d "$worktree_path" ]] || return 1
-    git -C "$worktree_path" diff --quiet 2>/dev/null
-}
-
-# 远程检查暂存区是否干净
-check_staging_area_clean_remote() {
-    local worktree_path="$1"
-    [[ -d "$worktree_path" ]] || return 1
-    git -C "$worktree_path" diff --cached --quiet 2>/dev/null
-}
-
-# 远程检查分支是否已推送
-check_branch_pushed_remote() {
-    local branch_name="$1"
-    local worktree_path="$2"
-    [[ -d "$worktree_path" ]] || return 1
-    git -C "$worktree_path" rev-parse "origin/$branch_name" >/dev/null 2>&1
-}
-
-# 远程检查分支是否已合并
-check_branch_merged_remote() {
-    local branch_name="$1"
-    local target_branch="$2"
-    local worktree_path="$3"
-    [[ -d "$worktree_path" ]] || return 1
-    
-    local merge_base commit_count
-    merge_base=$(git -C "$worktree_path" merge-base "$branch_name" "$target_branch" 2>/dev/null || echo "")
-    [[ -n "$merge_base" ]] || return 1
-    
-    commit_count=$(git -C "$worktree_path" rev-list --count "$merge_base..$branch_name" 2>/dev/null || echo "1")
-    [[ "$commit_count" -eq 0 ]]
-}
-
-# 远程检查同步要求
-check_sync_requirements_remote() {
-    local branch_name="$1"
-    local target_branch="$2"
-    local worktree_path="$3"
-    [[ -d "$worktree_path" ]] || return 1
-    
-    local target_latest_commit source_base_commit
-    target_latest_commit=$(git -C "$worktree_path" rev-parse "origin/$target_branch" 2>/dev/null || echo "")
-    source_base_commit=$(git -C "$worktree_path" merge-base "$branch_name" "origin/$target_branch" 2>/dev/null || echo "")
-    
-    [[ -n "$target_latest_commit" && -n "$source_base_commit" ]] || return 1
-    [[ "$target_latest_commit" != "$source_base_commit" ]]
-}
