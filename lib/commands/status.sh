@@ -314,11 +314,11 @@ EOF
             status_purpose=$(echo "$status_data" | jq -r '.status_purpose')
             environment_type=$(echo "$status_data" | jq -r '.environment_info.type // "unknown"')
             
-            echo "🎯 GPF Status Report"
-            echo "===================="
-            echo "📍 Current Environment: $environment_type"
-            echo "🌿 Branch: $branch_name"
-            echo "🎯 Purpose: $status_purpose"
+            echo "🎯 GPF 状态报告"
+            echo "==============="
+            echo "📍 当前环境: $environment_type"
+            echo "🌿 Git分支: $branch_name"
+            echo "🎯 目的: $status_purpose"
             echo ""
             
             # 显示基础状态
@@ -332,13 +332,13 @@ EOF
             branch_pushed=$(echo "$status_data" | jq -r '.complete_status.base_status.branch_pushed // false')
             conflicts=$(echo "$status_data" | jq -r '.complete_status.base_status.has_merge_conflicts // false')
             
-            echo "📊 Base Status:"
-            echo "   Working Tree: $(status_command_format_boolean "$working_clean")"
-            echo "   Staging Area: $(status_command_format_boolean "$staging_clean")"
-            echo "   Branch Pushed: $(status_command_format_boolean "$branch_pushed")"
-            echo "   Merge Conflicts: $(status_command_format_boolean "$conflicts")"
+            echo "📊 基础状态:"
+            echo "   Git工作区干净: $(status_command_format_boolean "$working_clean")"
+            echo "   Git暂存区干净: $(status_command_format_boolean "$staging_clean")"
+            echo "   Git分支已推送: $(status_command_format_boolean "$branch_pushed")"
+            echo "   Git合并冲突: $(status_command_format_conflict_boolean "$conflicts")"
             echo ""
-            echo "✅ Status check completed"
+            echo "✅ 状态检查完成"
             ;;
     esac
 }
@@ -350,9 +350,18 @@ EOF
 status_command_format_boolean() {
     local value="$1"
     if [[ "$value" == "true" ]]; then
-        echo "✅ Yes"
+        echo "✅ 是"
     else
-        echo "❌ No"
+        echo "❌ 否"
+    fi
+}
+
+status_command_format_conflict_boolean() {
+    local value="$1"
+    if [[ "$value" == "true" ]]; then
+        echo "🔥 存在"
+    else
+        echo "✅ 无"
     fi
 }
 
