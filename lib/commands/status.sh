@@ -210,7 +210,13 @@ status_command_collect_status_data() {
     # 调用status模块获取完整状态
     local complete_status
     if command -v status_module_get_complete_status >/dev/null 2>&1; then
-        complete_status=$(status_module_get_complete_status "$branch_to_check" "$target_branch_for_status" "$status_purpose")
+        complete_status=$(status_module_get_complete_status "$branch_to_check" "$target_branch_for_status" "$status_purpose" 2>&1)
+        
+        # 验证返回的是否为有效JSON
+        if ! echo "$complete_status" | jq . >/dev/null 2>&1; then
+            echo "$complete_status" >&2
+            return 1
+        fi
     else
         # 简单状态信息
         complete_status=$(cat <<EOF
