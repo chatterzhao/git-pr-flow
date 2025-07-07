@@ -1,30 +1,33 @@
 #!/bin/bash
 
 # GPF Main Entry Point
-# This is a placeholder for testing hooks installation
+set -euo pipefail
 
-echo "GPF v2.0.0 - Git PR Flow CLI Tool"
-echo ""
-echo "Usage: gpf <command> [options]"
-echo ""
-echo "Commands:"
-echo "  start   Create Epic or Feature branch"
-echo "  pr      Create pull request"
-echo "  status  Show current status"
-echo "  clean   Clean up branches"
-echo "  sync    Sync branches"
-echo ""
-echo "Options:"
-echo "  --help     Show this help message"
-echo "  --version  Show version information"
-echo ""
+# 显示帮助信息的函数
+show_help() {
+    echo "GPF v2.0.0 - Git PR Flow CLI Tool"
+    echo ""
+    echo "Usage: gpf <command> [options]"
+    echo ""
+    echo "Commands:"
+    echo "  start   Create Epic or Feature branch"
+    echo "  pr      Create pull request" 
+    echo "  status  Show current status"
+    echo "  clean   Clean up branches"
+    echo "  sync    Sync branches"
+    echo ""
+    echo "Options:"
+    echo "  --help     Show this help message"
+    echo "  --version  Show version information"
+    echo ""
+}
 
 case "${1:-}" in
     --version|-v)
         echo "GPF v2.0.0"
         ;;
-    --help|-h)
-        echo "Full help documentation coming soon..."
+    --help|-h|"")
+        show_help
         ;;
     status)
         # 获取脚本所在目录
@@ -34,7 +37,9 @@ case "${1:-}" in
         bash "$SCRIPT_DIR/../lib/core/commands/status.sh" "$@"
         ;;
     *)
-        echo "Command not implemented yet: ${1:-}"
-        echo "This is a development version for testing hooks."
+        echo "❌ 错误：未知命令 '$1'"
+        echo ""
+        show_help
+        exit 1
         ;;
 esac
