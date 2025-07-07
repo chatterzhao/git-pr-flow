@@ -4,27 +4,19 @@
 
 set -euo pipefail
 
-# 获取项目根目录
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+# 获取脚本所在目录 - 使用相对路径
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 计算项目根目录 - 从commands目录向上3级到项目根
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# 避免变量冲突，在测试模式下跳过environment-module加载
+# 避免变量冲突，在测试模式下跳过模块加载
 if [[ "${GPF_TEST_MODE:-}" != "true" ]]; then
-    # 加载environment-module以获取基础设施方法
-    source "$(dirname "${BASH_SOURCE[0]}")/../modules/environment-module.sh"
-    
-    # 通过Modules层获取项目根目录（遵循四层架构）
-    PROJECT_ROOT=$(environment_module_get_current_context | jq -r '.project_root' 2>/dev/null) || {
-        # 后备方案：使用相对路径计算
-        PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
-    }
-fi
-
-# 加载所有必需的Modules层依赖
-if [[ "${GPF_TEST_MODE:-}" != "true" ]]; then
-    source "$PROJECT_ROOT/lib/core/common.sh"
-    source "$PROJECT_ROOT/lib/core/modules/status-module.sh"
-    source "$PROJECT_ROOT/lib/core/modules/paths-module.sh" 
-    source "$PROJECT_ROOT/lib/core/modules/worktree-module.sh"
+    # 使用相对路径加载依赖 - 遵循相对路径原则
+    source "$SCRIPT_DIR/../common.sh"
+    source "$SCRIPT_DIR/../modules/environment-module.sh"
+    source "$SCRIPT_DIR/../modules/status-module.sh"
+    source "$SCRIPT_DIR/../modules/paths-module.sh" 
+    source "$SCRIPT_DIR/../modules/worktree-module.sh"
 fi
 
 # ==============================================================================
@@ -229,12 +221,12 @@ status_command_collect_status_data() {
         
         case "$current_type" in
             "epic"|"feature")
-                local worktree_name=$(echo "$current_context" | jq -r '.worktree_name // ""')
-                if [[ -n "$worktree_name" ]]; then
-                    branch_to_check="$worktree_name"
+                local current_branch=$(echo "$current_context" | jq -r '.current_branch // ""')
+                if [[ -n "$current_branch" ]]; then
+                    branch_to_check="$current_branch"
                     # 根据当前分支类型确定目标分支
-                    if [[ "$worktree_name" =~ ^epic-.*-e-.*-ef$ ]]; then
-                        local epic_part="${worktree_name%-e-*-ef}"
+                    if [[ "$current_branch" =~ ^epic-.*-e-.*-ef$ ]]; then
+                        local epic_part="${current_branch%-e-*-ef}"
                         target_branch_for_status="$epic_part-e"
                     else
                         target_branch_for_status="develop"

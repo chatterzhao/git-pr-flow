@@ -26,6 +26,13 @@ case "${1:-}" in
     --help|-h)
         echo "Full help documentation coming soon..."
         ;;
+    status)
+        # 获取脚本所在目录
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        # 调用status命令，传递除第一个参数外的所有参数
+        shift
+        bash "$SCRIPT_DIR/../lib/core/commands/status.sh" "$@"
+        ;;
     *)
         echo "Command not implemented yet: ${1:-}"
         echo "This is a development version for testing hooks."
