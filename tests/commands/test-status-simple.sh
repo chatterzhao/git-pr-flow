@@ -43,15 +43,15 @@ run_test() {
 # =============================================================================
 
 test_status_command_file_exists() {
-    [[ -f "$PROJECT_ROOT/lib/core/commands/status.sh" ]]
+    [[ -f "$PROJECT_ROOT/lib/commands/status.sh" ]]
 }
 
 test_status_command_syntax() {
-    bash -n "$PROJECT_ROOT/lib/core/commands/status.sh" 2>/dev/null
+    bash -n "$PROJECT_ROOT/lib/commands/status.sh" 2>/dev/null
 }
 
 test_status_command_executable() {
-    [[ -x "$PROJECT_ROOT/lib/core/commands/status.sh" ]]
+    [[ -x "$PROJECT_ROOT/lib/commands/status.sh" ]]
 }
 
 test_status_command_functions_defined() {
@@ -65,7 +65,7 @@ test_status_command_functions_defined() {
     )
     
     for func in "${functions_to_check[@]}"; do
-        if ! grep -q "^${func}()" "$PROJECT_ROOT/lib/core/commands/status.sh"; then
+        if ! grep -q "^${func}()" "$PROJECT_ROOT/lib/commands/status.sh"; then
             echo "❌ 函数 $func 未找到"
             return 1
         fi
@@ -80,13 +80,13 @@ test_status_command_functions_defined() {
 test_help_option() {
     # 测试--help选项
     local output
-    output=$(cd "$PROJECT_ROOT" && export GPF_TEST_MODE=true && bash lib/core/commands/status.sh --help 2>/dev/null)
+    output=$(cd "$PROJECT_ROOT" && export GPF_TEST_MODE=true && bash lib/commands/status.sh --help 2>/dev/null)
     [[ "$output" == *"GPF Status Command"* ]]
 }
 
 test_invalid_option_handling() {
     # 测试无效选项处理
-    if cd "$PROJECT_ROOT" && bash lib/core/commands/status.sh --invalid-option 2>/dev/null; then
+    if cd "$PROJECT_ROOT" && bash lib/commands/status.sh --invalid-option 2>/dev/null; then
         return 1  # 应该失败
     else
         return 0  # 正确失败
@@ -100,7 +100,7 @@ test_invalid_option_handling() {
 test_format_option_parsing() {
     # 测试格式选项解析
     local output
-    output=$(cd "$PROJECT_ROOT" && timeout 5 bash lib/core/commands/status.sh --format=json 2>/dev/null || echo "timeout")
+    output=$(cd "$PROJECT_ROOT" && timeout 5 bash lib/commands/status.sh --format=json 2>/dev/null || echo "timeout")
     
     # 检查是否没有立即报错（可能会因为环境问题失败，但不应该是参数解析问题）
     [[ "$output" != *"未知选项"* && "$output" != *"过多的参数"* ]]
@@ -109,7 +109,7 @@ test_format_option_parsing() {
 test_purpose_option_parsing() {
     # 测试目的选项解析
     local output
-    output=$(cd "$PROJECT_ROOT" && timeout 5 bash lib/core/commands/status.sh --purpose=pr 2>/dev/null || echo "timeout")
+    output=$(cd "$PROJECT_ROOT" && timeout 5 bash lib/commands/status.sh --purpose=pr 2>/dev/null || echo "timeout")
     
     # 检查是否没有立即报错
     [[ "$output" != *"未知选项"* && "$output" != *"过多的参数"* ]]
@@ -120,7 +120,7 @@ test_purpose_option_parsing() {
 # =============================================================================
 
 test_code_style_consistency() {
-    local file="$PROJECT_ROOT/lib/core/commands/status.sh"
+    local file="$PROJECT_ROOT/lib/commands/status.sh"
     
     # 检查是否有合适的shebang
     local first_line
@@ -129,7 +129,7 @@ test_code_style_consistency() {
 }
 
 test_error_handling_patterns() {
-    local file="$PROJECT_ROOT/lib/core/commands/status.sh"
+    local file="$PROJECT_ROOT/lib/commands/status.sh"
     
     # 检查是否有错误处理
     if grep -q "set -euo pipefail" "$file" && grep -q "return 1" "$file"; then
@@ -140,7 +140,7 @@ test_error_handling_patterns() {
 }
 
 test_documentation_comments() {
-    local file="$PROJECT_ROOT/lib/core/commands/status.sh"
+    local file="$PROJECT_ROOT/lib/commands/status.sh"
     
     # 检查是否有适当的注释
     local comment_count
@@ -153,7 +153,7 @@ test_documentation_comments() {
 # =============================================================================
 
 test_layer_separation() {
-    local file="$PROJECT_ROOT/lib/core/commands/status.sh"
+    local file="$PROJECT_ROOT/lib/commands/status.sh"
     
     # 检查是否只调用Modules层
     # 不应该直接调用Composite或Atomic层
@@ -172,7 +172,7 @@ test_layer_separation() {
 }
 
 test_no_direct_git_calls() {
-    local file="$PROJECT_ROOT/lib/core/commands/status.sh"
+    local file="$PROJECT_ROOT/lib/commands/status.sh"
     
     # Commands层不应该有直接的git调用
     if grep -q "git " "$file" | grep -v "# " | grep -v "comment"; then
@@ -187,7 +187,7 @@ test_no_direct_git_calls() {
 # =============================================================================
 
 test_output_format_functions() {
-    local file="$PROJECT_ROOT/lib/core/commands/status.sh"
+    local file="$PROJECT_ROOT/lib/commands/status.sh"
     
     # 检查是否有各种输出格式的函数
     local format_functions=(
@@ -210,7 +210,7 @@ test_output_format_functions() {
 # =============================================================================
 
 test_function_organization() {
-    local file="$PROJECT_ROOT/lib/core/commands/status.sh"
+    local file="$PROJECT_ROOT/lib/commands/status.sh"
     
     # 检查是否有适当的功能组织（通过分隔符检查）
     local section_count
@@ -219,7 +219,7 @@ test_function_organization() {
 }
 
 test_main_function_structure() {
-    local file="$PROJECT_ROOT/lib/core/commands/status.sh"
+    local file="$PROJECT_ROOT/lib/commands/status.sh"
     
     # 检查主函数是否有四个阶段
     local main_function_content

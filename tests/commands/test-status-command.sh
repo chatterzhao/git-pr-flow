@@ -15,7 +15,7 @@ export GPF_TEST_MODE="true"
 [[ -f "$PROJECT_ROOT/tests/test-framework.sh" ]] && source "$PROJECT_ROOT/tests/test-framework.sh" || true
 
 # 检查Commands层文件是否存在
-if [[ ! -f "$PROJECT_ROOT/lib/core/commands/status.sh" ]]; then
+if [[ ! -f "$PROJECT_ROOT/lib/commands/status.sh" ]]; then
     echo "❌ 错误：Commands层status.sh文件不存在"
     exit 1
 fi

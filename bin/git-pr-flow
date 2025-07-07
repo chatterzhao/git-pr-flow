@@ -34,7 +34,7 @@ case "${1:-}" in
         SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
         # 调用status命令，传递除第一个参数外的所有参数
         shift
-        bash "$SCRIPT_DIR/../lib/core/commands/status.sh" "$@"
+        bash "$SCRIPT_DIR/../lib/commands/status.sh" "$@"
         ;;
     *)
         echo "❌ 错误：未知命令 '$1'"
