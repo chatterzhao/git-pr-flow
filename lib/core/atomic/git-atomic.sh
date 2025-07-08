@@ -84,7 +84,10 @@ git_check_branch_exists_on_remote() {
     local branch_name="$1"
     local worktree_path="${2:-$(pwd)}"
     
-    git -C "$worktree_path" rev-parse "origin/$branch_name" >/dev/null 2>&1
+    local default_remote
+    default_remote=$(git_get_default_remote "$worktree_path") || return 1
+    
+    git -C "$worktree_path" rev-parse "$default_remote/$branch_name" >/dev/null 2>&1
 }
 
 # 检查分支是否已推送（本地与远程同步）
@@ -94,6 +97,9 @@ git_check_branch_pushed() {
     local branch_name="$1"
     local worktree_path="${2:-$(pwd)}"
     
+    local default_remote
+    default_remote=$(git_get_default_remote "$worktree_path") || return 1
+    
     # 首先检查远程分支是否存在
     if ! git_check_branch_exists_on_remote "$branch_name" "$worktree_path"; then
         return 1
@@ -102,7 +108,7 @@ git_check_branch_pushed() {
     # 比较本地和远程的commit哈希
     local local_hash remote_hash
     local_hash=$(git -C "$worktree_path" rev-parse "$branch_name" 2>/dev/null) || return 1
-    remote_hash=$(git -C "$worktree_path" rev-parse "origin/$branch_name" 2>/dev/null) || return 1
+    remote_hash=$(git -C "$worktree_path" rev-parse "$default_remote/$branch_name" 2>/dev/null) || return 1
     
     [[ "$local_hash" == "$remote_hash" ]]
 }
@@ -114,6 +120,9 @@ git_check_branch_ahead_of_remote() {
     local branch_name="$1"
     local worktree_path="${2:-$(pwd)}"
     
+    local default_remote
+    default_remote=$(git_get_default_remote "$worktree_path") || return 1
+    
     # 检查远程分支是否存在
     if ! git_check_branch_exists_on_remote "$branch_name" "$worktree_path"; then
         # 远程不存在，本地肯定领先
@@ -122,7 +131,7 @@ git_check_branch_ahead_of_remote() {
     
     # 检查是否有本地提交未推送到远程
     local ahead_count
-    ahead_count=$(git -C "$worktree_path" rev-list --count "origin/$branch_name..$branch_name" 2>/dev/null || echo "0")
+    ahead_count=$(git -C "$worktree_path" rev-list --count "$default_remote/$branch_name..$branch_name" 2>/dev/null || echo "0")
     [[ "$ahead_count" -gt 0 ]]
 }
 
@@ -133,6 +142,9 @@ git_check_branch_behind_remote() {
     local branch_name="$1"
     local worktree_path="${2:-$(pwd)}"
     
+    local default_remote
+    default_remote=$(git_get_default_remote "$worktree_path") || return 1
+    
     # 检查远程分支是否存在
     if ! git_check_branch_exists_on_remote "$branch_name" "$worktree_path"; then
         # 远程不存在，本地不可能落后
@@ -141,7 +153,7 @@ git_check_branch_behind_remote() {
     
     # 检查是否有远程提交未合并到本地
     local behind_count
-    behind_count=$(git -C "$worktree_path" rev-list --count "$branch_name..origin/$branch_name" 2>/dev/null || echo "0")
+    behind_count=$(git -C "$worktree_path" rev-list --count "$branch_name..$default_remote/$branch_name" 2>/dev/null || echo "0")
     [[ "$behind_count" -gt 0 ]]
 }
 
@@ -197,6 +209,37 @@ git_check_detached_head() {
     local worktree_path="${1:-$(pwd)}"
     
     ! git -C "$worktree_path" symbolic-ref HEAD >/dev/null 2>&1
+}
+
+# 获取默认远程名称
+# 参数：(optional: worktree_path)
+# 返回：默认远程名称（优先级：origin > all > 第一个远程）
+git_get_default_remote() {
+    local worktree_path="${1:-$(pwd)}"
+    
+    # 获取所有远程
+    local remotes
+    remotes=$(git -C "$worktree_path" remote 2>/dev/null || echo "")
+    
+    if [[ -z "$remotes" ]]; then
+        echo ""
+        return 1
+    fi
+    
+    # 优先使用 origin
+    if echo "$remotes" | grep -q "^origin$"; then
+        echo "origin"
+        return 0
+    fi
+    
+    # 其次使用 all
+    if echo "$remotes" | grep -q "^all$"; then
+        echo "all"
+        return 0
+    fi
+    
+    # 最后使用第一个远程
+    echo "$remotes" | head -n1
 }
 
 # 获取未合并的冲突文件列表（纯Git命令）

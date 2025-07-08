@@ -40,12 +40,15 @@ git_validate_branch_state() {
     has_untracked=$(git_check_no_untracked_files "$worktree_path" && echo "false" || echo "true")
     
     # 检查远程状态
-    local remote_exists ahead_count behind_count
+    local remote_exists branch_pushed ahead_count behind_count
     remote_exists=$(git_check_branch_exists_on_remote "$branch_name" "$worktree_path" && echo "true" || echo "false")
+    branch_pushed=$(git_check_branch_pushed "$branch_name" "$worktree_path" && echo "true" || echo "false")
     
     if [[ "$remote_exists" == "true" ]]; then
-        ahead_count=$(git_get_commit_count_between "origin/$branch_name" "$branch_name" "$worktree_path")
-        behind_count=$(git_get_commit_count_between "$branch_name" "origin/$branch_name" "$worktree_path")
+        local default_remote
+        default_remote=$(git_get_default_remote "$worktree_path") || default_remote="origin"
+        ahead_count=$(git_get_commit_count_between "$default_remote/$branch_name" "$branch_name" "$worktree_path")
+        behind_count=$(git_get_commit_count_between "$branch_name" "$default_remote/$branch_name" "$worktree_path")
     else
         ahead_count="0"
         behind_count="0"
@@ -70,6 +73,7 @@ git_validate_branch_state() {
     "staging_area_clean": $staging_area_clean,
     "has_untracked": $has_untracked,
     "remote_exists": $remote_exists,
+    "branch_pushed": $branch_pushed,
     "ahead_count": $ahead_count,
     "behind_count": $behind_count,
     "has_merge_conflicts": $has_merge_conflicts,

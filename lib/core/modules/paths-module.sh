@@ -30,9 +30,13 @@ paths_module_convert_and_validate() {
     local validation_options="${4:-}"   # JSON格式验证选项
     
     # 解析验证选项
-    local strict_validation=$(echo "${validation_options:-{}}" | jq -r '.strict_validation // true')
-    local auto_correction=$(echo "${validation_options:-{}}" | jq -r '.auto_correction // true')
-    local return_alternatives=$(echo "${validation_options:-{}}" | jq -r '.return_alternatives // false')
+    if [[ -z "$validation_options" ]]; then
+        validation_options="{}"
+    fi
+    
+    local strict_validation=$(echo "$validation_options" | jq -r '.strict_validation // true')
+    local auto_correction=$(echo "$validation_options" | jq -r '.auto_correction // true')
+    local return_alternatives=$(echo "$validation_options" | jq -r '.return_alternatives // false')
     
     # 第一阶段：输入清理和标准化
     local normalized_input
@@ -108,8 +112,12 @@ paths_module_batch_path_conversion() {
     local failed_count=0
     
     # 解析批量选项
-    local fail_fast=$(echo "${batch_options:-{}}" | jq -r '.fail_fast // false')
-    local include_errors=$(echo "${batch_options:-{}}" | jq -r '.include_errors // true')
+    if [[ -z "$batch_options" ]]; then
+        batch_options="{}"
+    fi
+    
+    local fail_fast=$(echo "$batch_options" | jq -r '.fail_fast // false')
+    local include_errors=$(echo "$batch_options" | jq -r '.include_errors // true')
     
     # 遍历转换请求
     echo "$conversion_requests" | jq -c '.[]' | while read -r request; do

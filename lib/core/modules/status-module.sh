@@ -123,8 +123,27 @@ status_module_get_base_status() {
     # 提取状态信息
     local working_tree_clean=$(echo "$git_status" | jq -r '.working_tree_clean')
     local staging_area_clean=$(echo "$git_status" | jq -r '.staging_area_clean')
-    local branch_pushed=$(echo "$git_status" | jq -r '.remote_exists')
+    local branch_pushed=$(echo "$git_status" | jq -r '.branch_pushed')
+    local remote_exists=$(echo "$git_status" | jq -r '.remote_exists')
+    local ahead_count=$(echo "$git_status" | jq -r '.ahead_count // 0')
+    local behind_count=$(echo "$git_status" | jq -r '.behind_count // 0')
     local has_merge_conflicts=$(echo "$git_status" | jq -r '.has_merge_conflicts // false')
+    
+    # 确定同步状态描述
+    local sync_status_desc=""
+    if [[ "$remote_exists" == "false" ]]; then
+        sync_status_desc="远程无此分支"
+    elif [[ "$branch_pushed" == "true" ]]; then
+        sync_status_desc="已同步"
+    elif [[ "$ahead_count" -gt 0 && "$behind_count" -gt 0 ]]; then
+        sync_status_desc="本地领先${ahead_count}个提交，落后${behind_count}个提交"
+    elif [[ "$ahead_count" -gt 0 ]]; then
+        sync_status_desc="本地领先${ahead_count}个提交"
+    elif [[ "$behind_count" -gt 0 ]]; then
+        sync_status_desc="本地落后${behind_count}个提交"
+    else
+        sync_status_desc="未知状态"
+    fi
     
     # 返回JSON格式状态
     cat <<EOF
@@ -132,6 +151,10 @@ status_module_get_base_status() {
     "working_tree_clean": $working_tree_clean,
     "staging_area_clean": $staging_area_clean,
     "branch_pushed": $branch_pushed,
+    "remote_exists": $remote_exists,
+    "ahead_count": $ahead_count,
+    "behind_count": $behind_count,
+    "sync_status_desc": "$sync_status_desc",
     "has_merge_conflicts": $has_merge_conflicts,
     "branch_exists": true
 }

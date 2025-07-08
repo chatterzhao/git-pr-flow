@@ -325,17 +325,20 @@ EOF
             local working_clean
             local staging_clean
             local branch_pushed
+            local sync_status_desc
             local conflicts
             
             working_clean=$(echo "$status_data" | jq -r '.complete_status.base_status.working_tree_clean // false')
             staging_clean=$(echo "$status_data" | jq -r '.complete_status.base_status.staging_area_clean // false')
             branch_pushed=$(echo "$status_data" | jq -r '.complete_status.base_status.branch_pushed // false')
+            sync_status_desc=$(echo "$status_data" | jq -r '.complete_status.base_status.sync_status_desc // ""')
             conflicts=$(echo "$status_data" | jq -r '.complete_status.base_status.has_merge_conflicts // false')
             
             echo "📊 本地Git状态:"
             echo "   Git工作区干净: $(status_command_format_boolean "$working_clean")"
             echo "   Git暂存区干净: $(status_command_format_boolean "$staging_clean")"
             echo "   Git分支已推送: $(status_command_format_boolean "$branch_pushed")"
+            echo "   Git分支同步状态: $sync_status_desc"
             echo "   Git合并是否有冲突: $(status_command_format_conflict_boolean "$conflicts")"
             
                         # 显示GitHub/PR状态
