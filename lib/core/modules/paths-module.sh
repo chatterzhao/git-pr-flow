@@ -745,29 +745,363 @@ paths_module_smart_branch_resolve() {
         current_env=$(environment_module_detect_environment_type 2>/dev/null || echo "unknown")
     fi
     
-    # 使用智能推断
-    local inference_result
-    local json_options='{"prefer_existing": true}'
-    inference_result=$(paths_module_intelligent_path_inference "$user_input" "$current_env" "$json_options") || {
-        # 后备方案：直接转换
-        paths_module_user_input_to_branch "$user_input" "auto" "$context_hint"
-        return
-    }
+    # 新的智能匹配逻辑
+    local resolved_branch
+    resolved_branch=$(paths_module_smart_resolve_with_existence_check "$user_input" "$current_env" "$context_hint")
     
-    # 提取最佳建议
-    local suggestions
-    suggestions=$(echo "$inference_result" | jq -r '.path_suggestions')
-    
-    if [[ "$suggestions" != "null" && "$suggestions" != "[]" ]]; then
-        # 返回第一个建议的分支名
-        echo "$suggestions" | jq -r '.[0].result // empty' || {
-            # 如果没有结果，使用后备方案
-            paths_module_user_input_to_branch "$user_input" "auto" "$context_hint"
-        }
+    if [[ -n "$resolved_branch" ]]; then
+        echo "$resolved_branch"
     else
-        # 后备方案
+        # 后备方案：使用原有逻辑
         paths_module_user_input_to_branch "$user_input" "auto" "$context_hint"
     fi
+}
+
+# 新增：智能解析与存在性检查
+paths_module_smart_resolve_with_existence_check() {
+    local user_input="$1"
+    local current_env="$2"
+    local context_hint="$3"
+    
+    # 1. 处理完整分支名（直接返回）
+    if [[ "$user_input" =~ ^epic-.*-e$ ]] || [[ "$user_input" =~ ^epic-.*-e-.*-ef$ ]]; then
+        if paths_module_check_branch_exists "$user_input"; then
+            echo "$user_input"
+            return 0
+        else
+            return 1
+        fi
+    fi
+    
+    # 2. 分析输入的后缀类型
+    local suffix_type
+    suffix_type=$(paths_module_detect_suffix_type "$user_input")
+    
+    case "$suffix_type" in
+        "epic_suffix")
+            # 输入有-e后缀，直接匹配Epic分支
+            local epic_candidate
+            epic_candidate=$(paths_module_generate_epic_candidate "$user_input")
+            if [[ -n "$epic_candidate" ]] && paths_module_check_branch_exists "$epic_candidate"; then
+                echo "$epic_candidate"
+                return 0
+            else
+                if [[ -n "$epic_candidate" ]]; then
+                    echo "❌ 错误：根据输入自动处理前缀后缀后是 $epic_candidate，不存在这个分支；请检查您的输入或cd到对应目录，命令会自动检测环境，用 gpf status 不带参数即可" >&2
+                else
+                    echo "❌ 错误：无法从输入 '$user_input' 生成有效的Epic分支名；请检查您的输入或cd到对应目录，命令会自动检测环境，用 gpf status 不带参数即可" >&2
+                fi
+                return 1
+            fi
+            ;;
+        "feature_suffix")
+            # 输入有-ef后缀，直接匹配Feature分支
+            local feature_candidate=""
+            feature_candidate=$(paths_module_generate_feature_candidate_from_suffix "$user_input" 2>/dev/null || echo "")
+            
+            if [[ -n "$feature_candidate" ]] && paths_module_check_branch_exists "$feature_candidate"; then
+                echo "$feature_candidate"
+                return 0
+            else
+                if [[ -n "${feature_candidate:-}" ]]; then
+                    echo "❌ 错误：根据输入自动处理前缀后缀后是 ${feature_candidate}，不存在这个分支；请检查您的输入或cd到对应目录，命令会自动检测环境，用 gpf status 不带参数即可" >&2
+                else
+                    echo "❌ 错误：无法从输入 '$user_input' 生成有效的Feature分支名；请检查您的输入或cd到对应目录，命令会自动检测环境，用 gpf status 不带参数即可" >&2
+                fi
+                return 1
+            fi
+            ;;
+        "no_suffix")
+            # 无后缀：检查是否包含-e-分隔符
+            
+            if [[ "$user_input" =~ -e- ]]; then
+                # 包含-e-的输入，可能是缺少-ef后缀的Feature分支
+                local feature_candidate_with_ef
+                
+                # 如果输入不以epic-开头，需要添加epic-前缀
+                if [[ "$user_input" =~ ^epic- ]]; then
+                    feature_candidate_with_ef="${user_input}-ef"
+                else
+                    feature_candidate_with_ef="epic-${user_input}-ef"
+                fi
+                
+                if paths_module_check_branch_exists "$feature_candidate_with_ef"; then
+                    echo "$feature_candidate_with_ef"
+                    return 0
+                else
+                    echo "❌ 错误：输入 '$user_input' 看起来像Feature分支但缺少-ef后缀，尝试 $feature_candidate_with_ef 不存在；请检查您的输入或cd到对应目录，命令会自动检测环境，用 gpf status 不带参数即可" >&2
+                    return 1
+                fi
+            fi
+            
+            # 不包含-e-的情况：按优先级尝试三种匹配模式
+            
+            # 1. 先尝试整体作为Epic名：aa-login → epic-aa-login-e
+            local epic_candidate
+            epic_candidate=$(paths_module_generate_epic_candidate "$user_input")
+            if [[ -n "$epic_candidate" ]] && paths_module_check_branch_exists "$epic_candidate"; then
+                echo "$epic_candidate"
+                return 0
+            fi
+            
+            # 2. 再尝试整体作为Feature名：aa-login → epic-*-e-aa-login-ef
+            local feature_matches_whole
+            feature_matches_whole=$(paths_module_find_feature_matches "$user_input")
+            
+            if [[ -n "$feature_matches_whole" ]]; then
+                local match_count
+                match_count=$(echo "$feature_matches_whole" | wc -l | tr -d ' ')
+                
+                if [[ "$match_count" -eq 1 ]]; then
+                    # 唯一匹配
+                    echo "$feature_matches_whole"
+                    return 0
+                elif [[ "$match_count" -gt 1 ]]; then
+                    # 多个匹配，需要用户明确
+                    echo "❌ 错误：输入 '$user_input' 匹配到多个分支:" >&2
+                    echo "$feature_matches_whole" | sed 's/^/  - /' >&2
+                    echo "请提供更具体的输入，或cd到对应目录，命令会自动检测环境，用 gpf status 不带参数即可" >&2
+                    return 1
+                fi
+            fi
+            
+            # 3. 最后尝试解析为 epic+feature 组合：aa-login → epic-aa-e-login-ef
+            local feature_candidate_parsed
+            feature_candidate_parsed=$(paths_module_try_parse_epic_feature_combination "$user_input")
+            if [[ -n "$feature_candidate_parsed" ]] && paths_module_check_branch_exists "$feature_candidate_parsed"; then
+                echo "$feature_candidate_parsed"
+                return 0
+            fi
+            
+            # 所有尝试都失败
+            local attempted_modes="Epic模式: $epic_candidate"
+            if [[ -n "$feature_candidate_parsed" ]]; then
+                attempted_modes+=", Feature解析模式: $feature_candidate_parsed"
+            fi
+            echo "❌ 错误：尝试 $attempted_modes 都不存在，Feature模式也未找到匹配；请检查您的输入或cd到对应目录，命令会自动检测环境，用 gpf status 不带参数即可" >&2
+            return 1
+            ;;
+    esac
+    
+    # 最终失败（理论上不会到这里）
+    echo "❌ 错误：无法处理输入: $user_input" >&2
+    echo "请检查输入或cd到对应目录，命令会自动检测环境，用 gpf status 不带参数即可" >&2
+    return 1
+}
+
+# 新增：生成Epic分支候选
+paths_module_generate_epic_candidate() {
+    local user_input="$1"
+    local clean_name
+    
+    # 清理输入获取干净的名称
+    clean_name=$(paths_module_clean_user_input_for_epic "$user_input")
+    
+    if [[ -n "$clean_name" ]]; then
+        echo "epic-$clean_name-e"
+    else
+        # 如果无法清理，直接使用原输入尝试
+        echo "epic-$user_input-e"
+    fi
+}
+
+# 新增：检测输入的后缀类型
+paths_module_detect_suffix_type() {
+    local user_input="$1"
+    
+    # 检测-ef后缀（按你的建议：有明显-ef后缀就在feature_suffix处理）
+    if [[ "$user_input" =~ -ef$ ]]; then
+        echo "feature_suffix"
+        return
+    fi
+    
+    # 检测-e后缀（但不是-e-xxx-ef中的-e）
+    if [[ "$user_input" =~ -e$ ]] && [[ ! "$user_input" =~ -e-.*-ef$ ]]; then
+        echo "epic_suffix"
+        return
+    fi
+    
+    echo "no_suffix"
+}
+
+# 新增：从带-ef后缀的输入生成Feature分支候选
+paths_module_generate_feature_candidate_from_suffix() {
+    local user_input="$1"
+    
+    # 移除-ef后缀
+    local clean_input
+    clean_input=$(echo "$user_input" | sed 's/-ef$//')
+    
+    # 检查是否包含 -e-*-ef 模式（按你的建议处理）
+    if [[ "$clean_input" =~ ^(.+)-e-(.+)$ ]]; then
+        # 提取前缀和 -e-* 部分
+        local prefix_part="${BASH_REMATCH[1]}"
+        local e_part="${BASH_REMATCH[2]}"
+        
+        # 如果前缀不是epic-开头，添加epic-前缀
+        if [[ "$prefix_part" =~ ^epic- ]]; then
+            echo "$prefix_part-e-$e_part-ef"
+        else
+            echo "epic-$prefix_part-e-$e_part-ef"
+        fi
+        return
+    fi
+    
+    # 其他格式：直接调用已修复的组合解析方法
+    local result
+    result=$(paths_module_try_parse_epic_feature_combination "$clean_input")
+    if [[ -n "$result" ]]; then
+        echo "$result"
+    fi
+}
+
+# 新增：查找匹配的Feature分支
+paths_module_find_feature_matches() {
+    local user_input="$1"
+    
+    # 查找所有现有的Feature分支
+    local existing_features
+    existing_features=$(git branch | grep -E "^\s*epic-.*-e-.*-ef$" | sed 's/^\s*\*\?\s*//')
+    
+    # 检查worktree目录中的Feature分支
+    if [[ -d "$PROJECT_ROOT/.worktrees" ]]; then
+        local worktree_features
+        worktree_features=$(find "$PROJECT_ROOT/.worktrees" -maxdepth 1 -type d -name "epic-*-e-*-ef" 2>/dev/null | xargs -I {} basename {})
+        existing_features=$(echo -e "$existing_features\n$worktree_features" | sort -u | grep -v '^$')
+    fi
+    
+    # 查找匹配的Feature分支
+    local matches=""
+    
+    # 尝试不同的匹配模式
+    while IFS= read -r feature_branch; do
+        if [[ -n "$feature_branch" ]]; then
+            # 提取feature名称部分
+            if [[ "$feature_branch" =~ ^epic-(.+)-e-(.+)-ef$ ]]; then
+                local epic_name="${BASH_REMATCH[1]}"
+                local feature_name="${BASH_REMATCH[2]}"
+                
+                # 检查是否匹配用户输入
+                if [[ "$feature_name" == "$user_input" ]]; then
+                    matches+="$feature_branch"$'\n'
+                fi
+            fi
+        fi
+    done <<< "$existing_features"
+    
+    # 移除空行并返回
+    echo "$matches" | grep -v '^$'
+}
+
+# 新增：尝试解析Epic+Feature组合
+paths_module_try_parse_epic_feature_combination() {
+    local user_input="$1"
+    
+    # 如果输入有-ef后缀，先去掉后缀再处理
+    if [[ "$user_input" =~ -ef$ ]]; then
+        local clean_input
+        clean_input=$(echo "$user_input" | sed 's/-ef$//')
+        local result
+        result=$(paths_module_try_parse_epic_feature_combination "$clean_input")
+        if [[ -n "$result" ]]; then
+            echo "$result"
+        fi
+        return
+    fi
+    
+    # 只有当输入包含"-"且不包含"-e-"分隔符时，才尝试解析为组合
+    if [[ "$user_input" =~ - ]] && [[ ! "$user_input" =~ -e- ]]; then
+        local input_parts
+        IFS='-' read -ra input_parts <<< "$user_input"
+        
+        # 如果有多个部分，尝试不同的分割点，找到存在的组合
+        if [[ ${#input_parts[@]} -ge 2 ]]; then
+            # 尝试不同的分割点（从左到右）
+            for ((i=1; i<${#input_parts[@]}; i++)); do
+                # 构建Epic部分（前i个部分）
+                local epic_parts=("${input_parts[@]:0:$i}")
+                local epic_part
+                epic_part=$(IFS='-'; echo "${epic_parts[*]}")
+                
+                # 构建Feature部分（剩余部分）
+                local feature_parts=("${input_parts[@]:$i}")
+                local feature_part
+                feature_part=$(IFS='-'; echo "${feature_parts[*]}")
+                
+                # 生成候选分支名
+                local candidate="epic-$epic_part-e-$feature_part-ef"
+                
+                # 检查是否存在，如果存在就返回
+                if paths_module_check_branch_exists "$candidate"; then
+                    echo "$candidate"
+                    return 0
+                fi
+            done
+            
+            # 如果没有找到存在的，返回最后一个尝试（通常是最合理的分割）
+            local epic_part="${input_parts[0]}"
+            local feature_parts=("${input_parts[@]:1}")
+            local feature_part
+            feature_part=$(IFS='-'; echo "${feature_parts[*]}")
+            echo "epic-$epic_part-e-$feature_part-ef"
+        fi
+    fi
+}
+
+# 新增：清理用户输入用于Epic名称
+paths_module_clean_user_input_for_epic() {
+    local user_input="$1"
+    local clean_name="$user_input"
+    
+    # 移除 epic- 前缀
+    clean_name=$(echo "$clean_name" | sed 's/^epic-//')
+    
+    # 移除 -e 后缀
+    clean_name=$(echo "$clean_name" | sed 's/-e$//')
+    
+    # 验证结果
+    if [[ "$clean_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "$clean_name"
+    fi
+}
+
+# 新增：清理用户输入用于Feature名称
+paths_module_clean_user_input_for_feature() {
+    local user_input="$1"
+    local clean_name="$user_input"
+    
+    # 移除各种前缀后缀
+    clean_name=$(echo "$clean_name" | sed 's/^epic-//')
+    clean_name=$(echo "$clean_name" | sed 's/-ef$//')
+    clean_name=$(echo "$clean_name" | sed 's/-e$//')
+    
+    # 验证结果
+    if [[ "$clean_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "$clean_name"
+    fi
+}
+
+# 新增：检查分支是否存在
+paths_module_check_branch_exists() {
+    local branch_name="$1"
+    
+    # 检查git分支是否存在
+    if git show-ref --verify --quiet "refs/heads/$branch_name"; then
+        return 0
+    fi
+    
+    # 检查worktree目录是否存在
+    if [[ -d "$PROJECT_ROOT/.worktrees/$branch_name" ]]; then
+        return 0
+    fi
+    
+    return 1
+}
+
+# 新增：查找现有Epic分支
+paths_module_find_existing_epics() {
+    # 从git分支中查找Epic分支
+    git branch | grep -E "^\s*epic-.*-e$" | sed 's/^\s*\*\?\s*//'
 }
 
 # 验证用户输入格式（为Commands层提供快速验证）
