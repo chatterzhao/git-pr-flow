@@ -2,7 +2,7 @@
 
 > 为了方便理解，本文档的示例 epic 我们用 auth，Epic 的子 Feature我们用 auth-login，git 分支我们会创建为 epic-auth-e 和 epic-auth-login-ef，worktree 目录名与 git 分支名完全一致(gpf工具会自动补全前缀`epic-`和自动补全后缀`-e`或`-ef`；auth 与 auth-login，使用`-`，没有使用`/`（如 auth/login），这样命名是为了避免git的冲突，git 的分支引用机制不允许同时存在 refs/heads/xx 和 refs/heads/xx/yy，会产生冲突)
 
-GPF (Git PR Flow) Cli 工具是一个结合 Epic 开发流程、Git Worktree 和 GitHub Cli 设计的 PR 友好工具，通过 gpf start，gpf sync，gpf stauts，gpf pr，gpf clean 五个命令实现从创建分支到清理分支的完整PR流程：
+GPF (Git PR Flow) Cli 工具是一个结合 Epic 开发流程、Git Worktree 和 GitHub Cli 设计的 PR 友好工具，通过 gpf status，gpf start，gpf sync，gpf pr，gpf clean 五个命令实现从创建分支到清理分支的完整PR流程：
 - **Epic开发流程**让应用拆分分为多个Epic大功能，每个Epic拆分为多个独立的Epic的子Feature，每个Feature开发完成，创建一个Feature→Epic的PR，确保PR功能集中、职责单一、变更可控。当Epic开发完成或达到一个里程碑，创建一个Epic→Develop的PR，这种Feature→Epic→Develop的分层合并策略让代码审查更聚焦，避免了传统开发中"巨型PR"和"功能混杂"的问题；
 - **Git Worktree物理隔离技术**实现多个功能的真正并行开发（多AI并行开发很方便）。开发者只需通过cd命令切换Worktree目录就能无缝切换到对应git分支（git worktree 特性，不需要 git checkout命令），不同worktree目录物理隔离，彻底避免传统Git工作流中的分支冲突、环境污染和状态混乱问题；
 - **GitHub CLI工具**gh工具可以在本地操作PR，让开发者能够在本地完成相关的操作；

@@ -1,6 +1,6 @@
 # GPF 实施路线图
 
-> GPF (Git PR Flow) Cli 工具是一个结合 Epic 开发流程、Git Worktree 和 GitHub Cli 设计的 PR 友好工具，通过 gpf start，gpf sync，gpf stauts，gpf pr，gpf clean 五个命令实现从创建分支到清理分支的 PR 完整流程
+> GPF (Git PR Flow) Cli 工具是一个结合 Epic 开发流程、Git Worktree 和 GitHub Cli 设计的 PR 友好工具，通过 gpf status，gpf start，gpf sync，gpf pr，gpf clean 五个命令实现从创建分支到清理分支的 PR 完整流程
 
 > 📖 **相关文档**: [主文档](../README.md) | [架构设计](ARCHITECTURE.md) | [命令详细](COMMANDS.md) | [核心组件](CORE-COMPONENTS.md) | [Commands实施](commands-implementation-roadmap.md) | [术语表](术语表.md)
 
