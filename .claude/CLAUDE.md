@@ -19,6 +19,12 @@ GPF (Git PR Flow) Cli 工具是一个结合 Epic 开发流程、Git Worktree 和
 
 ## 严格遵守架构指南
 架构指南 ARCHITECTURE.md
+### 严格分层原则
+  - **命令层**：只能调用模块层方法，绝不跨层调用 lib/commands (注意它不在 core 目录下)
+  - **模块层**：只能调用组合层方法，提供完整业务功能 lib/core/modules
+  - **组合层**：只能调用原子层方法，组合基础功能单元 lib/core/composite
+  - **原子层**：不依赖任何GPF内部层，提供最基础的功能 lib/core atomic
+  - **功能不足时**：回到对应Epic的Feature补充，而非跨层调用
 
 ## roadmap 驱动开发
 
